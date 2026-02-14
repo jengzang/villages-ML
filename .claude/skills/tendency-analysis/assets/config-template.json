@@ -1,0 +1,50 @@
+{
+  "analysis_parameters": {
+    "n": 1,
+    "high_threshold": 10,
+    "low_threshold": 20,
+    "display_threshold": 5,
+    "description": "n: number of top/bottom towns in tendency groups; high_threshold: minimum % for high tendency; low_threshold: minimum % for low tendency; display_threshold: minimum overall frequency %"
+  },
+  "output_options": {
+    "format": "markdown",
+    "include_statistics": true,
+    "max_results_per_category": 10,
+    "include_metadata": true,
+    "description": "format: json|markdown|txt|html; include_statistics: add detailed stats; max_results_per_category: limit displayed results"
+  },
+  "data_sources": {
+    "village_registry": "path/to/阳春村庄名录.txt",
+    "encoding": "utf-8",
+    "cache_parsed_data": true,
+    "cache_file": "village_data_cache.json",
+    "description": "village_registry: path to source data file; cache_parsed_data: save parsed data for faster loading"
+  },
+  "analyzer_settings": {
+    "use_optimized": true,
+    "precompute_frequencies": true,
+    "enable_caching": true,
+    "description": "use_optimized: use OptimizedTendencyAnalyzer for better performance; precompute_frequencies: calculate all frequencies at init; enable_caching: cache intermediate results"
+  },
+  "filtering_options": {
+    "min_villages_per_town": 10,
+    "exclude_towns": [],
+    "include_only_towns": [],
+    "filter_parentheses": true,
+    "description": "min_villages_per_town: exclude towns with fewer villages; exclude_towns/include_only_towns: filter specific towns; filter_parentheses: remove (content) from names"
+  },
+  "export_settings": {
+    "output_directory": "./results",
+    "filename_template": "tendency_analysis_{date}_{time}",
+    "auto_export": false,
+    "export_formats": ["json", "markdown"],
+    "description": "output_directory: where to save results; filename_template: naming pattern; auto_export: automatically save after analysis; export_formats: list of formats to export"
+  },
+  "advanced_options": {
+    "parallel_processing": false,
+    "max_workers": 4,
+    "verbose_logging": false,
+    "debug_mode": false,
+    "description": "parallel_processing: use multiprocessing for large datasets; max_workers: number of parallel workers; verbose_logging: detailed output; debug_mode: extra debugging info"
+  }
+}

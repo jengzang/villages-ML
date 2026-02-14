@@ -1,0 +1,19 @@
+# Core dependencies
+pandas>=2.0.0
+numpy>=1.24.0
+scikit-learn>=1.3.0
+
+# Database
+sqlite3
+
+# Data visualization
+matplotlib>=3.7.0
+seaborn>=0.12.0
+
+# Jupyter
+jupyter>=1.0.0
+ipykernel>=6.25.0
+
+# Geospatial (optional, for working with coordinates)
+# geopandas>=0.13.0
+# folium>=0.14.0

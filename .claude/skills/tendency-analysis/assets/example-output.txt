@@ -1,0 +1,87 @@
+==================================================
+=== 春城街道 ===
+==================================================
+
+高倾向字 (在以下镇使用频率最高):
+  城 (倾向值: +156.8%) - 在 [春城街道] 中使用频率最高
+  街 (倾向值: +245.2%) - 在 [春城街道] 中使用频率最高
+  社 (倾向值: +312.5%) - 在 [春城街道] 中使用频率最高
+  门 (倾向值: +89.3%) - 在 [春城街道] 中使用频率最高
+
+低倾向字 (在以下镇使用频率最低):
+  田 (倾向值: -95.8%) - 在 [岗美镇] 中使用频率最低
+  坑 (倾向值: -92.1%) - 在 [河口镇] 中使用频率最低
+  垌 (倾向值: -100.0%) - 在 [岗美镇] 中使用频率最低
+  寮 (倾向值: -100.0%) - 在 [岗美镇] 中使用频率最低
+
+==================================================
+=== 岗美镇 ===
+==================================================
+
+高倾向字 (在以下镇使用频率最高):
+  田 (倾向值: +185.7%) - 在 [岗美镇] 中使用频率最高
+  垌 (倾向值: +250.0%) - 在 [岗美镇] 中使用频率最高
+  寮 (倾向值: +250.0%) - 在 [岗美镇] 中使用频率最高
+  旱 (倾向值: +250.0%) - 在 [岗美镇] 中使用频率最高
+  塘 (倾向值: +250.0%) - 在 [岗美镇] 中使用频率最高
+
+低倾向字 (在以下镇使用频率最低):
+  城 (倾向值: -88.9%) - 在 [春城街道] 中使用频率最低
+  街 (倾向值: -100.0%) - 在 [春城街道] 中使用频率最低
+  社 (倾向值: -100.0%) - 在 [春城街道] 中使用频率最低
+  河 (倾向值: -95.2%) - 在 [河口镇] 中使用频率最低
+  坑 (倾向值: -78.6%) - 在 [河口镇] 中使用频率最低
+
+==================================================
+=== 河口镇 ===
+==================================================
+
+高倾向字 (在以下镇使用频率最高):
+  河 (倾向值: +198.4%) - 在 [河口镇] 中使用频率最高
+  坑 (倾向值: +167.3%) - 在 [河口镇] 中使用频率最高
+  水 (倾向值: +125.0%) - 在 [河口镇] 中使用频率最高
+  深 (倾向值: +250.0%) - 在 [河口镇] 中使用频率最高
+
+低倾向字 (在以下镇使用频率最低):
+  城 (倾向值: -92.3%) - 在 [春城街道] 中使用频率最低
+  街 (倾向值: -100.0%) - 在 [春城街道] 中使用频率最低
+  社 (倾向值: -100.0%) - 在 [春城街道] 中使用频率最低
+  田 (倾向值: -85.4%) - 在 [岗美镇] 中使用频率最低
+  垌 (倾向值: -100.0%) - 在 [岗美镇] 中使用频率最低
+
+==================================================
+
+INTERPRETATION NOTES:
+
+1. 春城街道 (Urban Street):
+   - High tendency for urban characters: 城 (city), 街 (street), 社 (community)
+   - Avoids agricultural characters: 田 (field), 坑 (pit), 垌 (field)
+   - Reflects urban administrative center naming patterns
+
+2. 岗美镇 (Agricultural Town):
+   - High tendency for agricultural characters: 田 (field), 垌 (field), 寮 (hut)
+   - Avoids urban characters: 城 (city), 街 (street), 社 (community)
+   - Reflects rural agricultural naming patterns
+
+3. 河口镇 (River Town):
+   - High tendency for water-related characters: 河 (river), 水 (water), 坑 (pit/stream)
+   - Avoids both urban and agricultural characters
+   - Reflects geographic features (river mouth location)
+
+STATISTICAL SUMMARY:
+
+- Total towns analyzed: 3
+- Total villages: 46
+- Characters with high tendency (>10%): 15
+- Characters with low tendency (<-20%): 18
+- Strongest positive tendency: 社 (+312.5% in 春城街道)
+- Strongest negative tendency: 街, 社, 垌, 寮 (-100.0% in various towns)
+
+METHODOLOGY:
+
+- n = 1 (comparing single highest/lowest town)
+- high_threshold = 10% (minimum for high tendency display)
+- low_threshold = 20% (minimum for low tendency display)
+- display_threshold = 5% (minimum overall frequency)
+
+Tendency value formula: T = (group_avg - overall_avg) / overall_avg × 100%
