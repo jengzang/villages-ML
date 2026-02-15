@@ -313,6 +313,45 @@ python scripts/query_results.py --run-id cluster_001 --type cluster-metrics
 
 ## 更新日志
 
+### 2026-02-16 - 村级聚类分析扩展
+
+**新增功能：** 实现三种互补的村级聚类方法
+
+**新增脚本：**
+- `scripts/run_dbscan_clustering.py` - DBSCAN聚类（异常检测）
+  - 基于密度的聚类算法
+  - 自动识别噪声点（异常村名）
+  - 无需预先指定聚类数量
+  - 支持任意形状的聚类
+
+- `scripts/run_gmm_clustering.py` - GMM聚类（软聚类）
+  - 高斯混合模型
+  - 提供概率分布（每个村庄属于各聚类的概率）
+  - 不确定性量化（识别命名模式模糊的村庄）
+  - 支持多种协方差类型（full, tied, diag, spherical）
+
+- `scripts/visualize_clusters.py` - 聚类可视化
+  - UMAP降维至2D空间
+  - 生成聚类散点图
+  - 支持PCA降维作为备选方案
+  - 导出2D坐标数据
+
+**分析价值：**
+- **DBSCAN**：识别独特/罕见村名（噪声点），揭示文化异常点
+- **GMM**：量化命名模式的不确定性，识别文化/语言边界村庄
+- **可视化**：直观展示聚类质量，发现子聚类和过渡区域
+
+**性能特征：**
+- 数据规模：284,764个自然村
+- 特征维度：106维 → PCA降至50维
+- 运行时间：DBSCAN约3-5分钟，GMM约5-8分钟，UMAP约10-15分钟
+- 内存占用：< 2GB（符合部署约束）
+
+**方法对比：**
+- **MiniBatchKMeans**（已有）：快速、硬聚类、需指定k
+- **DBSCAN**（新增）：异常检测、无需指定k、基于密度
+- **GMM**（新增）：软聚类、概率分布、不确定性量化
+
 ### 2026-02-16 - 区域级聚类分析功能
 
 **新增功能：** 实现区域级聚类分析系统
@@ -335,6 +374,158 @@ python scripts/query_results.py --run-id cluster_001 --type cluster-metrics
 **支持粒度：** 市级、县级、鎮级聚类
 
 **性能：** 121个县区，230维特征，运行时间约3-5秒，最佳k=4（轮廓系数0.62）
+
+## 村级聚类分析 (Village-Level Clustering)
+
+### 概述 (Overview)
+
+村级聚类直接对284,764个自然村进行聚类分析，提供三种互补的聚类方法：
+
+1. **MiniBatchKMeans**：快速聚类，适合大规模数据
+2. **DBSCAN**：基于密度的聚类，自动识别异常村名（噪声点）
+3. **GMM**：软聚类，提供概率分布和不确定性量化
+
+### 运行村级聚类 (Running Village-Level Clustering)
+
+#### 1. MiniBatchKMeans聚类
+
+```bash
+# 运行MiniBatchKMeans聚类（k=50）
+python scripts/run_village_clustering.py \
+    --db-path data/villages.db \
+    --output-dir results/village_clustering \
+    --k 50 \
+    --batch-size 10000 \
+    --pca-components 50
+
+# 结果保存在 results/village_clustering/
+# - village_clusters.csv: 聚类分配结果
+# - cluster_statistics.csv: 聚类统计信息
+```
+
+#### 2. DBSCAN聚类（异常检测）
+
+```bash
+# 运行DBSCAN聚类
+python scripts/run_dbscan_clustering.py \
+    --db-path data/villages.db \
+    --output-dir results/dbscan_clustering \
+    --eps 0.5 \
+    --min-samples 10 \
+    --pca-components 50
+
+# 结果保存在 results/dbscan_clustering/
+# - village_clusters_dbscan.csv: 聚类分配结果
+# - noise_points.csv: 异常村名（噪声点）
+# - cluster_statistics.csv: 聚类统计信息
+```
+
+**DBSCAN优势：**
+- 自动识别异常村名（label=-1）
+- 无需预先指定聚类数量
+- 发现任意形状的聚类
+- 基于密度的聚类，更符合地理分布特征
+
+#### 3. GMM聚类（软聚类）
+
+```bash
+# 运行GMM聚类
+python scripts/run_gmm_clustering.py \
+    --db-path data/villages.db \
+    --output-dir results/gmm_clustering \
+    --n-components 50 \
+    --covariance-type full \
+    --pca-components 50
+
+# 结果保存在 results/gmm_clustering/
+# - village_clusters_gmm.csv: 聚类分配结果（含概率分布）
+# - uncertain_villages.csv: 命名模式模糊的村庄
+# - cluster_statistics.csv: 聚类统计信息
+```
+
+**GMM优势：**
+- 软聚类：提供每个村庄属于各聚类的概率
+- 不确定性量化：识别命名模式模糊的村庄
+- 灵活的聚类形状：可以建模椭圆形聚类
+- 概率基础：有明确的统计假设
+
+#### 4. 聚类可视化
+
+```bash
+# 使用UMAP可视化聚类结果
+python scripts/visualize_clusters.py \
+    --db-path data/villages.db \
+    --cluster-file results/village_clustering/village_clusters.csv \
+    --output-dir results/visualization \
+    --method umap
+
+# 或使用PCA可视化
+python scripts/visualize_clusters.py \
+    --db-path data/villages.db \
+    --cluster-file results/dbscan_clustering/village_clusters_dbscan.csv \
+    --output-dir results/visualization_dbscan \
+    --method pca
+
+# 结果保存在 results/visualization/
+# - villages_2d.csv: 2D坐标数据
+# - cluster_visualization.png: 聚类散点图
+```
+
+### 村级聚类特征 (Village-Level Features)
+
+村级聚类使用以下特征：
+
+1. **基础特征**：
+   - `name_length`：村名长度
+
+2. **后缀特征**（独热编码）：
+   - `suffix_1`：末尾1个字符（例如：村、坑、围）
+   - `suffix_2`：末尾2个字符（例如：新村、老围）
+   - 保留前50个最常见后缀
+
+3. **语义特征**（二元指标）：
+   - `sem_mountain`：山地相关（山、岭、坑、岗、峰、坳）
+   - `sem_water`：水系相关（水、河、江、湖、塘、涌、沙、洲）
+   - `sem_direction`：方位相关（东、西、南、北、中、上、下、前、后）
+   - `sem_settlement`：聚落相关（村、庄、寨、围、堡、屯）
+   - `sem_clan`：姓氏相关（陈、李、王、张、刘、黄、林、吴、周、郑）
+
+**特征矩阵维度**：约106维（1个基础特征 + 5个语义特征 + 100个后缀特征）
+
+**预处理**：
+- StandardScaler标准化
+- PCA降维至50维（可选）
+
+### 预期发现 (Expected Insights)
+
+村级聚类揭示：
+
+**MiniBatchKMeans发现：**
+- Cluster 17（8.8%）："村"后缀村庄
+- Cluster 41（4.7%）："坑"后缀村庄（山地地形）
+- Cluster 12（2.2%）："围"后缀村庄（珠三角水乡）
+- Cluster 5（3.5%）：水系相关村庄（涌、塘、沙）
+
+**DBSCAN发现：**
+- 核心聚类：常见命名模式（村、坑、围等）
+- 边界点：过渡性命名模式
+- 噪声点：独特/罕见村名（潜在文化意义）
+
+**GMM发现：**
+- 高概率村庄：典型命名模式
+- 低概率村庄：混合命名模式（例如：同时包含山地和水系特征）
+- 高熵村庄：命名模式模糊，可能位于文化/语言边界
+
+### 性能特征 (Performance)
+
+- **数据规模**：284,764个自然村
+- **运行时间**：
+  - MiniBatchKMeans：约2分钟
+  - DBSCAN：约3-5分钟
+  - GMM：约5-8分钟
+  - UMAP可视化：约10-15分钟
+- **内存占用**：< 2GB（符合部署约束）
+- **特征维度**：106维 → PCA降至50维
 
 ## License
 
