@@ -652,3 +652,182 @@ def get_regions_in_cluster(conn: sqlite3.Connection, run_id: str,
     """
 
     return pd.read_sql_query(query, conn, params=(run_id, algorithm, cluster_id, region_level))
+
+
+def get_village_features(conn: sqlite3.Connection, run_id: str,
+                         city: Optional[str] = None,
+                         county: Optional[str] = None,
+                         town: Optional[str] = None,
+                         limit: Optional[int] = None) -> pd.DataFrame:
+    """
+    Query village features with optional filters.
+
+    Args:
+        conn: SQLite database connection
+        run_id: Run identifier
+        city: Filter by city (optional)
+        county: Filter by county (optional)
+        town: Filter by town (optional)
+        limit: Limit number of results (optional)
+
+    Returns:
+        DataFrame with village features
+    """
+    query = "SELECT * FROM village_features WHERE run_id = ?"
+    params = [run_id]
+
+    if city:
+        query += " AND city = ?"
+        params.append(city)
+
+    if county:
+        query += " AND county = ?"
+        params.append(county)
+
+    if town:
+        query += " AND town = ?"
+        params.append(town)
+
+    if limit:
+        query += f" LIMIT {limit}"
+
+    return pd.read_sql_query(query, conn, params=tuple(params))
+
+
+def get_villages_by_semantic_tag(conn: sqlite3.Connection, run_id: str,
+                                 semantic_category: str,
+                                 limit: Optional[int] = None) -> pd.DataFrame:
+    """
+    Query villages by semantic tag.
+
+    Args:
+        conn: SQLite database connection
+        run_id: Run identifier
+        semantic_category: Semantic category name (e.g., 'mountain', 'water')
+        limit: Limit number of results (optional)
+
+    Returns:
+        DataFrame with villages having the specified semantic tag
+    """
+    col_name = f"sem_{semantic_category}"
+    query = f"""
+        SELECT city, county, town, village_name, {col_name}
+        FROM village_features
+        WHERE run_id = ? AND {col_name} = 1
+    """
+
+    if limit:
+        query += f" LIMIT {limit}"
+
+    return pd.read_sql_query(query, conn, params=(run_id,))
+
+
+def get_villages_by_suffix(conn: sqlite3.Connection, run_id: str,
+                           suffix: str,
+                           suffix_length: int = 2,
+                           limit: Optional[int] = None) -> pd.DataFrame:
+    """
+    Query villages by suffix pattern.
+
+    Args:
+        conn: SQLite database connection
+        run_id: Run identifier
+        suffix: Suffix pattern to search for
+        suffix_length: Suffix length (1, 2, or 3)
+        limit: Limit number of results (optional)
+
+    Returns:
+        DataFrame with villages having the specified suffix
+    """
+    col_name = f"suffix_{suffix_length}"
+    query = f"""
+        SELECT city, county, town, village_name, {col_name}
+        FROM village_features
+        WHERE run_id = ? AND {col_name} = ?
+    """
+
+    if limit:
+        query += f" LIMIT {limit}"
+
+    return pd.read_sql_query(query, conn, params=(run_id, suffix))
+
+
+def get_villages_by_cluster(conn: sqlite3.Connection, run_id: str,
+                            cluster_id: int,
+                            algorithm: str = 'kmeans',
+                            limit: Optional[int] = None) -> pd.DataFrame:
+    """
+    Query villages by cluster assignment.
+
+    Args:
+        conn: SQLite database connection
+        run_id: Run identifier
+        cluster_id: Cluster ID
+        algorithm: Clustering algorithm ('kmeans', 'dbscan', 'gmm')
+        limit: Limit number of results (optional)
+
+    Returns:
+        DataFrame with villages in the specified cluster
+    """
+    col_name = f"{algorithm}_cluster_id"
+    query = f"""
+        SELECT city, county, town, village_name, {col_name}
+        FROM village_features
+        WHERE run_id = ? AND {col_name} = ?
+    """
+
+    if limit:
+        query += f" LIMIT {limit}"
+
+    return pd.read_sql_query(query, conn, params=(run_id, cluster_id))
+
+
+def get_region_aggregates(conn: sqlite3.Connection, run_id: str,
+                         region_level: str = 'county') -> pd.DataFrame:
+    """
+    Query region aggregates.
+
+    Args:
+        conn: SQLite database connection
+        run_id: Run identifier
+        region_level: Region level ('city', 'county', 'town')
+
+    Returns:
+        DataFrame with region aggregates
+    """
+    table_name = f"{region_level}_aggregates"
+    query = f"SELECT * FROM {table_name} WHERE run_id = ?"
+
+    return pd.read_sql_query(query, conn, params=(run_id,))
+
+
+def get_semantic_tag_statistics(conn: sqlite3.Connection, run_id: str) -> pd.DataFrame:
+    """
+    Query semantic tag statistics across all villages.
+
+    Args:
+        conn: SQLite database connection
+        run_id: Run identifier
+
+    Returns:
+        DataFrame with semantic tag counts and percentages
+    """
+    query = """
+        SELECT
+            SUM(sem_mountain) as mountain_count,
+            SUM(sem_water) as water_count,
+            SUM(sem_settlement) as settlement_count,
+            SUM(sem_direction) as direction_count,
+            SUM(sem_clan) as clan_count,
+            SUM(sem_symbolic) as symbolic_count,
+            SUM(sem_agriculture) as agriculture_count,
+            SUM(sem_vegetation) as vegetation_count,
+            SUM(sem_infrastructure) as infrastructure_count,
+            COUNT(*) as total_villages
+        FROM village_features
+        WHERE run_id = ?
+    """
+
+    return pd.read_sql_query(query, conn, params=(run_id,))
+
+
