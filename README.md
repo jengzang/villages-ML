@@ -527,6 +527,142 @@ python scripts/visualize_clusters.py \
 - **内存占用**：< 2GB（符合部署约束）
 - **特征维度**：106维 → PCA降至50维
 
+## 特徵物化管道 (Feature Materialization Pipeline)
+
+### 概述 (Overview)
+
+特徵物化管道將村莊級別的語義和形態學特徵預計算並存儲到數據庫中，實現"離線重、在線輕"的部署策略。
+
+### 運行管道 (Running Pipeline)
+
+```bash
+# 運行特徵物化管道
+python scripts/run_feature_materialization.py \
+    --run-id feature_001 \
+    --output-dir results/feature_001
+
+# 可選：關聯聚類結果
+python scripts/run_feature_materialization.py \
+    --run-id feature_001 \
+    --clustering-run-id village_cluster_001 \
+    --output-dir results/feature_001
+```
+
+### 物化特徵 (Materialized Features)
+
+**村莊級別特徵**（village_features表）：
+- 基礎信息：city, county, town, village_name, pinyin
+- 形態學特徵：suffix_1/2/3, prefix_1/2/3, name_length
+- 語義標籤（9個二元特徵）：
+  - sem_mountain：山地相關
+  - sem_water：水系相關
+  - sem_settlement：聚落相關
+  - sem_direction：方位相關
+  - sem_clan：姓氏相關
+  - sem_symbolic：象徵相關
+  - sem_agriculture：農業相關
+  - sem_vegetation：植被相關
+  - sem_infrastructure：基礎設施相關
+- 聚類分配：kmeans_cluster_id, dbscan_cluster_id, gmm_cluster_id
+
+**區域聚合統計**（city/county/town_aggregates表）：
+- 村莊總數和平均名稱長度
+- 語義標籤計數和百分比
+- Top N後綴和前綴
+- 聚類分佈
+
+### 查詢特徵 (Querying Features)
+
+```python
+import sqlite3
+from src.data.db_query import (
+    get_village_features,
+    get_villages_by_semantic_tag,
+    get_villages_by_suffix,
+    get_villages_by_cluster,
+    get_region_aggregates,
+    get_semantic_tag_statistics
+)
+
+conn = sqlite3.connect('data/villages.db')
+
+# 查詢特定區域的村莊特徵
+df = get_village_features(conn, run_id='feature_001', city='广州市', limit=100)
+
+# 查詢包含山地特徵的村莊
+df = get_villages_by_semantic_tag(conn, run_id='feature_001', semantic_category='mountain', limit=100)
+
+# 查詢以"村"結尾的村莊
+df = get_villages_by_suffix(conn, run_id='feature_001', suffix='村', suffix_length=1, limit=100)
+
+# 查詢特定聚類中的村莊
+df = get_villages_by_cluster(conn, run_id='feature_001', cluster_id=17, algorithm='kmeans', limit=100)
+
+# 查詢縣級聚合統計
+df = get_region_aggregates(conn, run_id='feature_001', region_level='county')
+
+# 查詢全局語義標籤統計
+df = get_semantic_tag_statistics(conn, run_id='feature_001')
+
+conn.close()
+```
+
+### 性能指標 (Performance Metrics)
+
+- **數據規模**：284,764個自然村
+- **運行時間**：約67秒（~1分鐘）
+- **內存占用**：< 1GB
+- **數據庫大小**：
+  - village_features：284,764條記錄
+  - city_aggregates：21條記錄
+  - county_aggregates：121條記錄
+  - town_aggregates：1,579條記錄
+
+### 語義標籤統計 (Semantic Tag Statistics)
+
+基於feature_001運行結果：
+
+| 語義類別 | 村莊數量 | 百分比 |
+|---------|---------|--------|
+| settlement（聚落） | 87,919 | 30.76% |
+| direction（方位） | 77,069 | 26.96% |
+| mountain（山地） | 75,030 | 26.25% |
+| water（水系） | 47,324 | 16.55% |
+| clan（姓氏） | 29,599 | 10.35% |
+| symbolic（象徵） | 24,886 | 8.71% |
+| vegetation（植被） | 21,092 | 7.38% |
+| agriculture（農業） | 20,356 | 7.12% |
+| infrastructure（基建） | 6,748 | 2.36% |
+
+## 更新日志 (Changelog)
+
+### 2026-02-16
+- **新增功能**：特徵物化管道（Phase 10）
+- **實現模塊**：
+  - 特徵提取器（feature_extractor.py）
+  - 物化管道（feature_materialization_pipeline.py）
+  - 區域聚合（region_aggregation.py）
+- **新增表**：village_features, city_aggregates, county_aggregates, town_aggregates
+- **新增腳本**：run_feature_materialization.py
+- **新增查詢函數**：6個村莊特徵查詢函數
+- **性能**：67秒處理284K村莊，內存占用<1GB
+
+### 2026-02-15
+- 實現村級聚類分析（MiniBatchKMeans, DBSCAN, GMM）
+- 實現層次聚類分析
+- 實現UMAP可視化
+- 添加聚類分析腳本
+
+### 2026-02-14
+- 實現語義分析管道（semantic_001）
+- 實現形態學模式分析管道（morph_001）
+- 添加9個語義類別的虛擬詞頻（VTF）分析
+
+### 2026-02-13
+- 實現字符頻率分析管道（run_002）
+- 實現區域傾向性分析
+- 添加數據庫持久化功能
+
 ## License
 
 TBD
