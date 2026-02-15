@@ -394,3 +394,261 @@ def get_region_pattern_profile(
     """
 
     return pd.read_sql_query(query, conn, params=(run_id, pattern_type, region_level, region_name, top_n))
+
+
+# ============================================================================
+# Semantic Analysis Query Functions
+# ============================================================================
+
+def get_semantic_vtf_global(conn: sqlite3.Connection, run_id: str,
+                           top_n: int = 20) -> pd.DataFrame:
+    """
+    Query global semantic VTF.
+
+    Args:
+        conn: SQLite database connection
+        run_id: Run identifier
+        top_n: Number of top categories to return
+
+    Returns:
+        DataFrame with global semantic VTF data
+    """
+    query = """
+        SELECT category, vtf_count, total_villages, frequency, rank
+        FROM semantic_vtf_global
+        WHERE run_id = ?
+        ORDER BY rank
+        LIMIT ?
+    """
+
+    return pd.read_sql_query(query, conn, params=(run_id, top_n))
+
+
+def get_semantic_vtf_regional(conn: sqlite3.Connection, run_id: str,
+                             level: str, region: Optional[str] = None,
+                             top_n: int = 20) -> pd.DataFrame:
+    """
+    Query regional semantic VTF.
+
+    Args:
+        conn: SQLite database connection
+        run_id: Run identifier
+        level: Region level ('city', 'county', 'township')
+        region: Specific region name (optional)
+        top_n: Number of top categories to return
+
+    Returns:
+        DataFrame with regional semantic VTF data
+    """
+    if region:
+        query = """
+            SELECT region_name, category, vtf_count, total_villages, frequency, rank_within_region
+            FROM semantic_vtf_regional
+            WHERE run_id = ? AND region_level = ? AND region_name = ?
+            ORDER BY rank_within_region
+            LIMIT ?
+        """
+        params = (run_id, level, region, top_n)
+    else:
+        query = """
+            SELECT region_name, category, vtf_count, total_villages, frequency, rank_within_region
+            FROM semantic_vtf_regional
+            WHERE run_id = ? AND region_level = ?
+            ORDER BY region_name, rank_within_region
+        """
+        params = (run_id, level)
+
+    return pd.read_sql_query(query, conn, params=params)
+
+
+def get_semantic_tendency_by_region(conn: sqlite3.Connection, run_id: str,
+                                   category: str, level: str) -> pd.DataFrame:
+    """
+    Query semantic tendency across regions for a specific category.
+
+    Args:
+        conn: SQLite database connection
+        run_id: Run identifier
+        category: Semantic category (e.g., 'water', 'mountain')
+        level: Region level ('city', 'county', 'township')
+
+    Returns:
+        DataFrame with tendency data for the category across regions
+    """
+    query = """
+        SELECT category, region_name, frequency, global_frequency, lift, log_lift,
+               log_odds, z_score, vtf_count, total_villages, support_flag
+        FROM semantic_tendency
+        WHERE run_id = ? AND category = ? AND region_level = ?
+        ORDER BY lift DESC
+    """
+
+    return pd.read_sql_query(query, conn, params=(run_id, category, level))
+
+
+def get_top_polarized_semantic_categories(conn: sqlite3.Connection, run_id: str,
+                                         level: str, top_n: int = 20,
+                                         metric: str = 'log_odds') -> pd.DataFrame:
+    """
+    Query semantic categories with highest regional variation.
+
+    Args:
+        conn: SQLite database connection
+        run_id: Run identifier
+        level: Region level ('city', 'county', 'township')
+        top_n: Number of top categories to return
+        metric: Metric to use ('log_odds', 'log_lift', 'z_score')
+
+    Returns:
+        DataFrame with top polarized semantic categories
+    """
+    if metric not in ['log_odds', 'log_lift', 'z_score']:
+        raise ValueError(f"Invalid metric: {metric}. Must be one of: log_odds, log_lift, z_score")
+
+    query = f"""
+        SELECT category, region_name, frequency, global_frequency, lift, log_lift,
+               log_odds, z_score, vtf_count, total_villages
+        FROM semantic_tendency
+        WHERE run_id = ? AND region_level = ? AND support_flag = 1
+        ORDER BY ABS({metric}) DESC
+        LIMIT ?
+    """
+
+    return pd.read_sql_query(query, conn, params=(run_id, level, top_n))
+
+
+def get_region_semantic_profile(conn: sqlite3.Connection, run_id: str,
+                               level: str, region: str, top_n: int = 20,
+                               metric: str = 'log_odds') -> pd.DataFrame:
+    """
+    Query semantic profile for a specific region.
+
+    Args:
+        conn: SQLite database connection
+        run_id: Run identifier
+        level: Region level ('city', 'county', 'township')
+        region: Region name
+        top_n: Number of top categories to return
+        metric: Metric to use ('log_odds', 'log_lift', 'z_score')
+
+    Returns:
+        DataFrame with region's semantic profile
+    """
+    if metric not in ['log_odds', 'log_lift', 'z_score']:
+        raise ValueError(f"Invalid metric: {metric}. Must be one of: log_odds, log_lift, z_score")
+
+    query = f"""
+        SELECT category, frequency, global_frequency, lift, log_lift, log_odds, z_score,
+               vtf_count, total_villages
+        FROM semantic_tendency
+        WHERE run_id = ? AND region_level = ? AND region_name = ? AND support_flag = 1
+        ORDER BY {metric} DESC
+        LIMIT ?
+    """
+
+    return pd.read_sql_query(query, conn, params=(run_id, level, region, top_n))
+
+
+# ============================================================================
+# Clustering Analysis Query Functions
+# ============================================================================
+
+def get_cluster_assignments(conn: sqlite3.Connection, run_id: str,
+                           algorithm: str = 'kmeans',
+                           region_level: str = 'county') -> pd.DataFrame:
+    """
+    Query cluster assignments for regions.
+
+    Args:
+        conn: SQLite database connection
+        run_id: Run identifier
+        algorithm: Clustering algorithm ('kmeans')
+        region_level: Region level ('city', 'county', 'town')
+
+    Returns:
+        DataFrame with cluster assignments
+    """
+    query = """
+        SELECT region_id, region_name, cluster_id, algorithm, k,
+               silhouette_score, distance_to_centroid
+        FROM cluster_assignments
+        WHERE run_id = ? AND algorithm = ? AND region_level = ?
+        ORDER BY cluster_id, distance_to_centroid
+    """
+
+    return pd.read_sql_query(query, conn, params=(run_id, algorithm, region_level))
+
+
+def get_cluster_profile(conn: sqlite3.Connection, run_id: str,
+                       cluster_id: int, algorithm: str = 'kmeans') -> pd.DataFrame:
+    """
+    Query profile for a specific cluster.
+
+    Args:
+        conn: SQLite database connection
+        run_id: Run identifier
+        cluster_id: Cluster ID
+        algorithm: Clustering algorithm ('kmeans')
+
+    Returns:
+        DataFrame with cluster profile
+    """
+    query = """
+        SELECT cluster_id, cluster_size, top_features_json,
+               top_semantic_categories_json, top_suffixes_json,
+               representative_regions_json
+        FROM cluster_profiles
+        WHERE run_id = ? AND algorithm = ? AND cluster_id = ?
+    """
+
+    return pd.read_sql_query(query, conn, params=(run_id, algorithm, cluster_id))
+
+
+def get_clustering_metrics(conn: sqlite3.Connection, run_id: str,
+                          algorithm: str = 'kmeans') -> pd.DataFrame:
+    """
+    Query clustering evaluation metrics.
+
+    Args:
+        conn: SQLite database connection
+        run_id: Run identifier
+        algorithm: Clustering algorithm ('kmeans')
+
+    Returns:
+        DataFrame with clustering metrics for different k values
+    """
+    query = """
+        SELECT k, silhouette_score, davies_bouldin_index,
+               calinski_harabasz_score, n_features, pca_enabled, pca_n_components
+        FROM clustering_metrics
+        WHERE run_id = ? AND algorithm = ?
+        ORDER BY k
+    """
+
+    return pd.read_sql_query(query, conn, params=(run_id, algorithm))
+
+
+def get_regions_in_cluster(conn: sqlite3.Connection, run_id: str,
+                          cluster_id: int, algorithm: str = 'kmeans',
+                          region_level: str = 'county') -> pd.DataFrame:
+    """
+    Query all regions in a specific cluster.
+
+    Args:
+        conn: SQLite database connection
+        run_id: Run identifier
+        cluster_id: Cluster ID
+        algorithm: Clustering algorithm ('kmeans')
+        region_level: Region level ('city', 'county', 'town')
+
+    Returns:
+        DataFrame with regions in the cluster
+    """
+    query = """
+        SELECT region_id, region_name, cluster_id, distance_to_centroid
+        FROM cluster_assignments
+        WHERE run_id = ? AND algorithm = ? AND cluster_id = ? AND region_level = ?
+        ORDER BY distance_to_centroid
+    """
+
+    return pd.read_sql_query(query, conn, params=(run_id, algorithm, cluster_id, region_level))

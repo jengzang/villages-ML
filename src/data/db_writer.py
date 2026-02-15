@@ -14,6 +14,7 @@ import logging
 from pathlib import Path
 from typing import Dict, Any
 import pandas as pd
+import numpy as np
 
 logger = logging.getLogger(__name__)
 
@@ -98,6 +99,73 @@ def create_analysis_tables(conn: sqlite3.Connection) -> None:
             rank_overrepresented INTEGER,
             rank_underrepresented INTEGER,
             PRIMARY KEY (run_id, region_level, region_name, char),
+            FOREIGN KEY (run_id) REFERENCES analysis_runs(run_id)
+        )
+    """)
+
+    # Table 5: semantic_vtf_global
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS semantic_vtf_global (
+            run_id TEXT NOT NULL,
+            category TEXT NOT NULL,
+            vtf_count INTEGER NOT NULL,
+            total_villages INTEGER NOT NULL,
+            frequency REAL NOT NULL,
+            rank INTEGER NOT NULL,
+            PRIMARY KEY (run_id, category),
+            FOREIGN KEY (run_id) REFERENCES analysis_runs(run_id)
+        )
+    """)
+
+    # Table 6: semantic_vtf_regional
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS semantic_vtf_regional (
+            run_id TEXT NOT NULL,
+            region_level TEXT NOT NULL,
+            region_name TEXT NOT NULL,
+            category TEXT NOT NULL,
+            vtf_count INTEGER NOT NULL,
+            total_villages INTEGER NOT NULL,
+            frequency REAL NOT NULL,
+            rank_within_region INTEGER NOT NULL,
+            PRIMARY KEY (run_id, region_level, region_name, category),
+            FOREIGN KEY (run_id) REFERENCES analysis_runs(run_id)
+        )
+    """)
+
+    # Table 7: semantic_tendency
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS semantic_tendency (
+            run_id TEXT NOT NULL,
+            region_level TEXT NOT NULL,
+            region_name TEXT NOT NULL,
+            category TEXT NOT NULL,
+            frequency REAL NOT NULL,
+            global_frequency REAL NOT NULL,
+            lift REAL NOT NULL,
+            log_lift REAL NOT NULL,
+            log_odds REAL NOT NULL,
+            z_score REAL,
+            vtf_count INTEGER NOT NULL,
+            total_villages INTEGER NOT NULL,
+            support_flag INTEGER NOT NULL,
+            PRIMARY KEY (run_id, region_level, region_name, category),
+            FOREIGN KEY (run_id) REFERENCES analysis_runs(run_id)
+        )
+    """)
+
+    # Table 8: semantic_indices
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS semantic_indices (
+            run_id TEXT NOT NULL,
+            region_level TEXT NOT NULL,
+            region_name TEXT NOT NULL,
+            category TEXT NOT NULL,
+            raw_intensity REAL NOT NULL,
+            normalized_index REAL NOT NULL,
+            z_score REAL,
+            rank_within_province INTEGER NOT NULL,
+            PRIMARY KEY (run_id, region_level, region_name, category),
             FOREIGN KEY (run_id) REFERENCES analysis_runs(run_id)
         )
     """)
@@ -725,3 +793,399 @@ def persist_morphology_results_to_db(
         raise
     finally:
         conn.close()
+
+
+def write_semantic_vtf_global(conn: sqlite3.Connection, run_id: str, df: pd.DataFrame) -> None:
+    """
+    Write global semantic VTF to database.
+
+    Args:
+        conn: SQLite database connection
+        run_id: Run identifier
+        df: DataFrame with columns: category, vtf_count, total_villages, frequency, rank
+    """
+    cursor = conn.cursor()
+
+    df_copy = df.copy()
+    df_copy['run_id'] = run_id
+
+    columns = ['run_id', 'category', 'vtf_count', 'total_villages', 'frequency', 'rank']
+    data = df_copy[columns].values.tolist()
+
+    cursor.executemany("""
+        INSERT OR REPLACE INTO semantic_vtf_global
+        (run_id, category, vtf_count, total_villages, frequency, rank)
+        VALUES (?, ?, ?, ?, ?, ?)
+    """, data)
+
+    conn.commit()
+    logger.info(f"Saved {len(data)} global semantic VTF records for run_id={run_id}")
+
+
+def write_semantic_vtf_regional(conn: sqlite3.Connection, run_id: str, df: pd.DataFrame) -> None:
+    """
+    Write regional semantic VTF to database.
+
+    Args:
+        conn: SQLite database connection
+        run_id: Run identifier
+        df: DataFrame with columns: region_level, region_name, category, vtf_count,
+                                    total_villages, frequency, rank_within_region
+    """
+    cursor = conn.cursor()
+
+    df_copy = df.copy()
+    df_copy['run_id'] = run_id
+
+    columns = ['run_id', 'region_level', 'region_name', 'category', 'vtf_count',
+               'total_villages', 'frequency', 'rank_within_region']
+    data = df_copy[columns].values.tolist()
+
+    cursor.executemany("""
+        INSERT OR REPLACE INTO semantic_vtf_regional
+        (run_id, region_level, region_name, category, vtf_count, total_villages, frequency, rank_within_region)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+    """, data)
+
+    conn.commit()
+    logger.info(f"Saved {len(data)} regional semantic VTF records for run_id={run_id}")
+
+
+def write_semantic_tendency(conn: sqlite3.Connection, run_id: str, df: pd.DataFrame) -> None:
+    """
+    Write semantic tendency to database.
+
+    Args:
+        conn: SQLite database connection
+        run_id: Run identifier
+        df: DataFrame with tendency columns
+    """
+    cursor = conn.cursor()
+
+    df_copy = df.copy()
+    df_copy['run_id'] = run_id
+
+    # Handle NaN values
+    df_copy['z_score'] = df_copy['z_score'].where(pd.notna(df_copy['z_score']), None)
+
+    columns = ['run_id', 'region_level', 'region_name', 'category', 'frequency',
+               'global_frequency', 'lift', 'log_lift', 'log_odds', 'z_score',
+               'vtf_count', 'total_villages', 'support_flag']
+    data = df_copy[columns].values.tolist()
+
+    cursor.executemany("""
+        INSERT OR REPLACE INTO semantic_tendency
+        (run_id, region_level, region_name, category, frequency, global_frequency,
+         lift, log_lift, log_odds, z_score, vtf_count, total_villages, support_flag)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    """, data)
+
+    conn.commit()
+    logger.info(f"Saved {len(data)} semantic tendency records for run_id={run_id}")
+
+
+def write_semantic_indices(conn: sqlite3.Connection, run_id: str, df: pd.DataFrame) -> None:
+    """
+    Write semantic indices to database.
+
+    Args:
+        conn: SQLite database connection
+        run_id: Run identifier
+        df: DataFrame with index columns
+    """
+    cursor = conn.cursor()
+
+    df_copy = df.copy()
+    df_copy['run_id'] = run_id
+
+    # Handle NaN values
+    df_copy['z_score'] = df_copy['z_score'].where(pd.notna(df_copy['z_score']), None)
+
+    columns = ['run_id', 'region_level', 'region_name', 'category', 'raw_intensity',
+               'normalized_index', 'z_score', 'rank_within_province']
+    data = df_copy[columns].values.tolist()
+
+    cursor.executemany("""
+        INSERT OR REPLACE INTO semantic_indices
+        (run_id, region_level, region_name, category, raw_intensity, normalized_index,
+         z_score, rank_within_province)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+    """, data)
+
+    conn.commit()
+    logger.info(f"Saved {len(data)} semantic indices records for run_id={run_id}")
+
+
+def create_clustering_tables(conn: sqlite3.Connection) -> None:
+    """
+    Create clustering result tables if they don't exist.
+
+    Creates 4 tables:
+    - region_vectors: Region feature vectors
+    - cluster_assignments: Cluster assignments for regions
+    - cluster_profiles: Cluster profiles with distinguishing features
+    - clustering_metrics: Clustering evaluation metrics
+
+    Args:
+        conn: SQLite database connection
+    """
+    cursor = conn.cursor()
+
+    # Table 1: region_vectors
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS region_vectors (
+            run_id TEXT NOT NULL,
+            region_level TEXT NOT NULL,
+            region_id TEXT NOT NULL,
+            region_name TEXT NOT NULL,
+            N_villages INTEGER NOT NULL,
+            feature_json TEXT NOT NULL,
+            created_at REAL NOT NULL,
+            PRIMARY KEY (run_id, region_level, region_id)
+        )
+    """)
+
+    # Table 2: cluster_assignments
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS cluster_assignments (
+            run_id TEXT NOT NULL,
+            region_level TEXT NOT NULL,
+            region_id TEXT NOT NULL,
+            region_name TEXT NOT NULL,
+            cluster_id INTEGER NOT NULL,
+            algorithm TEXT NOT NULL,
+            k INTEGER,
+            silhouette_score REAL,
+            distance_to_centroid REAL,
+            created_at REAL NOT NULL,
+            PRIMARY KEY (run_id, region_level, region_id, algorithm)
+        )
+    """)
+
+    # Table 3: cluster_profiles
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS cluster_profiles (
+            run_id TEXT NOT NULL,
+            algorithm TEXT NOT NULL,
+            cluster_id INTEGER NOT NULL,
+            cluster_size INTEGER NOT NULL,
+            top_features_json TEXT NOT NULL,
+            top_semantic_categories_json TEXT NOT NULL,
+            top_suffixes_json TEXT,
+            representative_regions_json TEXT NOT NULL,
+            created_at REAL NOT NULL,
+            PRIMARY KEY (run_id, algorithm, cluster_id)
+        )
+    """)
+
+    # Table 4: clustering_metrics
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS clustering_metrics (
+            run_id TEXT NOT NULL,
+            algorithm TEXT NOT NULL,
+            k INTEGER,
+            silhouette_score REAL NOT NULL,
+            davies_bouldin_index REAL NOT NULL,
+            calinski_harabasz_score REAL,
+            n_features INTEGER NOT NULL,
+            pca_enabled INTEGER NOT NULL,
+            pca_n_components INTEGER,
+            created_at REAL NOT NULL,
+            PRIMARY KEY (run_id, algorithm, k)
+        )
+    """)
+
+    conn.commit()
+    logger.info("Clustering tables created successfully")
+
+
+def write_region_vectors(conn: sqlite3.Connection, run_id: str, df: pd.DataFrame, batch_size: int = 10000) -> None:
+    """
+    Write region feature vectors to database.
+
+    Args:
+        conn: SQLite database connection
+        run_id: Run identifier
+        df: DataFrame with region vectors (must include region_id, region_name, N_villages, and feature columns)
+        batch_size: Number of rows to insert per batch
+    """
+    import time
+
+    cursor = conn.cursor()
+
+    # Extract feature columns (exclude metadata columns)
+    metadata_cols = ['region_id', 'region_name', 'N_villages']
+    feature_cols = [col for col in df.columns if col not in metadata_cols]
+
+    # Prepare data for insertion
+    data = []
+    for _, row in df.iterrows():
+        features = {col: float(row[col]) for col in feature_cols}
+        data.append((
+            run_id,
+            'county',  # Default to county level
+            row['region_id'],
+            row['region_name'],
+            int(row['N_villages']),
+            json.dumps(features, ensure_ascii=False),
+            time.time()
+        ))
+
+    # Batch insert
+    for i in range(0, len(data), batch_size):
+        batch = data[i:i + batch_size]
+        cursor.executemany("""
+            INSERT OR REPLACE INTO region_vectors
+            (run_id, region_level, region_id, region_name, N_villages, feature_json, created_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?)
+        """, batch)
+
+    conn.commit()
+    logger.info(f"Saved {len(data)} region vectors for run_id={run_id}")
+
+
+def write_cluster_assignments(
+    conn: sqlite3.Connection,
+    run_id: str,
+    region_df: pd.DataFrame,
+    labels: np.ndarray,
+    distances: np.ndarray,
+    algorithm: str,
+    k: int,
+    silhouette_score: float,
+    batch_size: int = 10000
+) -> None:
+    """
+    Write cluster assignments to database.
+
+    Args:
+        conn: SQLite database connection
+        run_id: Run identifier
+        region_df: DataFrame with region_id and region_name
+        labels: Cluster assignments array
+        distances: Distance to centroid array
+        algorithm: Algorithm name (e.g., 'kmeans')
+        k: Number of clusters
+        silhouette_score: Overall silhouette score
+        batch_size: Number of rows to insert per batch
+    """
+    import time
+    import numpy as np
+
+    cursor = conn.cursor()
+
+    # Prepare data for insertion
+    data = []
+    for i, (_, row) in enumerate(region_df.iterrows()):
+        data.append((
+            run_id,
+            'county',  # Default to county level
+            row['region_id'],
+            row['region_name'],
+            int(labels[i]),
+            algorithm,
+            k,
+            float(silhouette_score),
+            float(distances[i]),
+            time.time()
+        ))
+
+    # Batch insert
+    for i in range(0, len(data), batch_size):
+        batch = data[i:i + batch_size]
+        cursor.executemany("""
+            INSERT OR REPLACE INTO cluster_assignments
+            (run_id, region_level, region_id, region_name, cluster_id, algorithm, k,
+             silhouette_score, distance_to_centroid, created_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        """, batch)
+
+    conn.commit()
+    logger.info(f"Saved {len(data)} cluster assignments for run_id={run_id}")
+
+
+def write_cluster_profiles(conn: sqlite3.Connection, run_id: str, profiles_df: pd.DataFrame, algorithm: str, batch_size: int = 1000) -> None:
+    """
+    Write cluster profiles to database.
+
+    Args:
+        conn: SQLite database connection
+        run_id: Run identifier
+        profiles_df: DataFrame with cluster profiles
+        algorithm: Algorithm name (e.g., 'kmeans')
+        batch_size: Number of rows to insert per batch
+    """
+    import time
+
+    cursor = conn.cursor()
+
+    # Prepare data for insertion
+    data = []
+    for _, row in profiles_df.iterrows():
+        data.append((
+            run_id,
+            algorithm,
+            int(row['cluster_id']),
+            int(row['cluster_size']),
+            row['top_features_json'],
+            row['top_semantic_categories_json'],
+            row.get('top_suffixes_json', '[]'),
+            row['representative_regions_json'],
+            time.time()
+        ))
+
+    # Batch insert
+    for i in range(0, len(data), batch_size):
+        batch = data[i:i + batch_size]
+        cursor.executemany("""
+            INSERT OR REPLACE INTO cluster_profiles
+            (run_id, algorithm, cluster_id, cluster_size, top_features_json,
+             top_semantic_categories_json, top_suffixes_json, representative_regions_json, created_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+        """, batch)
+
+    conn.commit()
+    logger.info(f"Saved {len(data)} cluster profiles for run_id={run_id}")
+
+
+def write_clustering_metrics(conn: sqlite3.Connection, run_id: str, metrics_dict: dict) -> None:
+    """
+    Write clustering metrics to database.
+
+    Args:
+        conn: SQLite database connection
+        run_id: Run identifier
+        metrics_dict: Dictionary with metrics for each k value
+    """
+    import time
+
+    cursor = conn.cursor()
+
+    # Prepare data for insertion
+    data = []
+    for result in metrics_dict['results']:
+        data.append((
+            run_id,
+            metrics_dict['algorithm'],
+            result['k'],
+            float(result['silhouette_score']),
+            float(result['davies_bouldin_index']),
+            float(result.get('calinski_harabasz_score', 0)),
+            metrics_dict['n_features'],
+            1 if metrics_dict['pca_enabled'] else 0,
+            metrics_dict.get('pca_n_components'),
+            time.time()
+        ))
+
+    # Insert
+    cursor.executemany("""
+        INSERT OR REPLACE INTO clustering_metrics
+        (run_id, algorithm, k, silhouette_score, davies_bouldin_index,
+         calinski_harabasz_score, n_features, pca_enabled, pca_n_components, created_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    """, data)
+
+    conn.commit()
+    logger.info(f"Saved {len(data)} clustering metrics for run_id={run_id}")
+
+

@@ -45,7 +45,11 @@ models/
 # Data (keep structure, ignore large files)
 *.csv
 *.parquet
+data/*
 !data/villages.db
+
+# Analysis results (generated files, not to be committed)
+results/
 
 # OS
 .DS_Store
