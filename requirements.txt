@@ -14,6 +14,10 @@ seaborn>=0.12.0
 jupyter>=1.0.0
 ipykernel>=6.25.0
 
+# Testing
+pytest>=7.4.0
+pytest-cov>=4.1.0
+
 # Geospatial (optional, for working with coordinates)
 # geopandas>=0.13.0
 # folium>=0.14.0
