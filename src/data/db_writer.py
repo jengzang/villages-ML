@@ -1006,7 +1006,7 @@ def write_region_vectors(conn: sqlite3.Connection, run_id: str, df: pd.DataFrame
     Args:
         conn: SQLite database connection
         run_id: Run identifier
-        df: DataFrame with region vectors (must include region_id, region_name, N_villages, and feature columns)
+        df: DataFrame with region vectors (must include region_name, N_villages, and feature columns)
         batch_size: Number of rows to insert per batch
     """
     import time
@@ -1014,7 +1014,7 @@ def write_region_vectors(conn: sqlite3.Connection, run_id: str, df: pd.DataFrame
     cursor = conn.cursor()
 
     # Extract feature columns (exclude metadata columns)
-    metadata_cols = ['region_id', 'region_name', 'N_villages']
+    metadata_cols = ['region_name', 'N_villages']
     feature_cols = [col for col in df.columns if col not in metadata_cols]
 
     # Prepare data for insertion
@@ -1024,7 +1024,7 @@ def write_region_vectors(conn: sqlite3.Connection, run_id: str, df: pd.DataFrame
         data.append((
             run_id,
             'county',  # Default to county level
-            row['region_id'],
+            row['region_name'],
             row['region_name'],
             int(row['N_villages']),
             json.dumps(features, ensure_ascii=False),
@@ -1061,7 +1061,7 @@ def write_cluster_assignments(
     Args:
         conn: SQLite database connection
         run_id: Run identifier
-        region_df: DataFrame with region_id and region_name
+        region_df: DataFrame with region_name
         labels: Cluster assignments array
         distances: Distance to centroid array
         algorithm: Algorithm name (e.g., 'kmeans')
@@ -1080,7 +1080,7 @@ def write_cluster_assignments(
         data.append((
             run_id,
             'county',  # Default to county level
-            row['region_id'],
+            row['region_name'],
             row['region_name'],
             int(labels[i]),
             algorithm,
