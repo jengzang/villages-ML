@@ -1,0 +1,16 @@
+{
+  "query_limits": {
+    "max_rows_default": 500,
+    "max_rows_absolute": 5000,
+    "default_page_size": 50,
+    "max_page_size": 500
+  },
+  "feature_flags": {
+    "enable_full_scan": false,
+    "enable_runtime_clustering": false
+  },
+  "performance": {
+    "max_query_time_ms": 3000,
+    "max_memory_mb": 300
+  }
+}
