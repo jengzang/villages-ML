@@ -272,6 +272,70 @@ conn.close()
 - 模式类型：5种（suffix_1/2/3, prefix_2/3）
 - 区域层级：3级（市/县/镇）
 
+## 聚类分析管道 (Clustering Analysis Pipeline)
+
+### 概述 (Overview)
+
+聚类分析基于语义和形态学特征对区域进行分组，揭示广东省村名的深层模式。该系统使用KMeans算法对县级/市级/镇级区域进行聚类，生成可解释的聚类画像。
+
+### 运行分析 (Running Analysis)
+
+```bash
+# 运行县级聚类分析
+python scripts/run_clustering_analysis.py \
+    --semantic-run-id semantic_001 \
+    --morphology-run-id morph_001 \
+    --output-run-id cluster_001 \
+    --region-level county
+```
+
+### 数据库表 (Database Tables)
+
+聚类分析结果持久化到以下数据表：
+
+- `region_vectors`：区域特征向量（语义+形态学+多样性特征）
+- `cluster_assignments`：区域聚类分配结果
+- `cluster_profiles`：聚类画像（区分性特征、代表性区域）
+- `clustering_metrics`：聚类评估指标（轮廓系数、DB指数等）
+
+### 查询聚类结果 (Querying Clustering Results)
+
+```bash
+# 查询聚类分配
+python scripts/query_results.py --run-id cluster_001 --type cluster-assignments
+
+# 查询特定聚类的画像
+python scripts/query_results.py --run-id cluster_001 --type cluster-profile --cluster-id 0
+
+# 查询聚类评估指标
+python scripts/query_results.py --run-id cluster_001 --type cluster-metrics
+```
+
+## 更新日志
+
+### 2026-02-16 - 区域级聚类分析功能
+
+**新增功能：** 实现区域级聚类分析系统
+
+**新增模块：**
+- `src/clustering/feature_builder.py` - 区域特征构建器（语义+形态学+多样性特征）
+- `src/clustering/clustering_engine.py` - KMeans聚类引擎
+- `src/clustering/cluster_profiler.py` - 聚类画像生成器
+- `src/pipelines/clustering_pipeline.py` - 聚类分析管道
+
+**新增表：**
+- `region_vectors` - 区域特征向量
+- `cluster_assignments` - 聚类分配
+- `cluster_profiles` - 聚类画像
+- `clustering_metrics` - 聚类评估指标
+
+**新增脚本：**
+- `scripts/run_clustering_analysis.py` - 运行聚类分析
+
+**支持粒度：** 市级、县级、鎮级聚类
+
+**性能：** 121个县区，230维特征，运行时间约3-5秒，最佳k=4（轮廓系数0.62）
+
 ## License
 
 TBD
