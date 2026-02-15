@@ -207,3 +207,190 @@ def get_all_runs(conn: sqlite3.Connection) -> pd.DataFrame:
     """
 
     return pd.read_sql_query(query, conn)
+
+
+# ============================================================================
+# Morphology Pattern Query Functions
+# ============================================================================
+
+def get_pattern_frequency_global(
+    conn: sqlite3.Connection,
+    run_id: str,
+    pattern_type: str,
+    top_n: Optional[int] = None
+) -> pd.DataFrame:
+    """
+    Query global pattern frequency.
+
+    Args:
+        conn: SQLite database connection
+        run_id: Run identifier
+        pattern_type: Pattern type (e.g., 'suffix_1', 'prefix_2')
+        top_n: Limit to top N patterns by frequency (optional)
+
+    Returns:
+        DataFrame with global pattern frequency data
+    """
+    query = """
+        SELECT pattern, village_count, total_villages, frequency, rank
+        FROM pattern_frequency_global
+        WHERE run_id = ? AND pattern_type = ?
+        ORDER BY rank
+    """
+
+    if top_n:
+        query += f" LIMIT {top_n}"
+
+    return pd.read_sql_query(query, conn, params=(run_id, pattern_type))
+
+
+def get_pattern_frequency_regional(
+    conn: sqlite3.Connection,
+    run_id: str,
+    pattern_type: str,
+    region_level: str,
+    region_name: Optional[str] = None,
+    top_n: Optional[int] = None
+) -> pd.DataFrame:
+    """
+    Query regional pattern frequency.
+
+    Args:
+        conn: SQLite database connection
+        run_id: Run identifier
+        pattern_type: Pattern type (e.g., 'suffix_1', 'prefix_2')
+        region_level: Region level ('city', 'county', 'township')
+        region_name: Specific region name (optional, returns all if None)
+        top_n: Limit to top N patterns by frequency (optional)
+
+    Returns:
+        DataFrame with regional pattern frequency data
+    """
+    if region_name:
+        query = """
+            SELECT region_name, pattern, village_count, total_villages, frequency, rank_within_region
+            FROM pattern_frequency_regional
+            WHERE run_id = ? AND pattern_type = ? AND region_level = ? AND region_name = ?
+            ORDER BY rank_within_region
+        """
+        params = (run_id, pattern_type, region_level, region_name)
+    else:
+        query = """
+            SELECT region_name, pattern, village_count, total_villages, frequency, rank_within_region
+            FROM pattern_frequency_regional
+            WHERE run_id = ? AND pattern_type = ? AND region_level = ?
+            ORDER BY region_name, rank_within_region
+        """
+        params = (run_id, pattern_type, region_level)
+
+    if top_n and region_name:
+        query += f" LIMIT {top_n}"
+
+    return pd.read_sql_query(query, conn, params=params)
+
+
+def get_pattern_tendency_by_region(
+    conn: sqlite3.Connection,
+    run_id: str,
+    pattern_type: str,
+    pattern: str,
+    region_level: str
+) -> pd.DataFrame:
+    """
+    Query a specific pattern's tendency across all regions at a given level.
+
+    Args:
+        conn: SQLite database connection
+        run_id: Run identifier
+        pattern_type: Pattern type (e.g., 'suffix_1', 'prefix_2')
+        pattern: Pattern to query (e.g., '村', '新村')
+        region_level: Region level ('city', 'county', 'township')
+
+    Returns:
+        DataFrame with tendency data for the pattern across regions
+    """
+    query = """
+        SELECT pattern, region_name, frequency, global_frequency, lift, log_lift, log_odds, z_score,
+               village_count, total_villages, support_flag
+        FROM pattern_tendency
+        WHERE run_id = ? AND pattern_type = ? AND pattern = ? AND region_level = ?
+        ORDER BY lift DESC
+    """
+
+    return pd.read_sql_query(query, conn, params=(run_id, pattern_type, pattern, region_level))
+
+
+def get_top_polarized_patterns(
+    conn: sqlite3.Connection,
+    run_id: str,
+    pattern_type: str,
+    region_level: str,
+    top_n: int = 20,
+    metric: str = 'log_odds'
+) -> pd.DataFrame:
+    """
+    Query the most polarized patterns (highest absolute tendency values).
+
+    Args:
+        conn: SQLite database connection
+        run_id: Run identifier
+        pattern_type: Pattern type (e.g., 'suffix_1', 'prefix_2')
+        region_level: Region level ('city', 'county', 'township')
+        top_n: Number of top patterns to return
+        metric: Metric to use ('log_odds', 'log_lift', 'z_score')
+
+    Returns:
+        DataFrame with top polarized patterns
+    """
+    if metric not in ['log_odds', 'log_lift', 'z_score']:
+        raise ValueError(f"Invalid metric: {metric}. Must be one of: log_odds, log_lift, z_score")
+
+    query = f"""
+        SELECT pattern, region_name, frequency, global_frequency, lift, log_lift, log_odds, z_score,
+               village_count, total_villages
+        FROM pattern_tendency
+        WHERE run_id = ? AND pattern_type = ? AND region_level = ? AND support_flag = 1
+        ORDER BY ABS({metric}) DESC
+        LIMIT ?
+    """
+
+    return pd.read_sql_query(query, conn, params=(run_id, pattern_type, region_level, top_n))
+
+
+def get_region_pattern_profile(
+    conn: sqlite3.Connection,
+    run_id: str,
+    pattern_type: str,
+    region_level: str,
+    region_name: str,
+    top_n: int = 20,
+    metric: str = 'log_odds'
+) -> pd.DataFrame:
+    """
+    Query the pattern tendency profile for a specific region.
+
+    Args:
+        conn: SQLite database connection
+        run_id: Run identifier
+        pattern_type: Pattern type (e.g., 'suffix_1', 'prefix_2')
+        region_level: Region level ('city', 'county', 'township')
+        region_name: Region name
+        top_n: Number of top patterns to return
+        metric: Metric to use ('log_odds', 'log_lift', 'z_score')
+
+    Returns:
+        DataFrame with region's characteristic patterns
+    """
+    if metric not in ['log_odds', 'log_lift', 'z_score']:
+        raise ValueError(f"Invalid metric: {metric}. Must be one of: log_odds, log_lift, z_score")
+
+    query = f"""
+        SELECT pattern, frequency, global_frequency, lift, log_lift, log_odds, z_score,
+               village_count, total_villages, rank_overrepresented
+        FROM pattern_tendency
+        WHERE run_id = ? AND pattern_type = ? AND region_level = ? AND region_name = ? AND support_flag = 1
+        ORDER BY {metric} DESC
+        LIMIT ?
+    """
+
+    return pd.read_sql_query(query, conn, params=(run_id, pattern_type, region_level, region_name, top_n))

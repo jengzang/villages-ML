@@ -394,3 +394,334 @@ def persist_results_to_db(db_path: str, run_id: str, results_dir: Path,
         raise
     finally:
         conn.close()
+
+
+def create_morphology_tables(conn: sqlite3.Connection) -> None:
+    """
+    Create morphology analysis result tables if they don't exist.
+
+    Creates 3 tables:
+    - pattern_frequency_global: Global pattern frequency
+    - pattern_frequency_regional: Regional pattern frequency
+    - pattern_tendency: Regional pattern tendency analysis
+
+    Args:
+        conn: SQLite database connection
+    """
+    cursor = conn.cursor()
+
+    # Table 1: pattern_frequency_global
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS pattern_frequency_global (
+            run_id TEXT NOT NULL,
+            pattern_type TEXT NOT NULL,
+            pattern TEXT NOT NULL,
+            village_count INTEGER NOT NULL,
+            total_villages INTEGER NOT NULL,
+            frequency REAL NOT NULL,
+            rank INTEGER NOT NULL,
+            PRIMARY KEY (run_id, pattern_type, pattern),
+            FOREIGN KEY (run_id) REFERENCES analysis_runs(run_id)
+        )
+    """)
+
+    # Table 2: pattern_frequency_regional
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS pattern_frequency_regional (
+            run_id TEXT NOT NULL,
+            pattern_type TEXT NOT NULL,
+            region_level TEXT NOT NULL,
+            region_name TEXT NOT NULL,
+            pattern TEXT NOT NULL,
+            village_count INTEGER NOT NULL,
+            total_villages INTEGER NOT NULL,
+            frequency REAL NOT NULL,
+            rank_within_region INTEGER NOT NULL,
+            PRIMARY KEY (run_id, pattern_type, region_level, region_name, pattern),
+            FOREIGN KEY (run_id) REFERENCES analysis_runs(run_id)
+        )
+    """)
+
+    # Table 3: pattern_tendency
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS pattern_tendency (
+            run_id TEXT NOT NULL,
+            pattern_type TEXT NOT NULL,
+            region_level TEXT NOT NULL,
+            region_name TEXT NOT NULL,
+            pattern TEXT NOT NULL,
+            village_count INTEGER NOT NULL,
+            total_villages INTEGER NOT NULL,
+            frequency REAL NOT NULL,
+            rank_within_region INTEGER NOT NULL,
+            global_village_count INTEGER NOT NULL,
+            global_frequency REAL NOT NULL,
+            lift REAL NOT NULL,
+            log_lift REAL NOT NULL,
+            log_odds REAL NOT NULL,
+            z_score REAL,
+            support_flag INTEGER NOT NULL,
+            rank_overrepresented INTEGER,
+            rank_underrepresented INTEGER,
+            PRIMARY KEY (run_id, pattern_type, region_level, region_name, pattern),
+            FOREIGN KEY (run_id) REFERENCES analysis_runs(run_id)
+        )
+    """)
+
+    conn.commit()
+    logger.info("Morphology analysis tables created successfully")
+
+
+def create_morphology_indexes(conn: sqlite3.Connection) -> None:
+    """
+    Create indexes for morphology tables.
+
+    Args:
+        conn: SQLite database connection
+    """
+    cursor = conn.cursor()
+
+    # Indexes for pattern_frequency_global
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_pattern_global_type ON pattern_frequency_global(run_id, pattern_type)")
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_pattern_global_pattern ON pattern_frequency_global(run_id, pattern)")
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_pattern_global_rank ON pattern_frequency_global(run_id, pattern_type, rank)")
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_pattern_global_freq ON pattern_frequency_global(run_id, pattern_type, frequency DESC)")
+
+    # Indexes for pattern_frequency_regional
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_pattern_regional_type ON pattern_frequency_regional(run_id, pattern_type)")
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_pattern_regional_level ON pattern_frequency_regional(run_id, region_level)")
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_pattern_regional_name ON pattern_frequency_regional(run_id, region_name)")
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_pattern_regional_pattern ON pattern_frequency_regional(run_id, pattern)")
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_pattern_regional_freq ON pattern_frequency_regional(run_id, pattern_type, region_level, frequency DESC)")
+
+    # Indexes for pattern_tendency
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_pattern_tendency_type ON pattern_tendency(run_id, pattern_type)")
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_pattern_tendency_level ON pattern_tendency(run_id, region_level)")
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_pattern_tendency_pattern ON pattern_tendency(run_id, pattern)")
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_pattern_tendency_lift ON pattern_tendency(run_id, pattern_type, region_level, lift DESC)")
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_pattern_tendency_logodds ON pattern_tendency(run_id, pattern_type, region_level, log_odds DESC)")
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_pattern_tendency_zscore ON pattern_tendency(run_id, pattern_type, region_level, z_score DESC)")
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_pattern_tendency_support ON pattern_tendency(run_id, support_flag)")
+
+    conn.commit()
+    logger.info("Morphology indexes created successfully")
+
+
+def save_pattern_frequency_global(conn: sqlite3.Connection, run_id: str, pattern_type: str, df: pd.DataFrame, batch_size: int = 10000) -> None:
+    """
+    Save global pattern frequency data.
+
+    Args:
+        conn: SQLite database connection
+        run_id: Run identifier
+        pattern_type: Pattern type (e.g., 'suffix_1', 'prefix_2')
+        df: DataFrame with columns: pattern, village_count, total_villages, frequency, rank
+        batch_size: Number of rows to insert per batch
+    """
+    cursor = conn.cursor()
+
+    # Prepare data for insertion
+    df_copy = df.copy()
+    df_copy['run_id'] = run_id
+    df_copy['pattern_type'] = pattern_type
+
+    # Select and reorder columns
+    columns = ['run_id', 'pattern_type', 'pattern', 'village_count', 'total_villages', 'frequency', 'rank']
+    data = df_copy[columns].values.tolist()
+
+    # Batch insert
+    for i in range(0, len(data), batch_size):
+        batch = data[i:i + batch_size]
+        cursor.executemany("""
+            INSERT OR REPLACE INTO pattern_frequency_global
+            (run_id, pattern_type, pattern, village_count, total_villages, frequency, rank)
+            VALUES (?, ?, ?, ?, ?, ?, ?)
+        """, batch)
+
+    conn.commit()
+    logger.info(f"Saved {len(data)} global pattern frequency records for {pattern_type}")
+
+
+def save_pattern_frequency_regional(conn: sqlite3.Connection, run_id: str, pattern_type: str, df: pd.DataFrame, batch_size: int = 10000) -> None:
+    """
+    Save regional pattern frequency data.
+
+    Args:
+        conn: SQLite database connection
+        run_id: Run identifier
+        pattern_type: Pattern type (e.g., 'suffix_1', 'prefix_2')
+        df: DataFrame with columns: region_level, region_name, pattern, village_count, total_villages, frequency, rank_within_region
+        batch_size: Number of rows to insert per batch
+    """
+    cursor = conn.cursor()
+
+    # Prepare data for insertion
+    df_copy = df.copy()
+    df_copy['run_id'] = run_id
+    df_copy['pattern_type'] = pattern_type
+
+    # Select and reorder columns
+    columns = ['run_id', 'pattern_type', 'region_level', 'region_name', 'pattern', 'village_count', 'total_villages', 'frequency', 'rank_within_region']
+    data = df_copy[columns].values.tolist()
+
+    # Batch insert
+    for i in range(0, len(data), batch_size):
+        batch = data[i:i + batch_size]
+        cursor.executemany("""
+            INSERT OR REPLACE INTO pattern_frequency_regional
+            (run_id, pattern_type, region_level, region_name, pattern, village_count, total_villages, frequency, rank_within_region)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+        """, batch)
+
+    conn.commit()
+    logger.info(f"Saved {len(data)} regional pattern frequency records for {pattern_type}")
+
+
+def save_pattern_tendency(conn: sqlite3.Connection, run_id: str, df: pd.DataFrame, batch_size: int = 10000) -> None:
+    """
+    Save pattern tendency data.
+
+    Args:
+        conn: SQLite database connection
+        run_id: Run identifier
+        df: DataFrame with tendency analysis columns (must include pattern_type column)
+        batch_size: Number of rows to insert per batch
+    """
+    cursor = conn.cursor()
+
+    # Prepare data for insertion
+    df_copy = df.copy()
+
+    # Handle NaN values for optional columns
+    df_copy['z_score'] = df_copy['z_score'].where(pd.notna(df_copy['z_score']), None)
+    df_copy['rank_overrepresented'] = df_copy['rank_overrepresented'].where(pd.notna(df_copy['rank_overrepresented']), None)
+    df_copy['rank_underrepresented'] = df_copy['rank_underrepresented'].where(pd.notna(df_copy['rank_underrepresented']), None)
+
+    # Select and reorder columns
+    columns = [
+        'run_id', 'pattern_type', 'region_level', 'region_name', 'pattern',
+        'village_count', 'total_villages', 'frequency', 'rank_within_region',
+        'global_village_count', 'global_frequency',
+        'lift', 'log_lift', 'log_odds', 'z_score', 'support_flag',
+        'rank_overrepresented', 'rank_underrepresented'
+    ]
+    data = df_copy[columns].values.tolist()
+
+    # Batch insert
+    for i in range(0, len(data), batch_size):
+        batch = data[i:i + batch_size]
+        cursor.executemany("""
+            INSERT OR REPLACE INTO pattern_tendency
+            (run_id, pattern_type, region_level, region_name, pattern,
+             village_count, total_villages, frequency, rank_within_region,
+             global_village_count, global_frequency,
+             lift, log_lift, log_odds, z_score, support_flag,
+             rank_overrepresented, rank_underrepresented)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        """, batch)
+
+    conn.commit()
+    logger.info(f"Saved {len(data)} pattern tendency records")
+
+
+def persist_morphology_results_to_db(
+    db_path: str,
+    run_id: str,
+    results_dir: Path,
+    suffix_lengths: list,
+    prefix_lengths: list,
+    region_levels: list = None,
+    batch_size: int = 10000
+) -> None:
+    """
+    Main function to persist morphology analysis results to database.
+
+    Args:
+        db_path: Path to SQLite database
+        run_id: Run identifier
+        results_dir: Directory containing CSV result files
+        suffix_lengths: List of suffix n-gram lengths
+        prefix_lengths: List of prefix n-gram lengths
+        region_levels: List of region levels to process
+        batch_size: Number of rows to insert per batch
+    """
+    import time
+
+    if region_levels is None:
+        region_levels = ['city', 'county', 'township']
+
+    logger.info(f"Starting morphology database persistence for run_id={run_id}")
+    start_time = time.time()
+
+    # Build list of pattern types
+    pattern_types = []
+    for n in suffix_lengths:
+        pattern_types.append(f'suffix_{n}')
+    for n in prefix_lengths:
+        pattern_types.append(f'prefix_{n}')
+
+    logger.info(f"Pattern types to persist: {pattern_types}")
+
+    # Connect to database
+    conn = sqlite3.connect(db_path)
+
+    try:
+        # Step 1: Create tables and indexes
+        logger.info("Creating morphology tables...")
+        create_morphology_tables(conn)
+
+        # Step 2: Process each pattern type
+        for pattern_type in pattern_types:
+            logger.info(f"\nProcessing {pattern_type}...")
+
+            # Load global frequency
+            global_freq_file = results_dir / f"{pattern_type}_frequency_global.csv"
+            if not global_freq_file.exists():
+                logger.warning(f"Global frequency file not found: {global_freq_file}")
+                continue
+
+            global_freq_df = pd.read_csv(global_freq_file)
+            logger.info(f"Loaded {len(global_freq_df)} global frequency records")
+
+            # Save global frequency
+            save_pattern_frequency_global(conn, run_id, pattern_type, global_freq_df, batch_size)
+
+            # Load and combine regional frequency files
+            regional_freq_dfs = []
+            for level in region_levels:
+                regional_freq_file = results_dir / f"{pattern_type}_frequency_{level}.csv"
+                if regional_freq_file.exists():
+                    df = pd.read_csv(regional_freq_file)
+                    regional_freq_dfs.append(df)
+                    logger.info(f"Loaded {len(df)} {level}-level frequency records")
+
+            if regional_freq_dfs:
+                regional_freq_df = pd.concat(regional_freq_dfs, ignore_index=True)
+                save_pattern_frequency_regional(conn, run_id, pattern_type, regional_freq_df, batch_size)
+
+            # Load and combine tendency files
+            tendency_dfs = []
+            for level in region_levels:
+                tendency_file = results_dir / f"{pattern_type}_tendency_{level}.csv"
+                if tendency_file.exists():
+                    df = pd.read_csv(tendency_file)
+                    tendency_dfs.append(df)
+                    logger.info(f"Loaded {len(df)} {level}-level tendency records")
+
+            if tendency_dfs:
+                tendency_df = pd.concat(tendency_dfs, ignore_index=True)
+                save_pattern_tendency(conn, run_id, tendency_df, batch_size)
+
+        # Step 3: Create indexes
+        logger.info("\nCreating morphology indexes...")
+        create_morphology_indexes(conn)
+
+        elapsed = time.time() - start_time
+        logger.info(f"Morphology database persistence completed in {elapsed:.2f}s")
+
+    except Exception as e:
+        logger.error(f"Error persisting morphology results to database: {e}")
+        conn.rollback()
+        raise
+    finally:
+        conn.close()
