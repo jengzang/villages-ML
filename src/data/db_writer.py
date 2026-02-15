@@ -1189,3 +1189,190 @@ def write_clustering_metrics(conn: sqlite3.Connection, run_id: str, metrics_dict
     logger.info(f"Saved {len(data)} clustering metrics for run_id={run_id}")
 
 
+def create_feature_materialization_tables(conn: sqlite3.Connection) -> None:
+    """
+    Create tables for materialized village features.
+
+    Creates 4 tables:
+    - village_features: Materialized village-level features
+    - city_aggregates: City-level aggregates
+    - county_aggregates: County-level aggregates
+    - town_aggregates: Town-level aggregates
+
+    Args:
+        conn: SQLite database connection
+    """
+    cursor = conn.cursor()
+
+    # Table 1: village_features
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS village_features (
+            run_id TEXT NOT NULL,
+            city TEXT,
+            county TEXT,
+            town TEXT,
+            village_committee TEXT,
+            village_name TEXT NOT NULL,
+            pinyin TEXT,
+            name_length INTEGER NOT NULL,
+            suffix_1 TEXT,
+            suffix_2 TEXT,
+            suffix_3 TEXT,
+            prefix_1 TEXT,
+            prefix_2 TEXT,
+            prefix_3 TEXT,
+            sem_mountain INTEGER NOT NULL DEFAULT 0,
+            sem_water INTEGER NOT NULL DEFAULT 0,
+            sem_settlement INTEGER NOT NULL DEFAULT 0,
+            sem_direction INTEGER NOT NULL DEFAULT 0,
+            sem_clan INTEGER NOT NULL DEFAULT 0,
+            sem_symbolic INTEGER NOT NULL DEFAULT 0,
+            sem_agriculture INTEGER NOT NULL DEFAULT 0,
+            sem_vegetation INTEGER NOT NULL DEFAULT 0,
+            sem_infrastructure INTEGER NOT NULL DEFAULT 0,
+            kmeans_cluster_id INTEGER,
+            dbscan_cluster_id INTEGER,
+            gmm_cluster_id INTEGER,
+            has_valid_chars INTEGER NOT NULL DEFAULT 1,
+            created_at REAL NOT NULL
+        )
+    """)
+
+    # Table 2: city_aggregates
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS city_aggregates (
+            run_id TEXT NOT NULL,
+            city TEXT NOT NULL,
+            total_villages INTEGER NOT NULL,
+            avg_name_length REAL NOT NULL,
+            sem_mountain_count INTEGER NOT NULL,
+            sem_water_count INTEGER NOT NULL,
+            sem_settlement_count INTEGER NOT NULL,
+            sem_direction_count INTEGER NOT NULL,
+            sem_clan_count INTEGER NOT NULL,
+            sem_symbolic_count INTEGER NOT NULL,
+            sem_agriculture_count INTEGER NOT NULL,
+            sem_vegetation_count INTEGER NOT NULL,
+            sem_infrastructure_count INTEGER NOT NULL,
+            sem_mountain_pct REAL NOT NULL,
+            sem_water_pct REAL NOT NULL,
+            sem_settlement_pct REAL NOT NULL,
+            sem_direction_pct REAL NOT NULL,
+            sem_clan_pct REAL NOT NULL,
+            sem_symbolic_pct REAL NOT NULL,
+            sem_agriculture_pct REAL NOT NULL,
+            sem_vegetation_pct REAL NOT NULL,
+            sem_infrastructure_pct REAL NOT NULL,
+            top_suffixes_json TEXT,
+            top_prefixes_json TEXT,
+            cluster_distribution_json TEXT,
+            created_at REAL NOT NULL,
+            PRIMARY KEY (run_id, city)
+        )
+    """)
+
+    # Table 3: county_aggregates
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS county_aggregates (
+            run_id TEXT NOT NULL,
+            city TEXT NOT NULL,
+            county TEXT NOT NULL,
+            total_villages INTEGER NOT NULL,
+            avg_name_length REAL NOT NULL,
+            sem_mountain_count INTEGER NOT NULL,
+            sem_water_count INTEGER NOT NULL,
+            sem_settlement_count INTEGER NOT NULL,
+            sem_direction_count INTEGER NOT NULL,
+            sem_clan_count INTEGER NOT NULL,
+            sem_symbolic_count INTEGER NOT NULL,
+            sem_agriculture_count INTEGER NOT NULL,
+            sem_vegetation_count INTEGER NOT NULL,
+            sem_infrastructure_count INTEGER NOT NULL,
+            sem_mountain_pct REAL NOT NULL,
+            sem_water_pct REAL NOT NULL,
+            sem_settlement_pct REAL NOT NULL,
+            sem_direction_pct REAL NOT NULL,
+            sem_clan_pct REAL NOT NULL,
+            sem_symbolic_pct REAL NOT NULL,
+            sem_agriculture_pct REAL NOT NULL,
+            sem_vegetation_pct REAL NOT NULL,
+            sem_infrastructure_pct REAL NOT NULL,
+            top_suffixes_json TEXT,
+            top_prefixes_json TEXT,
+            cluster_distribution_json TEXT,
+            created_at REAL NOT NULL,
+            PRIMARY KEY (run_id, city, county)
+        )
+    """)
+
+    # Table 4: town_aggregates
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS town_aggregates (
+            run_id TEXT NOT NULL,
+            city TEXT NOT NULL,
+            county TEXT NOT NULL,
+            town TEXT NOT NULL,
+            total_villages INTEGER NOT NULL,
+            avg_name_length REAL NOT NULL,
+            sem_mountain_count INTEGER NOT NULL,
+            sem_water_count INTEGER NOT NULL,
+            sem_settlement_count INTEGER NOT NULL,
+            sem_direction_count INTEGER NOT NULL,
+            sem_clan_count INTEGER NOT NULL,
+            sem_symbolic_count INTEGER NOT NULL,
+            sem_agriculture_count INTEGER NOT NULL,
+            sem_vegetation_count INTEGER NOT NULL,
+            sem_infrastructure_count INTEGER NOT NULL,
+            sem_mountain_pct REAL NOT NULL,
+            sem_water_pct REAL NOT NULL,
+            sem_settlement_pct REAL NOT NULL,
+            sem_direction_pct REAL NOT NULL,
+            sem_clan_pct REAL NOT NULL,
+            sem_symbolic_pct REAL NOT NULL,
+            sem_agriculture_pct REAL NOT NULL,
+            sem_vegetation_pct REAL NOT NULL,
+            sem_infrastructure_pct REAL NOT NULL,
+            top_suffixes_json TEXT,
+            top_prefixes_json TEXT,
+            cluster_distribution_json TEXT,
+            created_at REAL NOT NULL,
+            PRIMARY KEY (run_id, city, county, town)
+        )
+    """)
+
+    conn.commit()
+    logger.info("Feature materialization tables created successfully")
+
+
+def create_feature_materialization_indexes(conn: sqlite3.Connection) -> None:
+    """
+    Create indexes for feature materialization tables.
+
+    Args:
+        conn: SQLite database connection
+    """
+    cursor = conn.cursor()
+
+    # Indexes for village_features
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_village_features_run_id ON village_features(run_id)")
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_village_features_city ON village_features(city)")
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_village_features_county ON village_features(county)")
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_village_features_town ON village_features(town)")
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_village_features_suffix_2 ON village_features(suffix_2)")
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_village_features_suffix_3 ON village_features(suffix_3)")
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_village_features_sem_mountain ON village_features(sem_mountain)")
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_village_features_sem_water ON village_features(sem_water)")
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_village_features_sem_settlement ON village_features(sem_settlement)")
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_village_features_kmeans_cluster ON village_features(kmeans_cluster_id)")
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_village_features_dbscan_cluster ON village_features(dbscan_cluster_id)")
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_village_features_gmm_cluster ON village_features(gmm_cluster_id)")
+
+    # Indexes for aggregates
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_city_aggregates_run_id ON city_aggregates(run_id)")
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_county_aggregates_run_id ON county_aggregates(run_id)")
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_town_aggregates_run_id ON town_aggregates(run_id)")
+
+    conn.commit()
+    logger.info("Feature materialization indexes created successfully")
+
+
