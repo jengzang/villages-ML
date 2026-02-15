@@ -634,9 +634,161 @@ conn.close()
 | agriculture（農業） | 20,356 | 7.12% |
 | infrastructure（基建） | 6,748 | 2.36% |
 
+## 在線服務策略 (Online Serving Policy)
+
+### 概述 (Overview)
+
+在線服務策略框架確保查詢在2核/2GB部署環境中安全執行，防止內存耗盡和性能問題。
+
+### 核心功能 (Core Features)
+
+1. **查詢驗證**：阻止全表掃描和昂貴操作
+2. **行數限制**：強制執行最大行數限制
+3. **分頁支持**：提供高效的分頁查詢
+4. **配置管理**：支持生產/開發環境配置
+
+### 配置模式 (Configuration Modes)
+
+**生產模式（Production）**：
+- 最大行數：500（默認）/ 5,000（絕對上限）
+- 全表掃描：禁用
+- 運行時聚類：禁用
+- 查詢超時：3秒
+- 內存限制：300MB
+
+**開發模式（Development）**：
+- 最大行數：10,000（默認）/ 50,000（絕對上限）
+- 全表掃描：允許
+- 運行時聚類：禁用
+- 查詢超時：10秒
+- 內存限制：1GB
+
+**默認模式（Default）**：
+- 最大行數：1,000（默認）/ 10,000（絕對上限）
+- 全表掃描：禁用
+- 運行時聚類：禁用
+- 查詢超時：5秒
+- 內存限制：500MB
+
+### 使用方法 (Usage)
+
+#### 命令行查詢（CLI）
+
+```bash
+# 使用默認配置
+python scripts/query_results.py --run-id feature_001 --type global --top 20
+
+# 使用生產配置（嚴格限制）
+python scripts/query_results.py --run-id feature_001 --type global --top 20 --config production
+
+# 使用開發配置（寬鬆限制）
+python scripts/query_results.py --run-id feature_001 --type global --top 20 --config development
+
+# 自定義最大行數
+python scripts/query_results.py --run-id feature_001 --type global --top 20 --max-rows 500
+
+# 允許全表掃描（不推薦用於生產環境）
+python scripts/query_results.py --run-id feature_001 --type global --top 20 --enable-full-scan
+```
+
+#### Python API
+
+```python
+import sqlite3
+from src.deployment import QueryPolicy, DeploymentConfig, SafeQueryExecutor, PolicyViolationError
+from src.data.db_query import get_village_features
+
+conn = sqlite3.connect('data/villages.db')
+
+# 使用生產配置
+config = DeploymentConfig.production()
+policy = QueryPolicy(
+    max_rows=config.max_rows_default,
+    max_rows_absolute=config.max_rows_absolute,
+    enable_full_scan=config.enable_full_scan
+)
+executor = SafeQueryExecutor(conn, policy)
+
+# 執行安全查詢
+try:
+    result = executor.execute(
+        get_village_features,
+        run_id='feature_001',
+        city='广州市',
+        limit=100
+    )
+    print(f"查詢成功，返回 {len(result)} 行")
+except PolicyViolationError as e:
+    print(f"查詢被阻止：{e}")
+
+# 使用分頁查詢
+results, total, has_next = executor.execute_with_pagination(
+    get_village_features,
+    run_id='feature_001',
+    city='广州市',
+    page=1,
+    page_size=50
+)
+print(f"第1頁：{len(results)} 行，總計 {total} 行，有下一頁：{has_next}")
+
+conn.close()
+```
+
+### 策略規則 (Policy Rules)
+
+**阻止的操作**：
+- 無過濾條件的全表掃描（除非明確啟用）
+- 超過絕對上限的行數請求（10倍於絕對上限）
+- 運行時聚類操作（必須使用預計算的cluster_id）
+
+**允許的過濾條件**：
+- city（城市）
+- county（縣區）
+- town（鄉鎮）
+- cluster_id（聚類ID）
+- semantic_category（語義類別）
+- suffix（後綴）
+- algorithm（算法）
+
+**注意**：run_id不被視為有效過濾條件，因為它不能限制結果集大小。
+
+### 測試驗證 (Testing)
+
+```bash
+# 運行策略測試
+python scripts/test_query_policy.py
+
+# 預期輸出：
+# [Test 1] 配置加載 - [OK]
+# [Test 2] 帶過濾條件的查詢 - [OK]
+# [Test 3] 無過濾條件的查詢 - [OK]（被阻止）
+# [Test 4] 超過上限的查詢 - [OK]（自動限制）
+# [Test 5] 分頁支持 - [OK]
+# [Test 6] 允許全表掃描 - [OK]
+```
+
+### 配置文件 (Configuration Files)
+
+配置文件位於 `config/` 目錄：
+
+- `deployment.json`：默認配置
+- `deployment.production.json`：生產環境配置
+- `deployment.development.json`：開發環境配置
+
+可以根據需要自定義配置文件。
+
 ## 更新日志 (Changelog)
 
 ### 2026-02-16
+- **新增功能**：在線服務策略框架（Phase 11）
+- **實現模塊**：
+  - 查詢策略（query_policy.py）
+  - 配置管理（config.py）
+  - 安全查詢執行器（query_wrapper.py）
+- **新增配置**：3個部署配置文件（default/production/development）
+- **更新模塊**：為db_query.py添加offset參數支持
+- **CLI集成**：為query_results.py添加策略標誌
+- **測試腳本**：test_query_policy.py
 - **新增功能**：特徵物化管道（Phase 10）
 - **實現模塊**：
   - 特徵提取器（feature_extractor.py）
