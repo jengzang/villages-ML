@@ -138,7 +138,7 @@ def run_clustering_pipeline(
         profiles_df = ClusterProfiler.generate_cluster_profiles(
             X_processed,
             best_labels,
-            region_df[['region_id', 'region_name']],
+            region_df[['region_name']],
             feature_names,
             distances,
             top_n_features=10,
@@ -155,7 +155,7 @@ def run_clustering_pipeline(
 
         # Write cluster assignments
         write_cluster_assignments(
-            conn, output_run_id, region_df[['region_id', 'region_name']],
+            conn, output_run_id, region_df[['region_name']],
             best_labels, distances, 'kmeans', best_k, best_silhouette
         )
 
@@ -207,7 +207,7 @@ def run_clustering_pipeline(
             region_df.to_csv(output_path / 'region_vectors.csv', index=False, encoding='utf-8-sig')
 
             # Export cluster assignments
-            assignments_df = region_df[['region_id', 'region_name']].copy()
+            assignments_df = region_df[['region_name']].copy()
             assignments_df['cluster_id'] = best_labels
             assignments_df['distance_to_centroid'] = distances
             assignments_df.to_csv(output_path / 'cluster_assignments_kmeans.csv', index=False, encoding='utf-8-sig')
