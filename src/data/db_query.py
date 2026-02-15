@@ -658,7 +658,8 @@ def get_village_features(conn: sqlite3.Connection, run_id: str,
                          city: Optional[str] = None,
                          county: Optional[str] = None,
                          town: Optional[str] = None,
-                         limit: Optional[int] = None) -> pd.DataFrame:
+                         limit: Optional[int] = None,
+                         offset: Optional[int] = None) -> pd.DataFrame:
     """
     Query village features with optional filters.
 
@@ -669,6 +670,7 @@ def get_village_features(conn: sqlite3.Connection, run_id: str,
         county: Filter by county (optional)
         town: Filter by town (optional)
         limit: Limit number of results (optional)
+        offset: Offset for pagination (optional)
 
     Returns:
         DataFrame with village features
@@ -691,12 +693,16 @@ def get_village_features(conn: sqlite3.Connection, run_id: str,
     if limit:
         query += f" LIMIT {limit}"
 
+    if offset:
+        query += f" OFFSET {offset}"
+
     return pd.read_sql_query(query, conn, params=tuple(params))
 
 
 def get_villages_by_semantic_tag(conn: sqlite3.Connection, run_id: str,
                                  semantic_category: str,
-                                 limit: Optional[int] = None) -> pd.DataFrame:
+                                 limit: Optional[int] = None,
+                                 offset: Optional[int] = None) -> pd.DataFrame:
     """
     Query villages by semantic tag.
 
@@ -705,6 +711,7 @@ def get_villages_by_semantic_tag(conn: sqlite3.Connection, run_id: str,
         run_id: Run identifier
         semantic_category: Semantic category name (e.g., 'mountain', 'water')
         limit: Limit number of results (optional)
+        offset: Offset for pagination (optional)
 
     Returns:
         DataFrame with villages having the specified semantic tag
@@ -719,13 +726,17 @@ def get_villages_by_semantic_tag(conn: sqlite3.Connection, run_id: str,
     if limit:
         query += f" LIMIT {limit}"
 
+    if offset:
+        query += f" OFFSET {offset}"
+
     return pd.read_sql_query(query, conn, params=(run_id,))
 
 
 def get_villages_by_suffix(conn: sqlite3.Connection, run_id: str,
                            suffix: str,
                            suffix_length: int = 2,
-                           limit: Optional[int] = None) -> pd.DataFrame:
+                           limit: Optional[int] = None,
+                           offset: Optional[int] = None) -> pd.DataFrame:
     """
     Query villages by suffix pattern.
 
@@ -735,6 +746,7 @@ def get_villages_by_suffix(conn: sqlite3.Connection, run_id: str,
         suffix: Suffix pattern to search for
         suffix_length: Suffix length (1, 2, or 3)
         limit: Limit number of results (optional)
+        offset: Offset for pagination (optional)
 
     Returns:
         DataFrame with villages having the specified suffix
@@ -749,13 +761,17 @@ def get_villages_by_suffix(conn: sqlite3.Connection, run_id: str,
     if limit:
         query += f" LIMIT {limit}"
 
+    if offset:
+        query += f" OFFSET {offset}"
+
     return pd.read_sql_query(query, conn, params=(run_id, suffix))
 
 
 def get_villages_by_cluster(conn: sqlite3.Connection, run_id: str,
                             cluster_id: int,
                             algorithm: str = 'kmeans',
-                            limit: Optional[int] = None) -> pd.DataFrame:
+                            limit: Optional[int] = None,
+                            offset: Optional[int] = None) -> pd.DataFrame:
     """
     Query villages by cluster assignment.
 
@@ -765,6 +781,7 @@ def get_villages_by_cluster(conn: sqlite3.Connection, run_id: str,
         cluster_id: Cluster ID
         algorithm: Clustering algorithm ('kmeans', 'dbscan', 'gmm')
         limit: Limit number of results (optional)
+        offset: Offset for pagination (optional)
 
     Returns:
         DataFrame with villages in the specified cluster
@@ -778,6 +795,9 @@ def get_villages_by_cluster(conn: sqlite3.Connection, run_id: str,
 
     if limit:
         query += f" LIMIT {limit}"
+
+    if offset:
+        query += f" OFFSET {offset}"
 
     return pd.read_sql_query(query, conn, params=(run_id, cluster_id))
 

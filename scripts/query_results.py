@@ -79,6 +79,7 @@ from src.data.db_query import (
     get_clustering_metrics,
     get_regions_in_cluster
 )
+from src.deployment import DeploymentConfig, QueryPolicy, SafeQueryExecutor, PolicyViolationError
 
 
 def main():
@@ -130,7 +131,45 @@ def main():
     parser.add_argument('--cluster-id', type=int,
                        help='Cluster ID (required for cluster-profile and cluster-regions)')
 
+    # Query policy flags
+    parser.add_argument('--max-rows', type=int,
+                       help='Maximum rows to return (default: from config)')
+    parser.add_argument('--enable-full-scan', action='store_true',
+                       help='Allow queries without filters (not recommended for production)')
+    parser.add_argument('--config', type=str,
+                       choices=['default', 'production', 'development'],
+                       default='default',
+                       help='Deployment configuration (default: default)')
+
     args = parser.parse_args()
+
+    # Load deployment configuration
+    if args.config == 'production':
+        config = DeploymentConfig.production()
+        print("Using PRODUCTION configuration (strict limits)")
+    elif args.config == 'development':
+        config = DeploymentConfig.development()
+        print("Using DEVELOPMENT configuration (relaxed limits)")
+    else:
+        config = DeploymentConfig()
+        print("Using DEFAULT configuration")
+
+    # Override max_rows if specified
+    if args.max_rows:
+        config.config['query_limits']['max_rows_default'] = args.max_rows
+
+    # Override enable_full_scan if specified
+    if args.enable_full_scan:
+        config.config['feature_flags']['enable_full_scan'] = True
+        print("WARNING: Full table scans enabled (not recommended for production)")
+
+    # Create query policy
+    policy = QueryPolicy(
+        max_rows=config.max_rows_default,
+        max_rows_absolute=config.max_rows_absolute,
+        enable_full_scan=config.enable_full_scan,
+        enable_runtime_clustering=config.enable_runtime_clustering
+    )
 
     # Connect to database
     try:
