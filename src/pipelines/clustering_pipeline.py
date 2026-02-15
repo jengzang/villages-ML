@@ -81,6 +81,9 @@ def run_clustering_pipeline(
     logger.info(f"Starting clustering pipeline: run_id={output_run_id}")
     start_time = time.time()
 
+    # Map 'town' to 'township' for database compatibility
+    db_region_level = 'township' if region_level == 'town' else region_level
+
     # Connect to database
     conn = sqlite3.connect(db_path)
 
@@ -96,7 +99,7 @@ def run_clustering_pipeline(
         region_df, feature_names = feature_builder.build_region_vectors(
             semantic_run_id=semantic_run_id,
             morphology_run_id=morphology_run_id,
-            region_level=region_level,
+            region_level=db_region_level,
             use_semantic=use_semantic,
             use_morphology=use_morphology,
             use_diversity=use_diversity,
