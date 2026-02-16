@@ -15,7 +15,8 @@ Skills are reusable commands that provide specialized guidance for working with 
 ├── 04_semantic_analysis/     # Semantic indexing and NLP methods
 ├── 05_embedding_clustering/  # Vector embeddings and clustering
 ├── 06_deployment/            # Offline/online deployment strategies
-└── 07_output_reporting/      # Result export and metrics
+├── 07_output_reporting/      # Result export and metrics
+└── 08_spatial_analysis/      # Geographic clustering and visualization
 ```
 
 ## Skill Categories
@@ -53,6 +54,7 @@ Vector representations and clustering methods:
 - `region_feature_schema.md` - Regional feature engineering
 - `clustering_pipeline.md` - Clustering workflow and methods
 - `cluster_interpretation.md` - Interpret and label clusters
+- `feature_materialization_pipeline.md` - Materialize all features for fast queries
 
 ### 06_deployment/ - Deployment Strategy
 Offline computation and online serving guidelines:
@@ -63,6 +65,13 @@ Offline computation and online serving guidelines:
 Result export and spatial analysis:
 - `result_export_reproducibility.md` - Reproducible result export
 - `spatial_hotspot_metrics.md` - Spatial pattern metrics
+
+### 08_spatial_analysis/ - Spatial Analysis (Phase 13)
+Geographic clustering and interactive visualization:
+- `spatial_clustering_pipeline.md` - Run spatial DBSCAN clustering
+- `interactive_map_generator.md` - Generate folium maps
+- `spatial_feature_extractor.md` - Extract spatial features (future)
+- `spatial_semantic_integration.md` - Integrate spatial + semantic (future)
 
 ## Usage
 
@@ -78,6 +87,7 @@ Skills are organized by the natural workflow of the analysis pipeline:
 5. **Embedding & Clustering** - Advanced ML techniques
 6. **Deployment** - Production deployment strategies
 7. **Output & Reporting** - Results and visualization
+8. **Spatial Analysis** - Geographic clustering and interactive maps
 
 This structure reflects the "offline-heavy, online-light" principle where expensive computations are done offline and lightweight queries are served online.
 
