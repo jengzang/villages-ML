@@ -100,6 +100,49 @@ This repository includes custom skills in the `.claude/skills/` directory. Skill
 To use a skill, type `/skill-name` in the Claude Code CLI. Skills can accept parameters and provide specialized functionality for this project.
 
 
+## Documentation Organization
+
+All project documentation must be placed in the `docs/` directory. This keeps the project root clean and makes documentation easy to find.
+
+### Documentation Types
+
+**Phase Summaries** (`docs/PHASE_XX_SUMMARY.md`)
+- Comprehensive summary of each implementation phase
+- Technical details, design decisions, performance metrics
+- Verification checklist and usage examples
+- Format: `PHASE_XX_SUMMARY.md` where XX is the phase number
+
+**Usage Guides** (`docs/*_GUIDE.md`)
+- Step-by-step guides for using specific features
+- API usage examples, CLI commands, troubleshooting
+- Format: `FEATURE_NAME_GUIDE.md` (e.g., `SPATIAL_ANALYSIS_GUIDE.md`)
+
+**Implementation Summaries** (`docs/IMPLEMENTATION_SUMMARY.md`)
+- Overall project implementation status
+- Cross-phase integration notes
+- Roadmap and future work
+
+**API Documentation** (`docs/api/`)
+- Module-level API documentation
+- Function signatures and parameters
+- Code examples
+
+### Files That Stay in Root
+
+- `README.md` - Project overview and quick start
+- `CLAUDE.md` - This file (Claude Code guidance)
+- `requirements.txt` - Python dependencies
+- `setup.py` / `pyproject.toml` - Package configuration (if applicable)
+
+### Documentation Standards
+
+- Use clear, descriptive filenames
+- Include table of contents for long documents
+- Provide code examples with expected output
+- Keep documentation up-to-date with code changes
+- Use consistent formatting (markdown)
+
+
 ## Data Assumptions & Statistical Rules
 
 - Dataset scale: 200,000+ natural villages (Guangdong Province)
