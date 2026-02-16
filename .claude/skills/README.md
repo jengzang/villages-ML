@@ -60,18 +60,20 @@ Vector representations and clustering methods:
 Offline computation and online serving guidelines:
 - `offline_feature_tagging.md` - Precompute features offline
 - `online_serving_policy.md` - Lightweight online query strategies
+- `query_safety_validator.md` - Validate query safety and resource consumption
 
 ### 07_output_reporting/ - Output & Reporting
 Result export and spatial analysis:
 - `result_export_reproducibility.md` - Reproducible result export
 - `spatial_hotspot_metrics.md` - Spatial pattern metrics
+- `comparison_report_generator.md` - Generate clustering comparison reports
 
 ### 08_spatial_analysis/ - Spatial Analysis (Phase 13)
 Geographic clustering and interactive visualization:
 - `spatial_clustering_pipeline.md` - Run spatial DBSCAN clustering
 - `interactive_map_generator.md` - Generate folium maps
-- `spatial_feature_extractor.md` - Extract spatial features (future)
-- `spatial_semantic_integration.md` - Integrate spatial + semantic (future)
+- `spatial_feature_extractor.md` - Extract spatial features (NN distance, density, isolation)
+- `spatial_semantic_integration.md` - Integrate spatial clustering with semantic analysis
 
 ## Usage
 
