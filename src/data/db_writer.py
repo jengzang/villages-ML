@@ -1595,6 +1595,78 @@ def create_spatial_analysis_indexes(conn: sqlite3.Connection) -> None:
     logger.info("Spatial analysis indexes created successfully")
 
 
+def create_spatial_tendency_table(conn: sqlite3.Connection) -> None:
+    """
+    Create spatial-tendency integration table.
+
+    This table stores the integration of tendency analysis with spatial clustering,
+    showing how naming patterns (character preferences) vary across geographic clusters.
+
+    Args:
+        conn: SQLite database connection
+    """
+    cursor = conn.cursor()
+
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS spatial_tendency_integration (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            run_id TEXT NOT NULL,
+            tendency_run_id TEXT NOT NULL,
+            spatial_run_id TEXT NOT NULL,
+
+            character TEXT NOT NULL,
+            cluster_id INTEGER NOT NULL,
+
+            -- Cluster-level tendency statistics
+            cluster_tendency_mean REAL,
+            cluster_tendency_std REAL,
+            cluster_size INTEGER NOT NULL,
+            n_villages_with_char INTEGER NOT NULL,
+
+            -- Spatial features
+            centroid_lon REAL,
+            centroid_lat REAL,
+            avg_distance_km REAL,
+            spatial_coherence REAL,
+
+            -- Regional information
+            dominant_city TEXT,
+            dominant_county TEXT,
+
+            -- Significance
+            is_significant INTEGER,
+            avg_p_value REAL,
+
+            created_at REAL NOT NULL,
+
+            FOREIGN KEY (tendency_run_id) REFERENCES analysis_runs(run_id),
+            FOREIGN KEY (spatial_run_id) REFERENCES analysis_runs(run_id)
+        )
+    """)
+
+    conn.commit()
+    logger.info("Spatial-tendency integration table created successfully")
+
+
+def create_spatial_tendency_indexes(conn: sqlite3.Connection) -> None:
+    """
+    Create indexes for spatial-tendency integration table.
+
+    Args:
+        conn: SQLite database connection
+    """
+    cursor = conn.cursor()
+
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_spatial_tendency_run ON spatial_tendency_integration(run_id)")
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_spatial_tendency_char ON spatial_tendency_integration(character)")
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_spatial_tendency_cluster ON spatial_tendency_integration(cluster_id)")
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_spatial_tendency_significant ON spatial_tendency_integration(is_significant)")
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_spatial_tendency_city ON spatial_tendency_integration(dominant_city)")
+
+    conn.commit()
+    logger.info("Spatial-tendency integration indexes created successfully")
+
+
 def write_spatial_features(conn: sqlite3.Connection, run_id: str, features_df: pd.DataFrame) -> None:
     """
     Write village spatial features to database.
@@ -1739,5 +1811,51 @@ def write_region_spatial_aggregates(conn: sqlite3.Connection, run_id: str, aggre
     aggregates_df[columns].to_sql('region_spatial_aggregates', conn, if_exists='append', index=False)
 
     logger.info("Regional spatial aggregates written successfully")
+
+
+def write_spatial_tendency_integration(conn: sqlite3.Connection, run_id: str, integration_df: pd.DataFrame) -> None:
+    """
+    Write spatial-tendency integration results to database.
+
+    Args:
+        conn: SQLite database connection
+        run_id: Unique run identifier for this integration analysis
+        integration_df: DataFrame with integration results
+    """
+    import time
+
+    logger.info(f"Writing {len(integration_df)} spatial-tendency integration records to database")
+
+    # Prepare data
+    integration_df = integration_df.copy()
+    integration_df['run_id'] = run_id
+    integration_df['created_at'] = time.time()
+
+    # Handle NaN values
+    for col in ['cluster_tendency_mean', 'cluster_tendency_std', 'centroid_lon', 'centroid_lat',
+                'avg_distance_km', 'spatial_coherence', 'avg_p_value']:
+        if col in integration_df.columns:
+            integration_df[col] = integration_df[col].where(pd.notna(integration_df[col]), None)
+
+    # Convert boolean to integer
+    if 'is_significant' in integration_df.columns:
+        integration_df['is_significant'] = integration_df['is_significant'].astype(int)
+
+    # Select columns
+    columns = [
+        'run_id', 'tendency_run_id', 'spatial_run_id',
+        'character', 'cluster_id',
+        'cluster_tendency_mean', 'cluster_tendency_std',
+        'cluster_size', 'n_villages_with_char',
+        'centroid_lon', 'centroid_lat', 'avg_distance_km', 'spatial_coherence',
+        'dominant_city', 'dominant_county',
+        'is_significant', 'avg_p_value',
+        'created_at'
+    ]
+
+    # Write to database
+    integration_df[columns].to_sql('spatial_tendency_integration', conn, if_exists='append', index=False)
+
+    logger.info("Spatial-tendency integration written successfully")
 
 
