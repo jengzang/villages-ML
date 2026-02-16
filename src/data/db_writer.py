@@ -1376,3 +1376,282 @@ def create_feature_materialization_indexes(conn: sqlite3.Connection) -> None:
     logger.info("Feature materialization indexes created successfully")
 
 
+def create_spatial_analysis_tables(conn: sqlite3.Connection) -> None:
+    """
+    Create spatial analysis tables if they don't exist.
+
+    Creates 4 tables:
+    - village_spatial_features: Per-village spatial features
+    - spatial_clusters: Spatial cluster profiles
+    - spatial_hotspots: Detected spatial hotspots
+    - region_spatial_aggregates: Regional spatial aggregates
+
+    Args:
+        conn: SQLite database connection
+    """
+    cursor = conn.cursor()
+
+    # Table 1: village_spatial_features
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS village_spatial_features (
+            run_id TEXT NOT NULL,
+            village_name TEXT NOT NULL,
+            city TEXT,
+            county TEXT,
+            town TEXT,
+            longitude REAL NOT NULL,
+            latitude REAL NOT NULL,
+            nn_distance_1 REAL,
+            nn_distance_5 REAL,
+            nn_distance_10 REAL,
+            local_density_1km INTEGER,
+            local_density_5km INTEGER,
+            local_density_10km INTEGER,
+            isolation_score REAL,
+            is_isolated INTEGER,
+            spatial_cluster_id INTEGER,
+            cluster_size INTEGER,
+            created_at REAL NOT NULL,
+            PRIMARY KEY (run_id, village_name)
+        )
+    """)
+
+    # Table 2: spatial_clusters
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS spatial_clusters (
+            run_id TEXT NOT NULL,
+            cluster_id INTEGER NOT NULL,
+            cluster_size INTEGER NOT NULL,
+            centroid_lon REAL NOT NULL,
+            centroid_lat REAL NOT NULL,
+            avg_distance_km REAL,
+            dominant_city TEXT,
+            dominant_county TEXT,
+            semantic_profile_json TEXT,
+            naming_patterns_json TEXT,
+            created_at REAL NOT NULL,
+            PRIMARY KEY (run_id, cluster_id)
+        )
+    """)
+
+    # Table 3: spatial_hotspots
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS spatial_hotspots (
+            run_id TEXT NOT NULL,
+            hotspot_id INTEGER NOT NULL,
+            hotspot_type TEXT NOT NULL,
+            center_lon REAL NOT NULL,
+            center_lat REAL NOT NULL,
+            radius_km REAL NOT NULL,
+            village_count INTEGER NOT NULL,
+            density_score REAL,
+            semantic_category TEXT,
+            pattern TEXT,
+            city TEXT,
+            county TEXT,
+            created_at REAL NOT NULL,
+            PRIMARY KEY (run_id, hotspot_id)
+        )
+    """)
+
+    # Table 4: region_spatial_aggregates
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS region_spatial_aggregates (
+            run_id TEXT NOT NULL,
+            region_level TEXT NOT NULL,
+            region_name TEXT NOT NULL,
+            total_villages INTEGER NOT NULL,
+            avg_nn_distance REAL,
+            avg_local_density REAL,
+            avg_isolation_score REAL,
+            n_isolated_villages INTEGER,
+            n_spatial_clusters INTEGER,
+            spatial_dispersion REAL,
+            created_at REAL NOT NULL,
+            PRIMARY KEY (run_id, region_level, region_name)
+        )
+    """)
+
+    conn.commit()
+    logger.info("Spatial analysis tables created successfully")
+
+
+def create_spatial_analysis_indexes(conn: sqlite3.Connection) -> None:
+    """
+    Create indexes for spatial analysis tables.
+
+    Args:
+        conn: SQLite database connection
+    """
+    cursor = conn.cursor()
+
+    # Indexes for village_spatial_features
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_village_spatial_run_id ON village_spatial_features(run_id)")
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_village_spatial_coords ON village_spatial_features(longitude, latitude)")
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_village_spatial_cluster ON village_spatial_features(run_id, spatial_cluster_id)")
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_village_spatial_city ON village_spatial_features(run_id, city)")
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_village_spatial_county ON village_spatial_features(run_id, county)")
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_village_spatial_isolated ON village_spatial_features(run_id, is_isolated)")
+
+    # Indexes for spatial_clusters
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_spatial_clusters_run_id ON spatial_clusters(run_id)")
+
+    # Indexes for spatial_hotspots
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_spatial_hotspots_run_id ON spatial_hotspots(run_id)")
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_spatial_hotspots_type ON spatial_hotspots(run_id, hotspot_type)")
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_spatial_hotspots_city ON spatial_hotspots(run_id, city)")
+
+    # Indexes for region_spatial_aggregates
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_region_spatial_run_id ON region_spatial_aggregates(run_id)")
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_region_spatial_level ON region_spatial_aggregates(run_id, region_level)")
+
+    conn.commit()
+    logger.info("Spatial analysis indexes created successfully")
+
+
+def write_spatial_features(conn: sqlite3.Connection, run_id: str, features_df: pd.DataFrame) -> None:
+    """
+    Write village spatial features to database.
+
+    Args:
+        conn: SQLite database connection
+        run_id: Unique run identifier
+        features_df: DataFrame with spatial features
+    """
+    import time
+
+    logger.info(f"Writing {len(features_df)} village spatial features to database")
+
+    # Prepare data
+    features_df = features_df.copy()
+    features_df['run_id'] = run_id
+    features_df['created_at'] = time.time()
+
+    # Select columns in correct order
+    columns = [
+        'run_id', 'village_name', 'city', 'county', 'town',
+        'longitude', 'latitude',
+        'nn_distance_1', 'nn_distance_5', 'nn_distance_10',
+        'local_density_1km', 'local_density_5km', 'local_density_10km',
+        'isolation_score', 'is_isolated',
+        'spatial_cluster_id', 'cluster_size',
+        'created_at'
+    ]
+
+    # Write to database
+    features_df[columns].to_sql('village_spatial_features', conn, if_exists='append', index=False)
+
+    logger.info("Village spatial features written successfully")
+
+
+def write_spatial_clusters(conn: sqlite3.Connection, run_id: str, clusters_df: pd.DataFrame) -> None:
+    """
+    Write spatial cluster profiles to database.
+
+    Args:
+        conn: SQLite database connection
+        run_id: Unique run identifier
+        clusters_df: DataFrame with cluster profiles
+    """
+    import time
+
+    logger.info(f"Writing {len(clusters_df)} spatial clusters to database")
+
+    # Prepare data
+    clusters_df = clusters_df.copy()
+    clusters_df['run_id'] = run_id
+    clusters_df['created_at'] = time.time()
+
+    # Convert JSON columns if they exist
+    if 'semantic_profile' in clusters_df.columns:
+        clusters_df['semantic_profile_json'] = clusters_df['semantic_profile'].apply(json.dumps)
+    else:
+        clusters_df['semantic_profile_json'] = None
+
+    if 'naming_patterns' in clusters_df.columns:
+        clusters_df['naming_patterns_json'] = clusters_df['naming_patterns'].apply(json.dumps)
+    else:
+        clusters_df['naming_patterns_json'] = None
+
+    # Select columns
+    columns = [
+        'run_id', 'cluster_id', 'cluster_size',
+        'centroid_lon', 'centroid_lat', 'avg_distance_km',
+        'dominant_city', 'dominant_county',
+        'semantic_profile_json', 'naming_patterns_json',
+        'created_at'
+    ]
+
+    # Write to database
+    clusters_df[columns].to_sql('spatial_clusters', conn, if_exists='append', index=False)
+
+    logger.info("Spatial clusters written successfully")
+
+
+def write_spatial_hotspots(conn: sqlite3.Connection, run_id: str, hotspots_df: pd.DataFrame) -> None:
+    """
+    Write spatial hotspots to database.
+
+    Args:
+        conn: SQLite database connection
+        run_id: Unique run identifier
+        hotspots_df: DataFrame with hotspot information
+    """
+    import time
+
+    logger.info(f"Writing {len(hotspots_df)} spatial hotspots to database")
+
+    # Prepare data
+    hotspots_df = hotspots_df.copy()
+    hotspots_df['run_id'] = run_id
+    hotspots_df['created_at'] = time.time()
+
+    # Select columns
+    columns = [
+        'run_id', 'hotspot_id', 'hotspot_type',
+        'center_lon', 'center_lat', 'radius_km',
+        'village_count', 'density_score',
+        'semantic_category', 'pattern',
+        'city', 'county',
+        'created_at'
+    ]
+
+    # Write to database
+    hotspots_df[columns].to_sql('spatial_hotspots', conn, if_exists='append', index=False)
+
+    logger.info("Spatial hotspots written successfully")
+
+
+def write_region_spatial_aggregates(conn: sqlite3.Connection, run_id: str, aggregates_df: pd.DataFrame) -> None:
+    """
+    Write regional spatial aggregates to database.
+
+    Args:
+        conn: SQLite database connection
+        run_id: Unique run identifier
+        aggregates_df: DataFrame with regional aggregates
+    """
+    import time
+
+    logger.info(f"Writing {len(aggregates_df)} regional spatial aggregates to database")
+
+    # Prepare data
+    aggregates_df = aggregates_df.copy()
+    aggregates_df['run_id'] = run_id
+    aggregates_df['created_at'] = time.time()
+
+    # Select columns
+    columns = [
+        'run_id', 'region_level', 'region_name',
+        'total_villages', 'avg_nn_distance', 'avg_local_density',
+        'avg_isolation_score', 'n_isolated_villages', 'n_spatial_clusters',
+        'spatial_dispersion',
+        'created_at'
+    ]
+
+    # Write to database
+    aggregates_df[columns].to_sql('region_spatial_aggregates', conn, if_exists='append', index=False)
+
+    logger.info("Regional spatial aggregates written successfully")
+
+
