@@ -61,6 +61,37 @@ Analysis results are automatically persisted to the SQLite database in the follo
 - `char_frequency_global`: Global character frequency statistics
 - `char_frequency_regional`: Regional character frequency (city/county/township levels)
 - `regional_tendency`: Regional tendency analysis (lift, log-odds, z-score)
+- `tendency_significance`: Statistical significance testing (p-values, effect sizes, confidence intervals) ✨ NEW
+
+### 统计显著性检验 (Statistical Significance Testing) ✨ NEW
+
+The system now includes statistical significance testing to identify meaningful regional naming patterns:
+
+```bash
+# Initialize database tables
+python scripts/init_tendency_tables.py
+
+# Run analysis with significance testing
+python scripts/test_significance.py
+
+# Query significant patterns
+python scripts/query_tendency.py --run-id test_sig_1771260439 --significant-only
+
+# Filter by effect size
+python scripts/query_tendency.py --run-id test_sig_1771260439 --min-effect-size 0.1
+
+# Export to CSV
+python scripts/query_tendency.py --run-id test_sig_1771260439 --output results.csv
+```
+
+**Features**:
+- Chi-square test for character-region associations
+- P-values and significance levels (***,  **, *, ns)
+- Effect sizes (Cramér's V) for measuring association strength
+- 95% confidence intervals (Wilson score method)
+- Fast computation: 27,000+ tests in ~3 seconds
+
+**Documentation**: See `docs/TENDENCY_SIGNIFICANCE_GUIDE.md` for complete usage guide.
 
 ### 查询结果 (Querying Results)
 

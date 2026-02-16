@@ -103,7 +103,28 @@ def create_analysis_tables(conn: sqlite3.Connection) -> None:
         )
     """)
 
-    # Table 5: semantic_vtf_global
+    # Table 5: tendency_significance
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS tendency_significance (
+            run_id TEXT NOT NULL,
+            region_level TEXT NOT NULL,
+            region_name TEXT NOT NULL,
+            char TEXT NOT NULL,
+            chi_square_statistic REAL NOT NULL,
+            p_value REAL NOT NULL,
+            is_significant INTEGER NOT NULL,
+            significance_level TEXT NOT NULL,
+            effect_size REAL NOT NULL,
+            effect_size_interpretation TEXT NOT NULL,
+            ci_lower REAL,
+            ci_upper REAL,
+            created_at REAL NOT NULL,
+            PRIMARY KEY (run_id, region_level, region_name, char),
+            FOREIGN KEY (run_id) REFERENCES analysis_runs(run_id)
+        )
+    """)
+
+    # Table 6: semantic_vtf_global
     cursor.execute("""
         CREATE TABLE IF NOT EXISTS semantic_vtf_global (
             run_id TEXT NOT NULL,
@@ -117,7 +138,7 @@ def create_analysis_tables(conn: sqlite3.Connection) -> None:
         )
     """)
 
-    # Table 6: semantic_vtf_regional
+    # Table 7: semantic_vtf_regional
     cursor.execute("""
         CREATE TABLE IF NOT EXISTS semantic_vtf_regional (
             run_id TEXT NOT NULL,
@@ -133,7 +154,7 @@ def create_analysis_tables(conn: sqlite3.Connection) -> None:
         )
     """)
 
-    # Table 7: semantic_tendency
+    # Table 8: semantic_tendency
     cursor.execute("""
         CREATE TABLE IF NOT EXISTS semantic_tendency (
             run_id TEXT NOT NULL,
@@ -154,7 +175,7 @@ def create_analysis_tables(conn: sqlite3.Connection) -> None:
         )
     """)
 
-    # Table 8: semantic_indices
+    # Table 9: semantic_indices
     cursor.execute("""
         CREATE TABLE IF NOT EXISTS semantic_indices (
             run_id TEXT NOT NULL,
@@ -205,6 +226,13 @@ def create_indexes(conn: sqlite3.Connection) -> None:
     cursor.execute("CREATE INDEX IF NOT EXISTS idx_tendency_logodds ON regional_tendency(run_id, region_level, log_odds DESC)")
     cursor.execute("CREATE INDEX IF NOT EXISTS idx_tendency_zscore ON regional_tendency(run_id, region_level, z_score DESC)")
     cursor.execute("CREATE INDEX IF NOT EXISTS idx_tendency_support ON regional_tendency(run_id, support_flag)")
+
+    # Indexes for tendency_significance
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_significance_level ON tendency_significance(run_id, region_level)")
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_significance_char ON tendency_significance(run_id, char)")
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_significance_pvalue ON tendency_significance(run_id, p_value)")
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_significance_flag ON tendency_significance(run_id, is_significant)")
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_significance_effect ON tendency_significance(run_id, effect_size DESC)")
 
     conn.commit()
     logger.info("Indexes created successfully")
@@ -352,6 +380,64 @@ def save_regional_tendency(conn: sqlite3.Connection, run_id: str, df: pd.DataFra
 
     conn.commit()
     logger.info(f"Saved {len(data)} regional tendency records for run_id={run_id}")
+
+
+def save_tendency_significance(conn: sqlite3.Connection, run_id: str, df: pd.DataFrame, batch_size: int = 10000) -> None:
+    """
+    Save tendency significance data to tendency_significance table.
+
+    Args:
+        conn: SQLite database connection
+        run_id: Run identifier
+        df: DataFrame with significance testing columns
+        batch_size: Number of rows to insert per batch
+    """
+    import time
+
+    cursor = conn.cursor()
+
+    # Prepare data for insertion
+    df_copy = df.copy()
+    df_copy['run_id'] = run_id
+    df_copy['created_at'] = time.time()
+
+    # Handle NaN values for optional columns
+    df_copy['ci_lower'] = df_copy['ci_lower'].where(pd.notna(df_copy['ci_lower']), None) if 'ci_lower' in df_copy.columns else None
+    df_copy['ci_upper'] = df_copy['ci_upper'].where(pd.notna(df_copy['ci_upper']), None) if 'ci_upper' in df_copy.columns else None
+
+    # Convert boolean to integer
+    df_copy['is_significant'] = df_copy['is_significant'].astype(int)
+
+    # Select and reorder columns
+    columns = [
+        'run_id', 'region_level', 'region_name', 'char',
+        'chi_square_statistic', 'p_value', 'is_significant', 'significance_level',
+        'effect_size', 'effect_size_interpretation',
+        'ci_lower', 'ci_upper', 'created_at'
+    ]
+
+    # Handle missing CI columns
+    if 'ci_lower' not in df_copy.columns:
+        df_copy['ci_lower'] = None
+    if 'ci_upper' not in df_copy.columns:
+        df_copy['ci_upper'] = None
+
+    data = df_copy[columns].values.tolist()
+
+    # Batch insert
+    for i in range(0, len(data), batch_size):
+        batch = data[i:i + batch_size]
+        cursor.executemany("""
+            INSERT OR REPLACE INTO tendency_significance
+            (run_id, region_level, region_name, char,
+             chi_square_statistic, p_value, is_significant, significance_level,
+             effect_size, effect_size_interpretation,
+             ci_lower, ci_upper, created_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        """, batch)
+
+    conn.commit()
+    logger.info(f"Saved {len(data)} tendency significance records for run_id={run_id}")
 
 
 def persist_results_to_db(db_path: str, run_id: str, results_dir: Path,

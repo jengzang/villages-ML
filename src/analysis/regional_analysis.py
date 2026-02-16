@@ -4,6 +4,7 @@ import logging
 import numpy as np
 import pandas as pd
 from typing import Optional
+from scipy import stats
 
 logger = logging.getLogger(__name__)
 
@@ -107,6 +108,130 @@ def filter_by_support(
     return df
 
 
+def compute_chi_square_significance(
+    n_region: int,
+    N_region: int,
+    n_global: int,
+    N_global: int
+) -> dict:
+    """
+    Compute chi-square test for character-region association.
+
+    Tests whether the character frequency in the region differs
+    significantly from the global frequency.
+
+    Contingency table:
+                    Has char    No char     Total
+    Region          n_region    N_region-n  N_region
+    Other regions   n_other     N_other-n   N_other
+    Total           n_global    N_global-n  N_global
+
+    Args:
+        n_region: Villages with char in region
+        N_region: Total villages in region
+        n_global: Villages with char globally
+        N_global: Total villages globally
+
+    Returns:
+        Dictionary with:
+        - chi_square_statistic: Chi-square test statistic
+        - p_value: P-value
+        - is_significant: Whether p < 0.05
+        - significance_level: '***' (p<0.001), '**' (p<0.01), '*' (p<0.05), 'ns'
+        - effect_size: Cramér's V
+        - effect_size_interpretation: 'small', 'medium', 'large'
+    """
+    # Calculate other regions
+    n_other = n_global - n_region
+    N_other = N_global - N_region
+
+    # Contingency table
+    observed = np.array([
+        [n_region, N_region - n_region],
+        [n_other, N_other - n_other]
+    ])
+
+    # Perform chi-square test
+    try:
+        chi2, p_value, dof, expected = stats.chi2_contingency(observed)
+    except (ValueError, ZeroDivisionError):
+        # Handle edge cases
+        return {
+            'chi_square_statistic': 0.0,
+            'p_value': 1.0,
+            'is_significant': False,
+            'significance_level': 'ns',
+            'effect_size': 0.0,
+            'effect_size_interpretation': 'none'
+        }
+
+    # Determine significance level
+    if p_value < 0.001:
+        sig_level = '***'
+    elif p_value < 0.01:
+        sig_level = '**'
+    elif p_value < 0.05:
+        sig_level = '*'
+    else:
+        sig_level = 'ns'
+
+    # Calculate Cramér's V (effect size)
+    # V = sqrt(chi2 / (n * min(r-1, c-1)))
+    n_total = N_global
+    min_dim = min(observed.shape[0] - 1, observed.shape[1] - 1)
+    cramers_v = np.sqrt(chi2 / (n_total * min_dim)) if n_total > 0 and min_dim > 0 else 0.0
+
+    # Interpret effect size (Cohen's guidelines)
+    if cramers_v < 0.1:
+        effect_interpretation = 'small'
+    elif cramers_v < 0.3:
+        effect_interpretation = 'medium'
+    else:
+        effect_interpretation = 'large'
+
+    return {
+        'chi_square_statistic': float(chi2),
+        'p_value': float(p_value),
+        'is_significant': p_value < 0.05,
+        'significance_level': sig_level,
+        'effect_size': float(cramers_v),
+        'effect_size_interpretation': effect_interpretation
+    }
+
+
+def compute_confidence_interval(
+    n_region: int,
+    N_region: int,
+    confidence_level: float = 0.95
+) -> tuple:
+    """
+    Compute confidence interval for regional frequency using Wilson score interval.
+
+    Args:
+        n_region: Villages with char in region
+        N_region: Total villages in region
+        confidence_level: Confidence level (default 0.95 for 95% CI)
+
+    Returns:
+        Tuple of (lower_bound, upper_bound)
+    """
+    if N_region == 0:
+        return (0.0, 0.0)
+
+    p = n_region / N_region
+    z = stats.norm.ppf((1 + confidence_level) / 2)
+
+    # Wilson score interval
+    denominator = 1 + z**2 / N_region
+    center = (p + z**2 / (2 * N_region)) / denominator
+    margin = z * np.sqrt(p * (1 - p) / N_region + z**2 / (4 * N_region**2)) / denominator
+
+    lower = max(0.0, center - margin)
+    upper = min(1.0, center + margin)
+
+    return (float(lower), float(upper))
+
+
 def compute_regional_tendency(
     char_freq_df: pd.DataFrame,
     smoothing_alpha: float = 1.0,
@@ -174,5 +299,79 @@ def compute_regional_tendency(
     ).astype(int)
 
     logger.info("Regional tendency computation complete")
+
+    return df
+
+
+def compute_tendency_significance(
+    tendency_df: pd.DataFrame,
+    compute_ci: bool = True,
+    confidence_level: float = 0.95
+) -> pd.DataFrame:
+    """
+    Compute statistical significance for tendency analysis results.
+
+    Adds the following columns:
+    - chi_square_statistic: Chi-square test statistic
+    - p_value: P-value from chi-square test
+    - is_significant: Boolean flag (p < 0.05)
+    - significance_level: '***', '**', '*', or 'ns'
+    - effect_size: Cramér's V
+    - effect_size_interpretation: 'small', 'medium', 'large'
+    - ci_lower: Lower bound of 95% confidence interval (optional)
+    - ci_upper: Upper bound of 95% confidence interval (optional)
+
+    Args:
+        tendency_df: DataFrame with tendency analysis results
+        compute_ci: Whether to compute confidence intervals
+        confidence_level: Confidence level for CI (default 0.95)
+
+    Returns:
+        DataFrame with significance testing columns added
+    """
+    df = tendency_df.copy()
+
+    logger.info(f"Computing statistical significance for {len(df)} char-region pairs")
+
+    # Compute chi-square significance for each row
+    significance_results = df.apply(
+        lambda row: compute_chi_square_significance(
+            n_region=row['village_count'],
+            N_region=row['total_villages'],
+            n_global=row['global_village_count'],
+            N_global=row.get('global_total_villages', row['total_villages'])  # Fallback if not present
+        ),
+        axis=1
+    )
+
+    # Extract significance columns
+    df['chi_square_statistic'] = significance_results.apply(lambda x: x['chi_square_statistic'])
+    df['p_value'] = significance_results.apply(lambda x: x['p_value'])
+    df['is_significant'] = significance_results.apply(lambda x: x['is_significant'])
+    df['significance_level'] = significance_results.apply(lambda x: x['significance_level'])
+    df['effect_size'] = significance_results.apply(lambda x: x['effect_size'])
+    df['effect_size_interpretation'] = significance_results.apply(lambda x: x['effect_size_interpretation'])
+
+    # Compute confidence intervals if requested
+    if compute_ci:
+        ci_results = df.apply(
+            lambda row: compute_confidence_interval(
+                n_region=row['village_count'],
+                N_region=row['total_villages'],
+                confidence_level=confidence_level
+            ),
+            axis=1
+        )
+        df['ci_lower'] = ci_results.apply(lambda x: x[0])
+        df['ci_upper'] = ci_results.apply(lambda x: x[1])
+
+    # Log summary statistics
+    n_significant = df['is_significant'].sum()
+    pct_significant = (n_significant / len(df) * 100) if len(df) > 0 else 0
+    logger.info(f"Significance testing complete: {n_significant}/{len(df)} ({pct_significant:.1f}%) are significant (p < 0.05)")
+
+    # Log effect size distribution
+    effect_counts = df['effect_size_interpretation'].value_counts()
+    logger.info(f"Effect size distribution: {effect_counts.to_dict()}")
 
     return df
