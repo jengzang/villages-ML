@@ -46,7 +46,7 @@ models/
 *.csv
 *.parquet
 data/*
-!data/villages.db
+!data/semantic_lexicon_v1.json
 
 # Analysis results (generated files, not to be committed)
 results/
