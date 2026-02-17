@@ -237,7 +237,8 @@ def compute_regional_tendency(
     smoothing_alpha: float = 1.0,
     min_global_support: int = 20,
     min_regional_support: int = 5,
-    compute_z: bool = True
+    compute_z: bool = True,
+    normalization_method: str = 'percentage'
 ) -> pd.DataFrame:
     """
     Compute regional tendency metrics.
@@ -248,8 +249,8 @@ def compute_regional_tendency(
     - log_odds: Log-odds ratio with smoothing
     - z_score: Statistical significance (if compute_z=True)
     - support_flag: Whether char meets support thresholds
-    - rank_overrepresented: Rank by lift (descending)
-    - rank_underrepresented: Rank by lift (ascending)
+    - rank_overrepresented: Rank by primary metric (descending)
+    - rank_underrepresented: Rank by primary metric (ascending)
 
     Args:
         char_freq_df: Regional frequency DataFrame with global stats
@@ -257,13 +258,14 @@ def compute_regional_tendency(
         min_global_support: Minimum global village count
         min_regional_support: Minimum regional village count
         compute_z: Whether to compute z-scores
+        normalization_method: 'percentage' (default, uses lift) or 'zscore' (uses z-scores for ranking)
 
     Returns:
         DataFrame with tendency metrics
     """
     df = char_freq_df.copy()
 
-    logger.info(f"Computing regional tendency for {len(df)} char-region pairs")
+    logger.info(f"Computing regional tendency for {len(df)} char-region pairs (method={normalization_method})")
 
     # Compute lift (already in char_freq_df as lift_vs_global)
     df['lift'] = df['lift_vs_global']
@@ -275,8 +277,8 @@ def compute_regional_tendency(
         axis=1
     )
 
-    # Compute z-score
-    if compute_z:
+    # Compute z-score (always compute if normalization_method is 'zscore')
+    if compute_z or normalization_method == 'zscore':
         df['z_score'] = df.apply(
             lambda row: compute_z_score(
                 row['village_count'],
@@ -289,14 +291,27 @@ def compute_regional_tendency(
     # Filter by support
     df = filter_by_support(df, min_global_support, min_regional_support)
 
-    # Add ranks (within each region)
-    df['rank_overrepresented'] = df.groupby('region_name')['lift'].rank(
-        ascending=False, method='dense'
-    ).astype(int)
+    # Add ranks (within each region) based on normalization method
+    if normalization_method == 'zscore':
+        # Use z-scores for ranking
+        logger.info("Using z-score normalization for ranking")
+        df['rank_overrepresented'] = df.groupby('region_name')['z_score'].rank(
+            ascending=False, method='dense'
+        ).astype(int)
 
-    df['rank_underrepresented'] = df.groupby('region_name')['lift'].rank(
-        ascending=True, method='dense'
-    ).astype(int)
+        df['rank_underrepresented'] = df.groupby('region_name')['z_score'].rank(
+            ascending=True, method='dense'
+        ).astype(int)
+    else:
+        # Use lift (percentage) for ranking (default)
+        logger.info("Using percentage (lift) normalization for ranking")
+        df['rank_overrepresented'] = df.groupby('region_name')['lift'].rank(
+            ascending=False, method='dense'
+        ).astype(int)
+
+        df['rank_underrepresented'] = df.groupby('region_name')['lift'].rank(
+            ascending=True, method='dense'
+        ).astype(int)
 
     logger.info("Regional tendency computation complete")
 

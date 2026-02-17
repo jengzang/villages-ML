@@ -44,7 +44,8 @@ def run_tendency_analysis_with_significance(
     region_levels: list = None,
     with_ci: bool = True,
     min_global_support: int = 20,
-    min_regional_support: int = 5
+    min_regional_support: int = 5,
+    normalization_method: str = 'percentage'
 ):
     """
     Run complete tendency analysis with significance testing.
@@ -56,11 +57,12 @@ def run_tendency_analysis_with_significance(
         with_ci: Whether to compute confidence intervals
         min_global_support: Minimum global village count
         min_regional_support: Minimum regional village count
+        normalization_method: 'percentage' (default, uses lift) or 'zscore' (uses z-scores)
     """
     if region_levels is None:
         region_levels = ['市级', '县区级', '乡镇']
 
-    logger.info(f"Starting tendency analysis with significance testing: run_id={run_id}")
+    logger.info(f"Starting tendency analysis with significance testing: run_id={run_id}, normalization={normalization_method}")
     start_time = time.time()
 
     # Connect to database
@@ -99,7 +101,8 @@ def run_tendency_analysis_with_significance(
                     regional_df,
                     min_global_support=min_global_support,
                     min_regional_support=min_regional_support,
-                    compute_z=True
+                    compute_z=True,
+                    normalization_method=normalization_method
                 )
 
                 # Compute statistical significance
@@ -124,7 +127,8 @@ def run_tendency_analysis_with_significance(
                 'region_levels': region_levels,
                 'min_global_support': min_global_support,
                 'min_regional_support': min_regional_support,
-                'with_ci': with_ci
+                'with_ci': with_ci,
+                'normalization_method': normalization_method
             },
             'status': 'completed'
         }
@@ -190,6 +194,9 @@ def main():
     parser.add_argument('--with-ci', action='store_true', help='Compute confidence intervals')
     parser.add_argument('--min-global-support', type=int, default=20, help='Minimum global village count')
     parser.add_argument('--min-regional-support', type=int, default=5, help='Minimum regional village count')
+    parser.add_argument('--normalization-method', type=str, default='percentage',
+                        choices=['percentage', 'zscore'],
+                        help='Normalization method: percentage (default, uses lift) or zscore')
 
     args = parser.parse_args()
 
@@ -198,7 +205,8 @@ def main():
         run_id=args.run_id,
         with_ci=args.with_ci,
         min_global_support=args.min_global_support,
-        min_regional_support=args.min_regional_support
+        min_regional_support=args.min_regional_support,
+        normalization_method=args.normalization_method
     )
 
 

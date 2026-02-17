@@ -190,3 +190,74 @@ def calculate_lift(
     logger.info("Calculated lift values for regional frequencies")
 
     return regional_freq
+
+
+def compute_char_frequency(
+    villages_df: pd.DataFrame,
+    region_levels: list = None,
+    min_global_support: int = 20,
+    min_regional_support: int = 5
+) -> dict:
+    """
+    Compute character frequencies at global and regional levels.
+
+    This is a convenience wrapper that combines global and regional frequency
+    computations into a single function call.
+
+    Args:
+        villages_df: DataFrame with village data
+        region_levels: List of region levels to analyze (e.g., ['市级', '县区级', '乡镇'])
+        min_global_support: Minimum global village count (for filtering)
+        min_regional_support: Minimum regional village count (for filtering)
+
+    Returns:
+        Dictionary with keys:
+        - 'global': Global frequency DataFrame
+        - 'regional': Dict mapping region_level to regional frequency DataFrame
+    """
+    if region_levels is None:
+        region_levels = ['市级', '县区级', '乡镇']
+
+    logger.info(f"Computing character frequencies for region levels: {region_levels}")
+
+    # Compute global frequencies
+    global_freq = compute_char_frequency_global(villages_df)
+
+    # Filter by minimum support
+    global_freq_filtered = global_freq[
+        global_freq['village_count'] >= min_global_support
+    ].copy()
+
+    logger.info(f"Global: {len(global_freq)} chars total, "
+                f"{len(global_freq_filtered)} meet min_global_support={min_global_support}")
+
+    # Compute regional frequencies
+    level_map = {
+        '市级': 'city',
+        '县区级': 'county',
+        '乡镇': 'township'
+    }
+
+    regional_freqs = {}
+    for level in region_levels:
+        if level not in level_map:
+            logger.warning(f"Unknown region level: {level}, skipping")
+            continue
+
+        level_key = level_map[level]
+        logger.info(f"Computing frequencies for {level}...")
+
+        regional_df = compute_char_frequency_by_region(villages_df, level_key)
+
+        # Add global stats and compute lift
+        regional_df = calculate_lift(regional_df, global_freq)
+
+        # Store with original level name as key
+        regional_freqs[level] = regional_df
+
+        logger.info(f"  {level}: {len(regional_df)} char-region pairs")
+
+    return {
+        'global': global_freq_filtered,
+        'regional': regional_freqs
+    }

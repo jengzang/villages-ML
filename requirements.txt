@@ -9,6 +9,7 @@ umap-learn>=0.5.0
 # NLP and embeddings
 gensim>=4.3.2
 msgpack>=1.0.7
+networkx>=3.0
 
 # Spatial analysis
 scipy>=1.10.0
