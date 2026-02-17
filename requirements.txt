@@ -33,3 +33,7 @@ pytest-cov>=4.1.0
 # Geospatial (optional, for working with coordinates)
 # geopandas>=0.13.0
 # folium>=0.14.0
+
+# LLM APIs (optional, for Phase 2 semantic discovery)
+# openai>=1.0.0        # For OpenAI GPT models and DeepSeek
+# anthropic>=0.18.0    # For Anthropic Claude models
