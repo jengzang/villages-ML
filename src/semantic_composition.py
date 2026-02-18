@@ -66,6 +66,8 @@ class SemanticCompositionAnalyzer:
         """
         Extract semantic category sequence from village name.
 
+        For unlabeled characters, use 'other' category.
+
         Args:
             village_name: Village name
             char_labels: Character -> category mapping
@@ -77,7 +79,7 @@ class SemanticCompositionAnalyzer:
 
         for char in village_name:
             if '\u4e00' <= char <= '\u9fff':  # Valid Chinese character
-                category = char_labels.get(char, 'other')
+                category = char_labels.get(char, 'other')  # Use 'other' for unlabeled
                 sequence.append(category)
 
         return sequence

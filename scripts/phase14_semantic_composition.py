@@ -220,6 +220,7 @@ def step6_extract_village_structures(db_path: str):
         cursor.execute("SELECT * FROM 广东省自然村")
 
         count = 0
+        skipped = 0
         for row in cursor:
             village_committee = row[3]  # 村委会 is at index 3
             village_name = row[4]        # 自然村 is at index 4
@@ -230,6 +231,16 @@ def step6_extract_village_structures(db_path: str):
             sequence = analyzer.extract_semantic_sequence(village_name, char_labels)
 
             if len(sequence) == 0:
+                skipped += 1
+                continue
+
+            # Calculate labeling coverage
+            labeled_count = sum(1 for cat in sequence if cat != 'other')
+            coverage = labeled_count / len(sequence) if len(sequence) > 0 else 0
+
+            # Only process villages with at least 50% labeled characters
+            if coverage < 0.5:
+                skipped += 1
                 continue
 
             sequence_str = json.dumps(sequence)
@@ -252,11 +263,12 @@ def step6_extract_village_structures(db_path: str):
 
             count += 1
             if count % 10000 == 0:
-                print(f"  Progress: {count:,} villages")
+                print(f"  Progress: {count:,} villages processed, {skipped:,} skipped")
                 conn.commit()
 
         conn.commit()
         print(f"\n[OK] Extracted structures for {count:,} villages")
+        print(f"     Skipped {skipped:,} villages (< 50% labeled)")
 
     conn.close()
 
