@@ -13,10 +13,14 @@ Usage:
 import argparse
 import logging
 import sqlite3
+import sys
 import time
 from pathlib import Path
 
 import pandas as pd
+
+# Add src to path
+sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from src.data.db_loader import load_villages
 from src.analysis.char_frequency import compute_char_frequency

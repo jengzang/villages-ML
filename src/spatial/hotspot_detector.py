@@ -30,7 +30,8 @@ class HotspotDetector:
     def detect_density_hotspots(
         self,
         coords: np.ndarray,
-        df: pd.DataFrame
+        df: pd.DataFrame,
+        sample_size: int = 10000
     ) -> pd.DataFrame:
         """
         Detect high-density hotspots using KDE.
@@ -38,6 +39,7 @@ class HotspotDetector:
         Args:
             coords: Array of shape (n_points, 2) with [latitude, longitude]
             df: DataFrame with village data
+            sample_size: Number of points to sample for KDE evaluation (default: 10000)
 
         Returns:
             DataFrame with hotspot information
@@ -51,25 +53,36 @@ class HotspotDetector:
         logger.info(f"Computing KDE with bandwidth={self.bandwidth_deg:.4f} degrees")
         kde = gaussian_kde(coords_t, bw_method=self.bandwidth_deg)
 
-        # Evaluate density at each point
-        density = kde(coords_t)
+        # For large datasets, sample points for density evaluation
+        n_points = coords.shape[0]
+        if n_points > sample_size:
+            logger.info(f"Sampling {sample_size} points from {n_points} for density evaluation")
+            sample_indices = np.random.choice(n_points, size=sample_size, replace=False)
+            eval_coords_t = coords_t[:, sample_indices]
+        else:
+            eval_coords_t = coords_t
+            sample_indices = np.arange(n_points)
+
+        # Evaluate density at sampled points
+        density = kde(eval_coords_t)
 
         # Find threshold
         threshold = np.percentile(density, self.threshold_percentile)
         logger.info(f"Density threshold (p{self.threshold_percentile}): {threshold:.6f}")
 
-        # Identify hotspot points
+        # Identify hotspot points (only among sampled points)
         hotspot_mask = density >= threshold
         n_hotspot_points = hotspot_mask.sum()
-        logger.info(f"Found {n_hotspot_points} villages in hotspots")
+        logger.info(f"Found {n_hotspot_points} villages in hotspots (from {len(sample_indices)} sampled)")
 
         if n_hotspot_points == 0:
             logger.warning("No hotspots detected")
             return pd.DataFrame()
 
-        # Get hotspot coordinates
-        hotspot_coords = coords[hotspot_mask]
-        hotspot_df = df[hotspot_mask].copy()
+        # Get hotspot coordinates and data (from sampled points)
+        hotspot_sample_indices = sample_indices[hotspot_mask]
+        hotspot_coords = coords[hotspot_sample_indices]
+        hotspot_df = df.iloc[hotspot_sample_indices].copy()
         hotspot_df['density_score'] = density[hotspot_mask]
 
         # Cluster hotspot points to identify distinct hotspots

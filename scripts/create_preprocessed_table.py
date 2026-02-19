@@ -138,12 +138,30 @@ def main():
 
     # Step 2: Administrative prefix removal
     logger.info("Step 2: Administrative prefix removal...")
-    df_prefix = batch_clean_prefixes(
-        df_clean[df_clean['有效'] == 1].copy(),
-        conn,
-        min_length=3,
+    # Select only valid rows
+    valid_df = df_clean[df_clean['有效'] == 1].copy()
+
+    # Prepare input dataframe with required columns
+    # batch_clean_prefixes expects columns: 自然村, 行政村
+    input_df = pd.DataFrame({
+        '自然村': valid_df['自然村_基础清洗'].values,
+        '行政村': valid_df['行政村'].values
+    })
+
+    df_prefix_results = batch_clean_prefixes(
+        input_df,
+        min_length=2,  # Changed from 3 to 2 to match new implementation
         confidence_threshold=0.7
     )
+
+    # Merge results back with original valid rows
+    df_prefix = valid_df.copy()
+    df_prefix['自然村_去前缀'] = df_prefix_results['自然村_去前缀'].values
+    df_prefix['有前缀'] = df_prefix_results['有前缀'].values
+    df_prefix['去除的前缀'] = df_prefix_results['去除的前缀'].values
+    df_prefix['前缀匹配来源'] = df_prefix_results['前缀匹配来源'].values
+    df_prefix['前缀置信度'] = df_prefix_results['前缀置信度'].values
+    df_prefix['需要审核'] = df_prefix_results['需要审核'].values
 
     # Merge back with invalid rows
     df_invalid = df_clean[df_clean['有效'] == 0].copy()

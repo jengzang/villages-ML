@@ -23,7 +23,12 @@
       "Bash(grep:*)",
       "Bash(PYTHONPATH=. timeout 60 python:*)",
       "Bash(PYTHONPATH=. timeout 90 python:*)",
-      "Bash(git push:*)"
+      "Bash(git push:*)",
+      "Bash(bash run_preprocessing.sh)",
+      "Bash(\"C:/Users/joengzaang/PycharmProjects/villages-ML/test3_debug.py\":*)",
+      "Bash(\"C:/Users/joengzaang/PycharmProjects/villages-ML/test3_final.py\":*)",
+      "Bash(tee:*)",
+      "Bash(\"docs/分析结果展示_中文版.md\":*)"
     ]
   }
 }

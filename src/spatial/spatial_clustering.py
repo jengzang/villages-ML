@@ -106,8 +106,11 @@ class SpatialClusterer:
             cluster_size = mask.sum()
 
             # Get dominant region
-            dominant_city = cluster_df['city'].mode()[0] if len(cluster_df) > 0 else None
-            dominant_county = cluster_df['county'].mode()[0] if len(cluster_df) > 0 else None
+            city_mode = cluster_df['city'].mode()
+            dominant_city = city_mode.iloc[0] if len(city_mode) > 0 else None
+
+            county_mode = cluster_df['county'].mode()
+            dominant_county = county_mode.iloc[0] if len(county_mode) > 0 else None
 
             # Calculate average density (avg distance to centroid)
             distances = np.sqrt(

@@ -142,8 +142,10 @@ def run_spatial_analysis_pipeline(
         logger.info("="*80)
         hotspot_detector = HotspotDetector(bandwidth_km=5.0, threshold_percentile=95)
 
-        # Detect density hotspots
-        density_hotspots_df = hotspot_detector.detect_density_hotspots(coords, coords_df)
+        # Detect density hotspots (use sampling for large datasets)
+        density_hotspots_df = hotspot_detector.detect_density_hotspots(
+            coords, coords_df, sample_size=10000
+        )
 
         # Detect naming hotspots (if semantic features available)
         naming_hotspots_df = pd.DataFrame()

@@ -51,13 +51,22 @@ class CoordinateLoader:
         """
         logger.info("Loading coordinates from database")
 
-        # Query all columns
-        query = "SELECT * FROM 广东省自然村"
+        # Query from preprocessed table with cleaned village names
+        query = """
+        SELECT
+            市级 as city,
+            区县级 as county,
+            乡镇级 as town,
+            行政村 as village_committee,
+            自然村_去前缀 as village_name,
+            拼音 as pinyin,
+            语言分布 as language_distribution,
+            longitude,
+            latitude
+        FROM 广东省自然村_预处理
+        WHERE 有效 = 1
+        """
         df = pd.read_sql_query(query, conn)
-
-        # Rename columns to English
-        df.columns = ['city', 'county', 'town', 'village_committee', 'village_name', 'pinyin',
-                      'language_distribution', 'longitude', 'latitude', 'notes', 'update_time', 'data_source']
 
         logger.info(f"Loaded {len(df)} total villages")
 

@@ -6,6 +6,67 @@
 
 This project focuses on analyzing and modeling village data from Guangdong Province, China. The dataset includes geographic coordinates, administrative divisions, and language distribution information for natural villages.
 
+## 快速开始 (Quick Start)
+
+### 运行完整分析管道 (Run Complete Analysis Pipeline)
+
+使用 `run_all_phases.py` 脚本可以一次性运行所有分析阶段，或选择性地运行特定阶段。
+
+```bash
+# 查看所有可用的分析阶段
+python run_all_phases.py --list
+
+# 运行所有分析阶段（Phase 0-6）
+python run_all_phases.py --all
+
+# 运行特定阶段（例如：Phase 1, 2, 3）
+python run_all_phases.py --phases 1,2,3
+
+# 使用自定义run ID前缀
+python run_all_phases.py --all --run-id-prefix production
+
+# 预览将要执行的命令（不实际运行）
+python run_all_phases.py --all --dry-run
+```
+
+### 分析阶段说明 (Analysis Phases)
+
+| Phase | 名称 | 说明 | 预计时间 |
+|-------|------|------|----------|
+| 0 | 数据预处理 | 清理村名，去除行政村前缀 | ~50秒 |
+| 1 | 字符嵌入 | 训练Word2Vec字符向量 | ~5秒 |
+| 2 | 频率与倾向性分析 | 计算字符频率和区域倾向性 | ~90秒 |
+| 3 | 空间分析 | 分析空间分布模式 | ~2分钟 |
+| 4 | 聚类分析 | 基于命名特征聚类村落 | ~3分钟 |
+| 5 | N-gram分析 | 提取字符n-gram模式 | ~2分钟 |
+| 6 | 语义组合分析 | 分析语义组合模式 | ~2分钟 |
+
+**总运行时间**：约10-15分钟（完整管道）
+
+### 配置常量 (Configuration Constants)
+
+所有预处理常量集中在 `src/preprocessing/constants.py` 中：
+
+```python
+# 行政分隔符
+DELIMITERS = ["社区", "村", "寨", "片", "管区", "农场", "区"]
+
+# 方位和大小修饰词
+MODIFIERS = ["大", "小", "新", "老", "東", "西", "南", "北", "上", "下"]
+
+# 同音字映射
+HOMOPHONE_PAIRS = {
+    "湖下": ["湖厦", "湖夏"],
+    "石": ["时"],
+}
+```
+
+修改这些常量后，重新运行 Phase 0 即可应用新配置：
+
+```bash
+python run_all_phases.py --phases 0
+```
+
 ## 数据结构 (Data Structure)
 
 The project uses a SQLite database (`data/villages.db`) containing information about villages including:

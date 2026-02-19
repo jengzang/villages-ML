@@ -1,20 +1,36 @@
 """Administrative prefix cleaning for village names.
 
-This module implements the administrative_prefix_cleaning skill specification.
-It detects and removes redundant administrative-village prefixes from natural village names.
+This module implements a 5-rule priority system for removing administrative
+prefixes from natural village names.
+
+Rule Priority Order:
+1. Greedy delimiter-based removal (HIGHEST PRIORITY)
+2. Admin village comparison (only if Rule 1 doesn't apply)
+3. Size/direction modifier handling (during Rule 2)
+4. Minimum 2 Chinese characters validation
+5. Identical names early exit
 
 Design Philosophy:
-- Split-first parsing: Parse natural village name before matching
+- Strict priority order: Rules are applied in sequence
 - Conservative behavior: Prefer false negatives over false positives
 - Explainable edits: All edits must be reproducible and auditable
 """
 
 import re
-import sqlite3
 import logging
 from dataclasses import dataclass
-from typing import Optional, List, Tuple
+from typing import Optional
 import pandas as pd
+
+from .constants import (
+    DELIMITERS,
+    DELIMITERS_SUBSET,
+    MODIFIERS,
+    HOMOPHONE_PAIRS,
+    MIN_LENGTH_DEFAULT,
+    CONFIDENCE_THRESHOLD_DEFAULT,
+    CONFIDENCE_SCORES
+)
 
 logger = logging.getLogger(__name__)
 
@@ -27,249 +43,212 @@ class PrefixCleanedName:
     prefix_removed_name: str  # After prefix removal
     had_prefix: bool
     removed_prefix: str
-    match_source: str  # "same_row_exact" | "same_row_partial" | "same_township" | "same_county" | "none"
+    match_source: str  # "rule1_delimiter" | "rule2_admin_match" | "rule3_modifier" | "none"
     confidence: float  # 0.0-1.0
     needs_review: bool  # True if confidence < threshold
 
 
-def generate_prefix_candidates(natural_village: str) -> List[Tuple[str, str]]:
-    """
-    Generate prefix candidates from natural village name.
+def count_chinese_chars(text: str) -> int:
+    """Count only Chinese characters (not numbers, punctuation).
 
-    Strategy (Split-First Parsing):
-    1. Try fixed-length prefixes (2-3 characters)
-    2. Try delimiter-based prefixes (村, 寨, 坊, etc.)
+    Args:
+        text: Input text
+
+    Returns:
+        Number of Chinese characters
+    """
+    chinese_chars = re.findall(r'[\u4e00-\u9fff]', text)
+    return len(chinese_chars)
+
+
+def remove_delimiters(text: str) -> str:
+    """Remove administrative delimiters from text.
+
+    Args:
+        text: Input text
+
+    Returns:
+        Text with delimiters removed
+    """
+    for delimiter in DELIMITERS:
+        text = text.replace(delimiter, "")
+    return text
+
+
+def try_rule1_delimiter_removal(natural_village: str) -> str:
+    """Rule 1: Find the LAST delimiter and remove everything up to and including it.
+
+    Delimiters: 村, 社区, 寨, 片 (checked in this order for longer matches first)
 
     Args:
         natural_village: Natural village name
 
     Returns:
-        List of (prefix, suffix) tuples
+        Prefix to remove (empty string if no delimiter found)
+
+    Examples:
+        霞露村尾厝 → 霞露村 (remove up to and including last 村)
+        陈家村石桥社区郑厝 → 陈家村石桥社区 (greedy to last delimiter!)
     """
-    candidates = []
+    delimiters = DELIMITERS  # Use constants from config
 
-    # Strategy 1: Fixed-length prefixes (2-3 characters)
-    for length in [2, 3]:
-        if len(natural_village) > length:
-            prefix = natural_village[:length]
-            suffix = natural_village[length:]
-            candidates.append((prefix, suffix))
+    last_delimiter_pos = -1
+    last_delimiter_len = 0
 
-    # Strategy 2: Delimiter-based prefixes
-    delimiters = ["村", "寨", "坊", "圩", "墟", "围", "片", "组"]
+    # Find the LAST occurrence of any delimiter
     for delimiter in delimiters:
-        # Find first delimiter (not including first character)
-        if delimiter in natural_village[1:]:
-            idx = natural_village.index(delimiter, 1)
+        pos = natural_village.rfind(delimiter)
+        if pos > last_delimiter_pos:
+            last_delimiter_pos = pos
+            last_delimiter_len = len(delimiter)
 
-            # Include delimiter in prefix
-            prefix_with_delim = natural_village[:idx+1]
-            suffix_after_delim = natural_village[idx+1:]
-            if suffix_after_delim:  # Must have something after delimiter
-                candidates.append((prefix_with_delim, suffix_after_delim))
+    if last_delimiter_pos > 0:  # Found a delimiter (not at start)
+        # Remove everything up to and including the delimiter
+        prefix = natural_village[:last_delimiter_pos + last_delimiter_len]
+        return prefix
 
-            # Also try without delimiter
-            prefix_no_delim = natural_village[:idx]
-            suffix_with_delim = natural_village[idx:]
-            if len(prefix_no_delim) >= 2:  # Prefix must be at least 2 chars
-                candidates.append((prefix_no_delim, suffix_with_delim))
-
-    # Remove duplicates while preserving order
-    seen = set()
-    unique_candidates = []
-    for candidate in candidates:
-        if candidate not in seen:
-            seen.add(candidate)
-            unique_candidates.append(candidate)
-
-    return unique_candidates
+    return ""  # No delimiter found
 
 
-def flexible_match(prefix_candidate: str, admin_village: str) -> Tuple[bool, float, str]:
-    """
-    Flexible matching between prefix candidate and administrative village.
+def try_homophone_match(natural_village: str, normalized_admin: str) -> str:
+    """Try to match with homophone variants.
 
-    Handles cases where admin village may or may not have "村" suffix.
-
-    Args:
-        prefix_candidate: Candidate prefix from natural village
-        admin_village: Administrative village name (can be None)
-
-    Returns:
-        Tuple of (is_match, confidence, match_type)
-    """
-    # Handle None/empty admin village
-    if not admin_village or not prefix_candidate:
-        return (False, 0.0, "none")
-
-    # Normalize: remove trailing delimiters
-    admin_normalized = admin_village.rstrip("村寨坊圩墟围")
-    prefix_normalized = prefix_candidate.rstrip("村寨坊圩墟围")
-
-    # Priority 1: Exact match (highest confidence)
-    if prefix_candidate == admin_village:
-        return (True, 1.0, "exact")
-    if prefix_normalized == admin_normalized and len(prefix_normalized) >= 2:
-        return (True, 0.95, "exact_normalized")
-
-    # Priority 2: Prefix match (admin is prefix of candidate)
-    if prefix_normalized.startswith(admin_normalized) and len(admin_normalized) >= 2:
-        return (True, 0.85, "admin_prefix")
-
-    # Priority 3: Suffix match (candidate is prefix of admin)
-    if admin_normalized.startswith(prefix_normalized) and len(prefix_normalized) >= 2:
-        return (True, 0.80, "candidate_prefix")
-
-    # Priority 4: Partial match (first 2 characters)
-    if len(prefix_normalized) >= 2 and len(admin_normalized) >= 2:
-        if prefix_normalized[:2] == admin_normalized[:2]:
-            return (True, 0.70, "partial_2char")
-
-    return (False, 0.0, "none")
-
-
-def search_admin_villages_in_region(
-    prefix_candidate: str,
-    city: str,
-    county: str,
-    township: str,
-    conn: sqlite3.Connection
-) -> List[Tuple[str, str, str, str, float]]:
-    """
-    Search for matching administrative villages in the same region.
-
-    Priority order: same township > same county > same city
-
-    Args:
-        prefix_candidate: Candidate prefix to search for
-        city: City name
-        county: County name
-        township: Township name
-        conn: Database connection
-
-    Returns:
-        List of (admin_village, township, county, city, confidence) tuples
-    """
-    results = []
-    cursor = conn.cursor()
-
-    # Priority 1: Same township (confidence 0.7)
-    if township:
-        query = """
-        SELECT DISTINCT 行政村, 乡镇级, 区县级, 市级
-        FROM 广东省自然村
-        WHERE 市级 = ? AND 区县级 = ? AND 乡镇级 = ?
-          AND (行政村 LIKE ? OR REPLACE(行政村, '村', '') LIKE ?)
-        LIMIT 10
-        """
-        cursor.execute(query, (city, county, township, f"{prefix_candidate}%", f"{prefix_candidate}%"))
-        for row in cursor.fetchall():
-            results.append((row[0], row[1], row[2], row[3], 0.7))
-
-    if results:
-        return results
-
-    # Priority 2: Same county (confidence 0.5)
-    if county:
-        query = """
-        SELECT DISTINCT 行政村, 乡镇级, 区县级, 市级
-        FROM 广东省自然村
-        WHERE 市级 = ? AND 区县级 = ?
-          AND (行政村 LIKE ? OR REPLACE(行政村, '村', '') LIKE ?)
-        LIMIT 10
-        """
-        cursor.execute(query, (city, county, f"{prefix_candidate}%", f"{prefix_candidate}%"))
-        for row in cursor.fetchall():
-            results.append((row[0], row[1], row[2], row[3], 0.5))
-
-    return results
-
-
-def remove_prefix_conservative(natural_village: str, prefix: str) -> str:
-    """
-    Conservatively remove prefix from natural village name.
-
-    Rules:
-    1. Only remove prefix (at beginning), never internal substrings
-    2. Remaining length must be >= 1 character
-    3. Only remove one prefix segment per pass
+    Start with simple common pairs, can expand later.
 
     Args:
         natural_village: Natural village name
-        prefix: Prefix to remove
+        normalized_admin: Normalized admin village name
 
     Returns:
-        Name with prefix removed, or original if removal not safe
+        Matched prefix (empty string if no match)
     """
-    # Check if it's actually a prefix (at beginning)
-    if not natural_village.startswith(prefix):
-        return natural_village
+    for standard, variants in HOMOPHONE_PAIRS.items():
+        if normalized_admin == standard:
+            for variant in variants:
+                # Check if natural village starts with variant
+                if natural_village.startswith(variant):
+                    # Find the delimiter after variant
+                    for delimiter in DELIMITERS_SUBSET:
+                        candidate = variant + delimiter
+                        if natural_village.startswith(candidate):
+                            return candidate
+                    return variant
 
-    # Remove prefix
-    remaining = natural_village[len(prefix):]
+    return ""
 
-    # Check remaining length
-    if len(remaining) < 1:
-        return natural_village  # Don't remove if nothing left
 
-    return remaining
+def try_rule2_admin_comparison(natural_village: str, admin_village: str, min_length: int = 2) -> tuple[str, bool]:
+    """Rule 2: Compare with admin village name (with homophone support).
+
+    Steps:
+    1. Normalize admin village (remove delimiters)
+    2. Check for modifiers (Rule 3)
+    3. Match with 70% threshold
+    4. Support homophone variants
+    5. IMPORTANT: If natural contains full admin name (with delimiter),
+       try that first. If it fails Rule 4, don't try normalized version.
+
+    Args:
+        natural_village: Natural village name
+        admin_village: Admin village name
+        min_length: Minimum Chinese characters required after removal
+
+    Returns:
+        Tuple of (prefix to remove, should_try_alternatives)
+        - If should_try_alternatives is False, don't try other matches
+
+    Examples:
+        Admin=凤北村, Natural=凤北超苟村 → 凤北
+        Admin=湖下村, Natural=湖厦村祠堂前片 → 湖厦村 (homophone)
+        Admin=松水村, Natural=大松水路头 → 大松水 (modifier)
+        Admin=王家村, Natural=王家村东 → "" (would leave only 东, abort)
+    """
+    if not admin_village:
+        return "", True
+
+    # Normalize admin village: remove delimiters
+    normalized_admin = remove_delimiters(admin_village)
+
+    # Rule 3: Check for modifiers
+    for modifier in MODIFIERS:
+        # Check with delimiter first
+        for delimiter in DELIMITERS_SUBSET:
+            candidate_with_delim = modifier + normalized_admin + delimiter
+            if natural_village.startswith(candidate_with_delim):
+                remaining = natural_village[len(candidate_with_delim):]
+                if count_chinese_chars(remaining) >= min_length:
+                    return candidate_with_delim, True
+                # If fails Rule 4, don't try without delimiter
+                return "", False
+
+        # Then check without delimiter
+        candidate = modifier + normalized_admin
+        if natural_village.startswith(candidate):
+            remaining = natural_village[len(candidate):]
+            if count_chinese_chars(remaining) >= min_length:
+                return candidate, True
+
+    # Check with delimiter FIRST (priority over normalized)
+    for delimiter in DELIMITERS_SUBSET:
+        candidate = normalized_admin + delimiter
+        if natural_village.startswith(candidate):
+            remaining = natural_village[len(candidate):]
+            if count_chinese_chars(remaining) >= min_length:
+                return candidate, True
+            # If natural contains full admin name but removal fails Rule 4,
+            # don't try to remove just the normalized part
+            return "", False
+
+    # Direct match (no modifier, no delimiter)
+    if natural_village.startswith(normalized_admin):
+        # Check 70% threshold (at least 2 chars)
+        if len(normalized_admin) >= 2:
+            remaining = natural_village[len(normalized_admin):]
+            if count_chinese_chars(remaining) >= min_length:
+                return normalized_admin, True
+
+    # Homophone matching
+    homophone_match = try_homophone_match(natural_village, normalized_admin)
+    if homophone_match:
+        remaining = natural_village[len(homophone_match):]
+        if count_chinese_chars(remaining) >= min_length:
+            return homophone_match, True
+
+    return "", True  # No match found
 
 
 def remove_administrative_prefix(
     natural_village: str,
     administrative_village: str,
-    township: str = None,
-    county: str = None,
-    city: str = None,
-    conn: sqlite3.Connection = None,
-    min_length: int = 3,
-    confidence_threshold: float = 0.7
+    min_length: int = MIN_LENGTH_DEFAULT,
+    confidence_threshold: float = CONFIDENCE_THRESHOLD_DEFAULT
 ) -> PrefixCleanedName:
-    """
-    Remove administrative prefix from natural village name.
+    """Remove administrative prefix from natural village name.
 
-    Implements the administrative_prefix_cleaning skill specification.
+    Applies 5 rules in strict priority order:
+    1. Rule 1: Greedy delimiter-based removal (HIGHEST PRIORITY)
+    2. Rule 2: Admin village comparison (only if Rule 1 doesn't apply)
+    3. Rule 3: Modifier handling (during Rule 2)
+    4. Rule 4: Minimum 2 Chinese characters validation
+    5. Rule 5: Identical names early exit
 
     Args:
         natural_village: Natural village name (after basic cleaning)
         administrative_village: Administrative village name from same row
-        township: Township name (for fallback search)
-        county: County name (for fallback search)
-        city: City name (for fallback search)
-        conn: Database connection (for fallback search)
-        min_length: Minimum length to attempt prefix removal
+        min_length: Minimum Chinese characters required after removal (default: 2)
         confidence_threshold: Minimum confidence to auto-remove (default 0.7)
 
     Returns:
         PrefixCleanedName with results and metadata
+
+    Examples:
+        Rule 1: 霞露村尾厝 + 霞露村 → 尾厝 (remove 霞露村)
+        Rule 2: 凤北超苟村 + 凤北村 → 超苟村 (remove 凤北)
+        Rule 3: 大松水路头 + 松水村 → 路头 (remove 大松水)
+        Rule 4: 王家村东 + 王家村 → 王家村东 (would leave only 东, abort)
+        Rule 5: 凤北村 + 凤北村 → 凤北村 (identical, no removal)
     """
-    # Step 0: Length guard (conservative entry filter)
-    if len(natural_village) <= min_length:
-        return PrefixCleanedName(
-            raw_name=natural_village,
-            clean_name=natural_village,
-            prefix_removed_name=natural_village,
-            had_prefix=False,
-            removed_prefix="",
-            match_source="too_short",
-            confidence=0.0,
-            needs_review=False
-        )
-
-    # Handle None/empty administrative village
-    if not administrative_village:
-        return PrefixCleanedName(
-            raw_name=natural_village,
-            clean_name=natural_village,
-            prefix_removed_name=natural_village,
-            had_prefix=False,
-            removed_prefix="",
-            match_source="no_admin_village",
-            confidence=0.0,
-            needs_review=False
-        )
-
-    # Handle identical names
+    # Rule 5: Early exit for identical names
     if natural_village == administrative_village:
         return PrefixCleanedName(
             raw_name=natural_village,
@@ -277,103 +256,83 @@ def remove_administrative_prefix(
             prefix_removed_name=natural_village,
             had_prefix=False,
             removed_prefix="",
-            match_source="identical",
+            match_source="rule5_identical",
+            confidence=1.0,
+            needs_review=False
+        )
+
+    # Handle empty/None cases
+    if not natural_village:
+        return PrefixCleanedName(
+            raw_name=natural_village or "",
+            clean_name=natural_village or "",
+            prefix_removed_name=natural_village or "",
+            had_prefix=False,
+            removed_prefix="",
+            match_source="empty_name",
             confidence=0.0,
             needs_review=False
         )
 
-    # Step 1: Generate prefix candidates (split-first parsing)
-    prefix_candidates = generate_prefix_candidates(natural_village)
+    # Rule 1: Check for explicit delimiters (HIGHEST PRIORITY)
+    prefix = try_rule1_delimiter_removal(natural_village)
+    if prefix:
+        remaining = natural_village[len(prefix):]
+        # Rule 4: Validate minimum length
+        if count_chinese_chars(remaining) >= min_length:
+            return PrefixCleanedName(
+                raw_name=natural_village,
+                clean_name=natural_village,
+                prefix_removed_name=remaining,
+                had_prefix=True,
+                removed_prefix=prefix,
+                match_source="rule1_delimiter",
+                confidence=CONFIDENCE_SCORES["rule1_delimiter"],
+                needs_review=False
+            )
 
-    if not prefix_candidates:
+    # Rule 2: Compare with admin village (only if Rule 1 didn't match)
+    prefix, _ = try_rule2_admin_comparison(natural_village, administrative_village, min_length)
+    if prefix:
+        remaining = natural_village[len(prefix):]\
+        # Rule 4 validation already done in try_rule2_admin_comparison
+        # Determine if this was a modifier match (Rule 3)
+        match_source = "rule3_modifier" if any(prefix.startswith(m) for m in MODIFIERS) else "rule2_admin_match"
+
         return PrefixCleanedName(
             raw_name=natural_village,
             clean_name=natural_village,
-            prefix_removed_name=natural_village,
-            had_prefix=False,
-            removed_prefix="",
-            match_source="no_candidates",
-            confidence=0.0,
+            prefix_removed_name=remaining,
+            had_prefix=True,
+            removed_prefix=prefix,
+            match_source=match_source,
+            confidence=CONFIDENCE_SCORES.get(match_source, 0.9),
             needs_review=False
         )
 
-    # Step 2: Match and validate prefix candidates
-    best_match = None
-    best_confidence = 0.0
-    best_match_source = "none"
-
-    # 2.1 Row-level match (primary)
-    for prefix, suffix in prefix_candidates:
-        is_match, conf, match_type = flexible_match(prefix, administrative_village)
-        if is_match and conf > best_confidence:
-            best_match = prefix
-            best_confidence = conf
-            best_match_source = f"same_row_{match_type}"
-
-    # 2.2 Local search match (fallback)
-    if best_confidence < 0.7 and conn and city:
-        for prefix, suffix in prefix_candidates:
-            # Only search if prefix is reasonable length
-            if len(prefix) >= 2:
-                matches = search_admin_villages_in_region(
-                    prefix, city, county, township, conn
-                )
-                for admin_v, twn, cnt, cty, search_conf in matches:
-                    is_match, match_conf, match_type = flexible_match(prefix, admin_v)
-                    if is_match:
-                        # Combine search confidence with match confidence
-                        combined_conf = min(search_conf, match_conf)
-                        if combined_conf > best_confidence:
-                            best_match = prefix
-                            best_confidence = combined_conf
-                            if twn == township:
-                                best_match_source = "same_township"
-                            elif cnt == county:
-                                best_match_source = "same_county"
-                            else:
-                                best_match_source = "same_city"
-
-    # Step 3: Apply editing rule (conservative removal)
-    if best_match and best_confidence >= confidence_threshold:
-        final_name = remove_prefix_conservative(natural_village, best_match)
-        had_prefix = (final_name != natural_village)
-        needs_review = False
-    elif best_match and best_confidence > 0:
-        # Low confidence: keep original but mark for review
-        final_name = natural_village
-        had_prefix = False
-        needs_review = True
-    else:
-        # No match found
-        final_name = natural_village
-        had_prefix = False
-        needs_review = False
-
+    # No match found
     return PrefixCleanedName(
         raw_name=natural_village,
         clean_name=natural_village,
-        prefix_removed_name=final_name,
-        had_prefix=had_prefix,
-        removed_prefix=best_match if had_prefix else "",
-        match_source=best_match_source,
-        confidence=best_confidence,
-        needs_review=needs_review
+        prefix_removed_name=natural_village,
+        had_prefix=False,
+        removed_prefix="",
+        match_source="none",
+        confidence=0.0,
+        needs_review=False
     )
 
 
 def batch_clean_prefixes(
     villages_df: pd.DataFrame,
-    conn: sqlite3.Connection,
-    min_length: int = 3,
-    confidence_threshold: float = 0.7
+    min_length: int = MIN_LENGTH_DEFAULT,
+    confidence_threshold: float = CONFIDENCE_THRESHOLD_DEFAULT
 ) -> pd.DataFrame:
-    """
-    Batch clean prefixes for all villages.
+    """Batch clean prefixes for all villages.
 
     Args:
-        villages_df: DataFrame with columns: 自然村, 行政村, 乡镇级, 区县级, 市级
-        conn: Database connection for fallback searches
-        min_length: Minimum length to attempt prefix removal
+        villages_df: DataFrame with columns: 自然村, 行政村
+        min_length: Minimum Chinese characters required after removal
         confidence_threshold: Minimum confidence to auto-remove
 
     Returns:
@@ -396,11 +355,7 @@ def batch_clean_prefixes(
 
         result = remove_administrative_prefix(
             natural_village=row['自然村'],
-            administrative_village=row['行政村'],
-            township=row.get('乡镇级'),
-            county=row.get('区县级'),
-            city=row.get('市级'),
-            conn=conn,
+            administrative_village=row.get('行政村', ''),
             min_length=min_length,
             confidence_threshold=confidence_threshold
         )
@@ -427,4 +382,3 @@ def batch_clean_prefixes(
     logger.info(f"  Needs review: {needs_review_count} ({100*needs_review_count/total:.1f}%)")
 
     return output_df
-

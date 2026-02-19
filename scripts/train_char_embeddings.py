@@ -34,9 +34,13 @@ def load_villages(db_path: str) -> pd.DataFrame:
     """Load village data from database."""
     print(f"Loading villages from {db_path}...")
     conn = sqlite3.connect(db_path)
-    df = pd.read_sql_query("SELECT 自然村 FROM 广东省自然村", conn)
+    # Use preprocessed table with prefix-cleaned names
+    df = pd.read_sql_query(
+        "SELECT 自然村_去前缀 as 自然村 FROM 广东省自然村_预处理 WHERE 有效 = 1",
+        conn
+    )
     conn.close()
-    print(f"Loaded {len(df)} villages")
+    print(f"Loaded {len(df)} valid villages (prefix-cleaned)")
     return df
 
 
