@@ -52,12 +52,15 @@ class CoordinateLoader:
         logger.info("Loading coordinates from database")
 
         # Query from preprocessed table with cleaned village names
+        # Use ROWID to ensure absolute uniqueness (handles duplicate rows in source data)
         query = """
         SELECT
+            ROWID as row_id,
             市级 as city,
             区县级 as county,
             乡镇级 as town,
             行政村 as village_committee,
+            自然村 as village_name_original,
             自然村_去前缀 as village_name,
             拼音 as pinyin,
             语言分布 as language_distribution,
@@ -68,10 +71,13 @@ class CoordinateLoader:
         """
         df = pd.read_sql_query(query, conn)
 
+        # Create unique village_id using ROWID (guaranteed unique)
+        df['village_id'] = 'v_' + df['row_id'].astype(str)
+
         logger.info(f"Loaded {len(df)} total villages")
 
-        # Keep only needed columns
-        df = df[['village_name', 'city', 'county', 'town', 'longitude', 'latitude']]
+        # Keep only needed columns (including village_id for uniqueness)
+        df = df[['village_id', 'village_name', 'city', 'county', 'town', 'longitude', 'latitude']]
 
         # Convert coordinates to numeric
         df['longitude'] = pd.to_numeric(df['longitude'], errors='coerce')

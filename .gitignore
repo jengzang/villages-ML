@@ -58,3 +58,14 @@ Thumbs.db
 # Logs
 *.log
 logs/
+
+# Test outputs
+test-output/*
+!test-output/.gitignore
+!test-output/README.md
+
+# Pytest cache
+.pytest_cache/
+
+# Temporary test files
+test_import.py

@@ -1,177 +1,92 @@
-# Phase 12 Implementation Summary
+# Phase 12 (New): N-gram Structure Analysis - Implementation Summary
+
+**Status:** ✅ Implemented (Running)
+**Date:** 2026-02-17
+**Phase:** NLP Phase 4
+
+---
 
 ## Overview
 
-Successfully implemented Phase 12: Result Export & Reproducibility framework for the villages-ML project.
+Phase 12 implements comprehensive N-gram structure analysis for village names, extracting and analyzing character bigrams and trigrams to discover naming patterns and structural tendencies.
 
-## Components Implemented
+## Objectives
 
-### 1. Core Export Module (`src/export/`)
+1. Extract character bigrams and trigrams from 285K village names
+2. Compute global and regional frequency statistics
+3. Calculate tendency scores (lift, log-odds, z-score)
+4. Perform statistical significance testing
+5. Detect structural patterns (prefixes, suffixes, templates)
+6. Store all results in database for future analysis
 
-**exporters.py** (~360 lines)
-- `BaseExporter`: Abstract base class for all exporters
-- `CSVExporter`: UTF-8-BOM encoding, metadata in header comments, gzip compression support
-- `JSONExporter`: Structured JSON with metadata, pretty-print option
-- `ExcelExporter`: Multi-sheet workbooks, formatted tables, auto-column width
-- `LaTeXExporter`: Publication-ready tables with booktabs style, CJK support
+## Implementation Components
 
-**formatters.py** (~60 lines)
-- `format_number()`: Number formatting with thousands separator
-- `format_percentage()`: Percentage formatting
-- `format_timestamp()`: Unix timestamp to string conversion
-- `sanitize_latex()`: LaTeX special character escaping
-- `truncate_text()`: Text truncation utility
+### 1. Core Module: `src/ngram_analysis.py`
 
-**report_generator.py** (~170 lines)
-- `ReportGenerator`: Generate analysis reports in Markdown format
-  - `generate_summary_report()`: Overall summary with top-N rankings
-  - `generate_comparison_report()`: Cross-run comparison
+**NgramExtractor Class:**
+- Extracts n-grams with position awareness (prefix, suffix, middle, all)
+- Supports both bigrams (n=2) and trigrams (n=3)
+- Handles Chinese character validation
+- Provides global and regional extraction methods
 
-**reproducibility.py** (~300 lines)
-- `RunSnapshot`: Capture and store complete run configuration
-  - Git commit hash tracking
-  - Environment capture (Python version, platform)
-  - Data hash calculation
-- `ResultVersioning`: Semantic versioning and run comparison
-  - Parameter difference detection
-  - Result overlap calculation
-- `DeterminismValidator`: Reproducibility verification
-  - Validate run reproducibility
-  - Calculate result checksums
+**NgramAnalyzer Class:**
+- Calculates tendency scores:
+  - Lift (observed/expected ratio)
+  - Log-odds ratio
+  - Z-score normalization
+- Performs statistical significance testing:
+  - Chi-square test
+  - P-value calculation
+  - Cramer's V effect size
 
-### 2. CLI Scripts (`scripts/`)
+**StructuralPatternDetector Class:**
+- Detects common templates (e.g., "XX村", "大XX")
+- Identifies prefix patterns (e.g., "大X", "新X")
+- Identifies suffix patterns (e.g., "X村", "X坑")
+- Frequency-based pattern discovery
 
-**export_results.py** (~110 lines)
-- Export analysis results to CSV, JSON, Excel, or LaTeX
-- Support for all result types: global, regional, tendency, pattern, semantic, cluster
-- Top-N filtering, compression, region-level selection
+### 2. Database Schema: `src/ngram_schema.py`
 
-**generate_report.py** (~55 lines)
-- Generate summary or comparison reports
-- Markdown output format
-- Multi-run comparison support
+**Tables Created:**
 
-**compare_runs.py** (~95 lines)
-- Compare two runs and identify differences
-- Verify reproducibility of a run
-- Generate comparison reports
+1. **ngram_frequency** - Global n-gram frequencies
+2. **regional_ngram_frequency** - Regional n-gram frequencies (3 levels)
+3. **ngram_tendency** - Tendency scores (lift, log-odds, z-score)
+4. **ngram_significance** - Statistical significance tests
+5. **structural_patterns** - Identified templates and patterns
+6. **village_ngrams** - Per-village n-gram features
 
-**test_export.py** (~165 lines)
-- Comprehensive test suite for export module
-- Tests CSV, JSON export, report generation, and reproducibility
+### 3. Analysis Script: `scripts/phase12_ngram_analysis.py`
 
-### 3. Templates (`templates/`)
+**Execution Steps:**
+1. Create database tables and indexes
+2. Extract global n-grams (bigrams and trigrams)
+3. Extract regional n-grams (city, county, township levels)
+4. Calculate tendency scores
+5. Perform statistical significance testing
+6. Detect structural patterns
 
-**report_template.md**
-- Markdown template for analysis reports
-- Placeholder variables for dynamic content
+## Expected Results
 
-### 4. Database Schema Update
+- ~90,000+ unique bigrams
+- ~110,000+ unique trigrams
+- Regional tendency analysis for 3 administrative levels
+- Common structural patterns (prefix/suffix templates)
 
-**run_snapshots table**
-```sql
-CREATE TABLE run_snapshots (
-    run_id TEXT PRIMARY KEY,
-    created_at REAL NOT NULL,
-    git_commit_hash TEXT,
-    parameters_json TEXT NOT NULL,
-    random_state INTEGER,
-    environment_json TEXT NOT NULL,
-    data_hash TEXT NOT NULL,
-    is_reproducible INTEGER DEFAULT 1,
-    FOREIGN KEY (run_id) REFERENCES analysis_runs(run_id)
-);
-```
+## Performance
 
-## Test Results
-
-All tests passed successfully:
-- ✓ CSV Export
-- ✓ JSON Export
-- ✓ Report Generation
-- ✓ Reproducibility Framework
-
-## Usage Examples
-
-### Export to CSV
-```bash
-python scripts/export_results.py \
-    --run-id run_002 \
-    --type global \
-    --format csv \
-    --output results/global_frequency.csv
-```
-
-### Export to LaTeX (top 20)
-```bash
-python scripts/export_results.py \
-    --run-id run_002 \
-    --type global \
-    --format latex \
-    --top 20 \
-    --output paper/tables/char_frequency_top20.tex
-```
-
-### Generate Summary Report
-```bash
-python scripts/generate_report.py \
-    --run-id run_002 \
-    --type summary \
-    --output results/run_002/summary.md
-```
-
-### Compare Runs
-```bash
-python scripts/compare_runs.py \
-    --run-ids run_002 run_003 \
-    --output comparison.md
-```
-
-### Verify Reproducibility
-```bash
-python scripts/compare_runs.py \
-    --run-id run_002 \
-    --verify-reproducibility
-```
-
-## Key Features
-
-1. **Multiple Export Formats**: CSV, JSON, Excel, LaTeX
-2. **Metadata Embedding**: All exports include run metadata
-3. **Reproducibility Tracking**: Git commit, environment, parameters
-4. **Report Generation**: Auto-generated Markdown reports
-5. **Run Comparison**: Cross-run parameter and result comparison
-6. **Determinism Validation**: Checksum-based verification
-7. **DataFrame Support**: Handles pandas DataFrames from db_query functions
-8. **Error Handling**: Graceful degradation with error messages
+- **Processing Time:** ~5-10 minutes (estimated)
+- **Approach:** Offline-heavy, accuracy-focused, full dataset
+- **Database Size:** +100-200MB (6 new tables)
 
 ## Files Created
 
-- `src/export/__init__.py`
-- `src/export/exporters.py`
-- `src/export/formatters.py`
-- `src/export/report_generator.py`
-- `src/export/reproducibility.py`
-- `scripts/export_results.py`
-- `scripts/generate_report.py`
-- `scripts/compare_runs.py`
-- `scripts/test_export.py`
-- `templates/report_template.md`
-- `test_output/` (test artifacts)
+1. `src/ngram_analysis.py` - Core module (~200 lines)
+2. `src/ngram_schema.py` - Database schema (~100 lines)
+3. `scripts/phase12_ngram_analysis.py` - Execution script (~400 lines)
 
-## Total Lines of Code
+**Total:** ~700 lines of code
 
-- Core module: ~890 lines
-- CLI scripts: ~425 lines
-- **Total: ~1,315 lines**
+---
 
-## Next Steps
-
-Phase 12 is complete and ready for use. The export and reproducibility framework provides:
-- Standardized export formats for academic/research use
-- Complete reproducibility tracking
-- Auto-generated reports for quick insights
-- Cross-run comparison tools
-- Publication-ready LaTeX tables
-
-The system is now ready for Phase 13 (Spatial Hotspot Analysis) or Phase 14 (Lightweight Web API).
+**Implementation Status:** ✅ Complete and running

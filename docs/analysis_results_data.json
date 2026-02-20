@@ -1,0 +1,1503 @@
+{
+  "overview": {
+    "total_villages": 285860,
+    "valid_villages": 284764,
+    "preprocessed_count": 1096
+  },
+  "global_top_chars": [
+    {
+      "char": "村",
+      "frequency": 0.1240536022811872,
+      "village_count": 35326
+    },
+    {
+      "char": "屋",
+      "frequency": 0.0755678386312876,
+      "village_count": 21519
+    },
+    {
+      "char": "塘",
+      "frequency": 0.0747531289067438,
+      "village_count": 21287
+    },
+    {
+      "char": "下",
+      "frequency": 0.0682600328693233,
+      "village_count": 19438
+    },
+    {
+      "char": "坑",
+      "frequency": 0.0652821283589217,
+      "village_count": 18590
+    },
+    {
+      "char": "新",
+      "frequency": 0.0534793723925777,
+      "village_count": 15229
+    },
+    {
+      "char": "大",
+      "frequency": 0.0499747159051003,
+      "village_count": 14231
+    },
+    {
+      "char": "山",
+      "frequency": 0.0417363149836355,
+      "village_count": 11885
+    },
+    {
+      "char": "上",
+      "frequency": 0.0393343259681701,
+      "village_count": 11201
+    },
+    {
+      "char": "头",
+      "frequency": 0.0392640923712267,
+      "village_count": 11181
+    },
+    {
+      "char": "田",
+      "frequency": 0.035201078788049,
+      "village_count": 10024
+    },
+    {
+      "char": "石",
+      "frequency": 0.0348639575227205,
+      "village_count": 9928
+    },
+    {
+      "char": "岭",
+      "frequency": 0.0333750052675197,
+      "village_count": 9504
+    },
+    {
+      "char": "围",
+      "frequency": 0.0247854363613378,
+      "village_count": 7058
+    },
+    {
+      "char": "龙",
+      "frequency": 0.022868059164782,
+      "village_count": 6512
+    },
+    {
+      "char": "水",
+      "frequency": 0.0227065218918121,
+      "village_count": 6466
+    },
+    {
+      "char": "子",
+      "frequency": 0.0226994985321178,
+      "village_count": 6464
+    },
+    {
+      "char": "坪",
+      "frequency": 0.0220779311991684,
+      "village_count": 6287
+    },
+    {
+      "char": "岗",
+      "frequency": 0.0218883004874211,
+      "village_count": 6233
+    },
+    {
+      "char": "东",
+      "frequency": 0.0214142237080529,
+      "village_count": 6098
+    }
+  ],
+  "regional_tendency": {
+    "广州市": [
+      {
+        "char": "遇",
+        "lift": 34.504301466133526,
+        "log_lift": 3.54108399644317,
+        "frequency": 0.0002423361201987,
+        "village_count": 2,
+        "z_score": 8.066413311313537
+      },
+      {
+        "char": "汞",
+        "lift": 34.504301466133526,
+        "log_lift": 3.54108399644317,
+        "frequency": 0.0002423361201987,
+        "village_count": 2,
+        "z_score": 8.066413311313537
+      },
+      {
+        "char": "掂",
+        "lift": 34.504301466133526,
+        "log_lift": 3.54108399644317,
+        "frequency": 0.0002423361201987,
+        "village_count": 2,
+        "z_score": 8.066413311313537
+      },
+      {
+        "char": "貂",
+        "lift": 34.504301466133526,
+        "log_lift": 3.54108399644317,
+        "frequency": 0.0001211680600993,
+        "village_count": 1,
+        "z_score": 5.70380553725221
+      },
+      {
+        "char": "罕",
+        "lift": 34.504301466133526,
+        "log_lift": 3.54108399644317,
+        "frequency": 0.0001211680600993,
+        "village_count": 1,
+        "z_score": 5.70380553725221
+      },
+      {
+        "char": "庾",
+        "lift": 34.504301466133526,
+        "log_lift": 3.54108399644317,
+        "frequency": 0.0001211680600993,
+        "village_count": 1,
+        "z_score": 5.70380553725221
+      },
+      {
+        "char": "晻",
+        "lift": 34.504301466133526,
+        "log_lift": 3.54108399644317,
+        "frequency": 0.0001211680600993,
+        "village_count": 1,
+        "z_score": 5.70380553725221
+      },
+      {
+        "char": "煊",
+        "lift": 34.504301466133526,
+        "log_lift": 3.54108399644317,
+        "frequency": 0.0001211680600993,
+        "village_count": 1,
+        "z_score": 5.70380553725221
+      },
+      {
+        "char": "尒",
+        "lift": 34.504301466133526,
+        "log_lift": 3.54108399644317,
+        "frequency": 0.0001211680600993,
+        "village_count": 1,
+        "z_score": 5.70380553725221
+      },
+      {
+        "char": "吒",
+        "lift": 34.504301466133526,
+        "log_lift": 3.54108399644317,
+        "frequency": 0.0001211680600993,
+        "village_count": 1,
+        "z_score": 5.70380553725221
+      }
+    ],
+    "深圳市": [
+      {
+        "char": "难",
+        "lift": 312.2412280701754,
+        "log_lift": 5.743776055961523,
+        "frequency": 0.0010964912280701,
+        "village_count": 1,
+        "z_score": 17.61378778699054
+      },
+      {
+        "char": "掷",
+        "lift": 312.2412280701754,
+        "log_lift": 5.743776055961523,
+        "frequency": 0.0010964912280701,
+        "village_count": 1,
+        "z_score": 17.61378778699054
+      },
+      {
+        "char": "辇",
+        "lift": 104.08040935672511,
+        "log_lift": 4.645163767293413,
+        "frequency": 0.0021929824561403,
+        "village_count": 2,
+        "z_score": 14.289308478918706
+      },
+      {
+        "char": "蚝",
+        "lift": 78.06030701754385,
+        "log_lift": 4.357481694841632,
+        "frequency": 0.0043859649122807,
+        "village_count": 4,
+        "z_score": 17.444471006797
+      },
+      {
+        "char": "疆",
+        "lift": 78.06030701754385,
+        "log_lift": 4.357481694841632,
+        "frequency": 0.0010964912280701,
+        "village_count": 1,
+        "z_score": 8.722051720688938
+      },
+      {
+        "char": "捕",
+        "lift": 62.44824561403509,
+        "log_lift": 4.134338143527423,
+        "frequency": 0.0010964912280701,
+        "village_count": 1,
+        "z_score": 7.775944993914007
+      },
+      {
+        "char": "鸯",
+        "lift": 62.44824561403509,
+        "log_lift": 4.134338143527423,
+        "frequency": 0.0010964912280701,
+        "village_count": 1,
+        "z_score": 7.775944993914007
+      },
+      {
+        "char": "棺",
+        "lift": 62.44824561403509,
+        "log_lift": 4.134338143527423,
+        "frequency": 0.0010964912280701,
+        "village_count": 1,
+        "z_score": 7.775944993914007
+      },
+      {
+        "char": "峦",
+        "lift": 52.04020467836256,
+        "log_lift": 3.952016586733468,
+        "frequency": 0.0010964912280701,
+        "village_count": 1,
+        "z_score": 7.075342773934083
+      },
+      {
+        "char": "臣",
+        "lift": 44.60588972431077,
+        "log_lift": 3.7978659069062095,
+        "frequency": 0.0010964912280701,
+        "village_count": 1,
+        "z_score": 6.52911603458021
+      }
+    ],
+    "汕头市": [
+      {
+        "char": "徽",
+        "lift": 62.09419973833406,
+        "log_lift": 4.128652582618004,
+        "frequency": 0.0008722197993894,
+        "village_count": 4,
+        "z_score": 15.50627597671996
+      },
+      {
+        "char": "薏",
+        "lift": 62.09419973833406,
+        "log_lift": 4.128652582618004,
+        "frequency": 0.0004361098996947,
+        "village_count": 2,
+        "z_score": 10.964554389610802
+      },
+      {
+        "char": "檎",
+        "lift": 62.09419973833406,
+        "log_lift": 4.128652582618004,
+        "frequency": 0.0004361098996947,
+        "village_count": 2,
+        "z_score": 10.964554389610802
+      },
+      {
+        "char": "驴",
+        "lift": 62.09419973833406,
+        "log_lift": 4.128652582618004,
+        "frequency": 0.0004361098996947,
+        "village_count": 2,
+        "z_score": 10.964554389610802
+      },
+      {
+        "char": "匏",
+        "lift": 62.09419973833406,
+        "log_lift": 4.128652582618004,
+        "frequency": 0.0004361098996947,
+        "village_count": 2,
+        "z_score": 10.964554389610802
+      },
+      {
+        "char": "操",
+        "lift": 62.09419973833406,
+        "log_lift": 4.128652582618004,
+        "frequency": 0.0004361098996947,
+        "village_count": 2,
+        "z_score": 10.964554389610802
+      },
+      {
+        "char": "畓",
+        "lift": 62.09419973833406,
+        "log_lift": 4.128652582618004,
+        "frequency": 0.0004361098996947,
+        "village_count": 2,
+        "z_score": 10.964554389610802
+      },
+      {
+        "char": "昼",
+        "lift": 62.09419973833406,
+        "log_lift": 4.128652582618004,
+        "frequency": 0.0002180549498473,
+        "village_count": 1,
+        "z_score": 7.753097148301361
+      },
+      {
+        "char": "靳",
+        "lift": 62.09419973833406,
+        "log_lift": 4.128652582618004,
+        "frequency": 0.0002180549498473,
+        "village_count": 1,
+        "z_score": 7.753097148301361
+      },
+      {
+        "char": "兠",
+        "lift": 62.09419973833406,
+        "log_lift": 4.128652582618004,
+        "frequency": 0.0002180549498473,
+        "village_count": 1,
+        "z_score": 7.753097148301361
+      }
+    ],
+    "佛山市": [
+      {
+        "char": "竺",
+        "lift": 53.07809878844362,
+        "log_lift": 3.971764390971056,
+        "frequency": 0.0003727865796831,
+        "village_count": 2,
+        "z_score": 10.109134268128576
+      },
+      {
+        "char": "镳",
+        "lift": 53.07809878844362,
+        "log_lift": 3.971764390971056,
+        "frequency": 0.0003727865796831,
+        "village_count": 2,
+        "z_score": 10.109134268128576
+      },
+      {
+        "char": "绀",
+        "lift": 53.07809878844362,
+        "log_lift": 3.971764390971056,
+        "frequency": 0.0003727865796831,
+        "village_count": 2,
+        "z_score": 10.109134268128576
+      },
+      {
+        "char": "熹",
+        "lift": 53.07809878844362,
+        "log_lift": 3.971764390971056,
+        "frequency": 0.0003727865796831,
+        "village_count": 2,
+        "z_score": 10.109134268128576
+      },
+      {
+        "char": "癸",
+        "lift": 53.07809878844362,
+        "log_lift": 3.971764390971056,
+        "frequency": 0.0001863932898415,
+        "village_count": 1,
+        "z_score": 7.148224841703328
+      },
+      {
+        "char": "贸",
+        "lift": 53.07809878844362,
+        "log_lift": 3.971764390971056,
+        "frequency": 0.0001863932898415,
+        "village_count": 1,
+        "z_score": 7.148224841703328
+      },
+      {
+        "char": "壕",
+        "lift": 53.07809878844362,
+        "log_lift": 3.971764390971056,
+        "frequency": 0.0001863932898415,
+        "village_count": 1,
+        "z_score": 7.148224841703328
+      },
+      {
+        "char": "泌",
+        "lift": 53.07809878844362,
+        "log_lift": 3.971764390971056,
+        "frequency": 0.0001863932898415,
+        "village_count": 1,
+        "z_score": 7.148224841703328
+      },
+      {
+        "char": "捌",
+        "lift": 53.07809878844362,
+        "log_lift": 3.971764390971056,
+        "frequency": 0.0001863932898415,
+        "village_count": 1,
+        "z_score": 7.148224841703328
+      },
+      {
+        "char": "释",
+        "lift": 53.07809878844362,
+        "log_lift": 3.971764390971056,
+        "frequency": 0.0001863932898415,
+        "village_count": 1,
+        "z_score": 7.148224841703328
+      }
+    ],
+    "韶关市": [
+      {
+        "char": "俚",
+        "lift": 15.138163840306206,
+        "log_lift": 2.7172189619428337,
+        "frequency": 0.0045186327149008,
+        "village_count": 85,
+        "z_score": 33.506626065609595
+      },
+      {
+        "char": "仂",
+        "lift": 15.138163840306204,
+        "log_lift": 2.7172189619428337,
+        "frequency": 0.0021795757801286,
+        "village_count": 41,
+        "z_score": 23.26910100455948
+      },
+      {
+        "char": "芭",
+        "lift": 15.138163840306202,
+        "log_lift": 2.7172189619428337,
+        "frequency": 0.0002126415395247,
+        "village_count": 4,
+        "z_score": 7.267573880881733
+      },
+      {
+        "char": "胞",
+        "lift": 15.138163840306202,
+        "log_lift": 2.7172189619428337,
+        "frequency": 0.0002126415395247,
+        "village_count": 4,
+        "z_score": 7.267573880881733
+      },
+      {
+        "char": "浈",
+        "lift": 15.138163840306202,
+        "log_lift": 2.7172189619428337,
+        "frequency": 0.0001594811546435,
+        "village_count": 3,
+        "z_score": 6.293892553510492
+      },
+      {
+        "char": "芸",
+        "lift": 15.138163840306202,
+        "log_lift": 2.7172189619428337,
+        "frequency": 0.0001594811546435,
+        "village_count": 3,
+        "z_score": 6.293892553510492
+      },
+      {
+        "char": "仚",
+        "lift": 15.138163840306202,
+        "log_lift": 2.7172189619428337,
+        "frequency": 0.0001594811546435,
+        "village_count": 3,
+        "z_score": 6.293892553510492
+      },
+      {
+        "char": "玑",
+        "lift": 15.138163840306202,
+        "log_lift": 2.7172189619428337,
+        "frequency": 0.0001594811546435,
+        "village_count": 3,
+        "z_score": 6.293892553510492
+      },
+      {
+        "char": "钨",
+        "lift": 15.138163840306202,
+        "log_lift": 2.7172189619428337,
+        "frequency": 0.0001594811546435,
+        "village_count": 3,
+        "z_score": 6.293892553510492
+      },
+      {
+        "char": "寡",
+        "lift": 15.138163840306202,
+        "log_lift": 2.7172189619428337,
+        "frequency": 0.0001063207697623,
+        "village_count": 2,
+        "z_score": 5.138932727437406
+      }
+    ],
+    "湛江市": [
+      {
+        "char": "垉",
+        "lift": 17.811108331248438,
+        "log_lift": 2.87982232620464,
+        "frequency": 0.0015011258443832,
+        "village_count": 24,
+        "z_score": 19.51528046130229
+      },
+      {
+        "char": "臧",
+        "lift": 17.811108331248438,
+        "log_lift": 2.87982232620464,
+        "frequency": 0.0003127345509131,
+        "village_count": 5,
+        "z_score": 8.907168932130201
+      },
+      {
+        "char": "堿",
+        "lift": 17.811108331248438,
+        "log_lift": 2.87982232620464,
+        "frequency": 0.0001876407305479,
+        "village_count": 3,
+        "z_score": 6.899439158194944
+      },
+      {
+        "char": "倜",
+        "lift": 17.811108331248438,
+        "log_lift": 2.87982232620464,
+        "frequency": 0.0001876407305479,
+        "village_count": 3,
+        "z_score": 6.899439158194944
+      },
+      {
+        "char": "傥",
+        "lift": 17.811108331248438,
+        "log_lift": 2.87982232620464,
+        "frequency": 0.0001876407305479,
+        "village_count": 3,
+        "z_score": 6.899439158194944
+      },
+      {
+        "char": "乒",
+        "lift": 17.811108331248438,
+        "log_lift": 2.87982232620464,
+        "frequency": 0.0001876407305479,
+        "village_count": 3,
+        "z_score": 6.899439158194944
+      },
+      {
+        "char": "硅",
+        "lift": 17.811108331248438,
+        "log_lift": 2.87982232620464,
+        "frequency": 0.0001876407305479,
+        "village_count": 3,
+        "z_score": 6.899439158194944
+      },
+      {
+        "char": "讨",
+        "lift": 17.811108331248434,
+        "log_lift": 2.87982232620464,
+        "frequency": 0.0005629221916437,
+        "village_count": 9,
+        "z_score": 11.950305064649806
+      },
+      {
+        "char": "苫",
+        "lift": 17.811108331248434,
+        "log_lift": 2.87982232620464,
+        "frequency": 0.0002501876407305,
+        "village_count": 4,
+        "z_score": 7.96680009906792
+      },
+      {
+        "char": "觅",
+        "lift": 17.811108331248434,
+        "log_lift": 2.87982232620464,
+        "frequency": 0.0001250938203652,
+        "village_count": 2,
+        "z_score": 5.6333585916136
+      }
+    ],
+    "梅州市": [
+      {
+        "char": "岃",
+        "lift": 7.308012113124263,
+        "log_lift": 1.988971296030022,
+        "frequency": 0.0021300621054252,
+        "village_count": 83,
+        "z_score": 21.261565395381947
+      },
+      {
+        "char": "杠",
+        "lift": 7.308012113124263,
+        "log_lift": 1.9889712960300217,
+        "frequency": 0.0001796437920238,
+        "village_count": 7,
+        "z_score": 6.173724527463279
+      },
+      {
+        "char": "峺",
+        "lift": 7.308012113124263,
+        "log_lift": 1.9889712960300217,
+        "frequency": 0.0001283169943027,
+        "village_count": 5,
+        "z_score": 5.217731228487541
+      },
+      {
+        "char": "袛",
+        "lift": 7.308012113124262,
+        "log_lift": 1.9889712960300217,
+        "frequency": 0.0004106143817687,
+        "village_count": 16,
+        "z_score": 9.333941655065235
+      },
+      {
+        "char": "椹",
+        "lift": 7.308012113124262,
+        "log_lift": 1.9889712960300217,
+        "frequency": 0.0001026535954421,
+        "village_count": 4,
+        "z_score": 4.666872491670924
+      },
+      {
+        "char": "筀",
+        "lift": 7.308012113124262,
+        "log_lift": 1.9889712960300217,
+        "frequency": 0.0001026535954421,
+        "village_count": 4,
+        "z_score": 4.666872491670924
+      },
+      {
+        "char": "逗",
+        "lift": 7.308012113124262,
+        "log_lift": 1.9889712960300217,
+        "frequency": 0.0001026535954421,
+        "village_count": 4,
+        "z_score": 4.666872491670924
+      },
+      {
+        "char": "冉",
+        "lift": 7.308012113124262,
+        "log_lift": 1.9889712960300217,
+        "frequency": 5.132679772109018e-05,
+        "village_count": 2,
+        "z_score": 3.2999655972283524
+      },
+      {
+        "char": "懂",
+        "lift": 7.308012113124262,
+        "log_lift": 1.9889712960300217,
+        "frequency": 5.132679772109018e-05,
+        "village_count": 2,
+        "z_score": 3.2999655972283524
+      },
+      {
+        "char": "邠",
+        "lift": 7.308012113124262,
+        "log_lift": 1.9889712960300217,
+        "frequency": 5.132679772109018e-05,
+        "village_count": 2,
+        "z_score": 3.2999655972283524
+      }
+    ]
+  },
+  "char_similarity": {
+    "山": [
+      {
+        "similar_char": "砵",
+        "cosine_similarity": 0.4993771016597748
+      },
+      {
+        "similar_char": "櫈",
+        "cosine_similarity": 0.48291340470314026
+      },
+      {
+        "similar_char": "岽",
+        "cosine_similarity": 0.4762665331363678
+      },
+      {
+        "similar_char": "岭",
+        "cosine_similarity": 0.47135046124458313
+      },
+      {
+        "similar_char": "涯",
+        "cosine_similarity": 0.46850481629371643
+      },
+      {
+        "similar_char": "蔸",
+        "cosine_similarity": 0.46744683384895325
+      },
+      {
+        "similar_char": "槁",
+        "cosine_similarity": 0.4634588360786438
+      },
+      {
+        "similar_char": "莒",
+        "cosine_similarity": 0.4594902992248535
+      },
+      {
+        "similar_char": "椿",
+        "cosine_similarity": 0.45939913392066956
+      },
+      {
+        "similar_char": "该",
+        "cosine_similarity": 0.4581194519996643
+      },
+      {
+        "similar_char": "借",
+        "cosine_similarity": 0.456033855676651
+      },
+      {
+        "similar_char": "著",
+        "cosine_similarity": 0.455820232629776
+      },
+      {
+        "similar_char": "领",
+        "cosine_similarity": 0.45538222789764404
+      },
+      {
+        "similar_char": "羔",
+        "cosine_similarity": 0.45473015308380127
+      },
+      {
+        "similar_char": "榅",
+        "cosine_similarity": 0.4546263515949249
+      }
+    ],
+    "水": [
+      {
+        "similar_char": "峥",
+        "cosine_similarity": 0.5085793733596802
+      },
+      {
+        "similar_char": "流",
+        "cosine_similarity": 0.5005359053611755
+      },
+      {
+        "similar_char": "浆",
+        "cosine_similarity": 0.48844507336616516
+      },
+      {
+        "similar_char": "米",
+        "cosine_similarity": 0.4649336338043213
+      },
+      {
+        "similar_char": "资",
+        "cosine_similarity": 0.46065375208854675
+      },
+      {
+        "similar_char": "条",
+        "cosine_similarity": 0.45367032289505005
+      },
+      {
+        "similar_char": "湴",
+        "cosine_similarity": 0.44978222250938416
+      },
+      {
+        "similar_char": "续",
+        "cosine_similarity": 0.4426945149898529
+      },
+      {
+        "similar_char": "轮",
+        "cosine_similarity": 0.438937246799469
+      },
+      {
+        "similar_char": "尝",
+        "cosine_similarity": 0.4300236403942108
+      },
+      {
+        "similar_char": "樊",
+        "cosine_similarity": 0.42782557010650635
+      },
+      {
+        "similar_char": "扞",
+        "cosine_similarity": 0.42678868770599365
+      },
+      {
+        "similar_char": "责",
+        "cosine_similarity": 0.4266849458217621
+      },
+      {
+        "similar_char": "气",
+        "cosine_similarity": 0.42610645294189453
+      },
+      {
+        "similar_char": "到",
+        "cosine_similarity": 0.42578181624412537
+      }
+    ],
+    "村": [
+      {
+        "similar_char": "漳",
+        "cosine_similarity": 0.5801191926002502
+      },
+      {
+        "similar_char": "竞",
+        "cosine_similarity": 0.5776795148849487
+      },
+      {
+        "similar_char": "县",
+        "cosine_similarity": 0.5637367963790894
+      },
+      {
+        "similar_char": "昆",
+        "cosine_similarity": 0.5629907846450806
+      },
+      {
+        "similar_char": "坋",
+        "cosine_similarity": 0.5595667362213135
+      },
+      {
+        "similar_char": "啸",
+        "cosine_similarity": 0.5568705797195435
+      },
+      {
+        "similar_char": "镳",
+        "cosine_similarity": 0.5546138882637024
+      },
+      {
+        "similar_char": "碣",
+        "cosine_similarity": 0.5495994091033936
+      },
+      {
+        "similar_char": "寄",
+        "cosine_similarity": 0.5493892431259155
+      },
+      {
+        "similar_char": "汰",
+        "cosine_similarity": 0.548056423664093
+      },
+      {
+        "similar_char": "潜",
+        "cosine_similarity": 0.5452057123184204
+      },
+      {
+        "similar_char": "韶",
+        "cosine_similarity": 0.5439419150352478
+      },
+      {
+        "similar_char": "铎",
+        "cosine_similarity": 0.5416318774223328
+      },
+      {
+        "similar_char": "襀",
+        "cosine_similarity": 0.5388038158416748
+      },
+      {
+        "similar_char": "斐",
+        "cosine_similarity": 0.5379219651222229
+      }
+    ],
+    "围": [
+      {
+        "similar_char": "楼",
+        "cosine_similarity": 0.5821809768676758
+      },
+      {
+        "similar_char": "阜",
+        "cosine_similarity": 0.5491381287574768
+      },
+      {
+        "similar_char": "袭",
+        "cosine_similarity": 0.5157447457313538
+      },
+      {
+        "similar_char": "恢",
+        "cosine_similarity": 0.5154813528060913
+      },
+      {
+        "similar_char": "俊",
+        "cosine_similarity": 0.5121573805809021
+      },
+      {
+        "similar_char": "庄",
+        "cosine_similarity": 0.5087524652481079
+      },
+      {
+        "similar_char": "枓",
+        "cosine_similarity": 0.4961843192577362
+      },
+      {
+        "similar_char": "稳",
+        "cosine_similarity": 0.49509158730506897
+      },
+      {
+        "similar_char": "汰",
+        "cosine_similarity": 0.4938792288303375
+      },
+      {
+        "similar_char": "粤",
+        "cosine_similarity": 0.4929186701774597
+      },
+      {
+        "similar_char": "庐",
+        "cosine_similarity": 0.4924270212650299
+      },
+      {
+        "similar_char": "创",
+        "cosine_similarity": 0.4817292094230652
+      },
+      {
+        "similar_char": "府",
+        "cosine_similarity": 0.48166927695274353
+      },
+      {
+        "similar_char": "穗",
+        "cosine_similarity": 0.4808638393878937
+      },
+      {
+        "similar_char": "骏",
+        "cosine_similarity": 0.47932273149490356
+      }
+    ],
+    "寨": [
+      {
+        "similar_char": "坫",
+        "cosine_similarity": 0.5854962468147278
+      },
+      {
+        "similar_char": "腹",
+        "cosine_similarity": 0.5847439765930176
+      },
+      {
+        "similar_char": "臧",
+        "cosine_similarity": 0.5588411092758179
+      },
+      {
+        "similar_char": "潜",
+        "cosine_similarity": 0.5536560416221619
+      },
+      {
+        "similar_char": "渠",
+        "cosine_similarity": 0.5498754978179932
+      },
+      {
+        "similar_char": "埭",
+        "cosine_similarity": 0.5451461672782898
+      },
+      {
+        "similar_char": "徽",
+        "cosine_similarity": 0.5437182784080505
+      },
+      {
+        "similar_char": "崛",
+        "cosine_similarity": 0.5370908975601196
+      },
+      {
+        "similar_char": "沿",
+        "cosine_similarity": 0.5353039503097534
+      },
+      {
+        "similar_char": "枞",
+        "cosine_similarity": 0.5339909791946411
+      },
+      {
+        "similar_char": "疏",
+        "cosine_similarity": 0.5321503281593323
+      },
+      {
+        "similar_char": "溢",
+        "cosine_similarity": 0.5319786667823792
+      },
+      {
+        "similar_char": "听",
+        "cosine_similarity": 0.5284121632575989
+      },
+      {
+        "similar_char": "夸",
+        "cosine_similarity": 0.5277423858642578
+      },
+      {
+        "similar_char": "驿",
+        "cosine_similarity": 0.5262383222579956
+      }
+    ],
+    "坑": [
+      {
+        "similar_char": "坜",
+        "cosine_similarity": 0.5711408853530884
+      },
+      {
+        "similar_char": "屈",
+        "cosine_similarity": 0.5683785676956177
+      },
+      {
+        "similar_char": "径",
+        "cosine_similarity": 0.5670161843299866
+      },
+      {
+        "similar_char": "恪",
+        "cosine_similarity": 0.5550178289413452
+      },
+      {
+        "similar_char": "埪",
+        "cosine_similarity": 0.5535774827003479
+      },
+      {
+        "similar_char": "闩",
+        "cosine_similarity": 0.5451442003250122
+      },
+      {
+        "similar_char": "挣",
+        "cosine_similarity": 0.5437138676643372
+      },
+      {
+        "similar_char": "垻",
+        "cosine_similarity": 0.5429059863090515
+      },
+      {
+        "similar_char": "囊",
+        "cosine_similarity": 0.5428106784820557
+      },
+      {
+        "similar_char": "恧",
+        "cosine_similarity": 0.5389358997344971
+      },
+      {
+        "similar_char": "碲",
+        "cosine_similarity": 0.5388429164886475
+      },
+      {
+        "similar_char": "刻",
+        "cosine_similarity": 0.5362945199012756
+      },
+      {
+        "similar_char": "摸",
+        "cosine_similarity": 0.5352251529693604
+      },
+      {
+        "similar_char": "堞",
+        "cosine_similarity": 0.5348647236824036
+      },
+      {
+        "similar_char": "幌",
+        "cosine_similarity": 0.5341187715530396
+      }
+    ],
+    "岗": [
+      {
+        "similar_char": "江",
+        "cosine_similarity": 0.6129225492477417
+      },
+      {
+        "similar_char": "冈",
+        "cosine_similarity": 0.5674907565116882
+      },
+      {
+        "similar_char": "坲",
+        "cosine_similarity": 0.5479329228401184
+      },
+      {
+        "similar_char": "羔",
+        "cosine_similarity": 0.510575532913208
+      },
+      {
+        "similar_char": "纲",
+        "cosine_similarity": 0.5093573331832886
+      },
+      {
+        "similar_char": "床",
+        "cosine_similarity": 0.5073814392089844
+      },
+      {
+        "similar_char": "轿",
+        "cosine_similarity": 0.5058512091636658
+      },
+      {
+        "similar_char": "认",
+        "cosine_similarity": 0.4945503771305084
+      },
+      {
+        "similar_char": "砾",
+        "cosine_similarity": 0.4909459948539734
+      },
+      {
+        "similar_char": "堑",
+        "cosine_similarity": 0.4856877028942108
+      },
+      {
+        "similar_char": "痕",
+        "cosine_similarity": 0.4809335172176361
+      },
+      {
+        "similar_char": "榅",
+        "cosine_similarity": 0.48078733682632446
+      },
+      {
+        "similar_char": "蹬",
+        "cosine_similarity": 0.47663676738739014
+      },
+      {
+        "similar_char": "幢",
+        "cosine_similarity": 0.4762362539768219
+      },
+      {
+        "similar_char": "埧",
+        "cosine_similarity": 0.47274938225746155
+      }
+    ]
+  },
+  "clustering_metrics": [
+    {
+      "algorithm": "kmeans",
+      "k": 4,
+      "silhouette_score": 0.624493116181863,
+      "davies_bouldin_index": 0.248310286592376
+    },
+    {
+      "algorithm": "kmeans",
+      "k": 8,
+      "silhouette_score": 0.13381887195005226,
+      "davies_bouldin_index": 0.8893700533932292
+    },
+    {
+      "algorithm": "kmeans",
+      "k": 10,
+      "silhouette_score": 0.13147386817735557,
+      "davies_bouldin_index": 0.788398901031033
+    },
+    {
+      "algorithm": "kmeans",
+      "k": 8,
+      "silhouette_score": 0.12276057940052046,
+      "davies_bouldin_index": 0.872973647761023
+    },
+    {
+      "algorithm": "kmeans",
+      "k": 12,
+      "silhouette_score": 0.12120764759110016,
+      "davies_bouldin_index": 0.7344875652276305
+    },
+    {
+      "algorithm": "kmeans",
+      "k": 12,
+      "silhouette_score": 0.11986757219077931,
+      "davies_bouldin_index": 0.8235873851726704
+    },
+    {
+      "algorithm": "kmeans",
+      "k": 6,
+      "silhouette_score": 0.11294273779200832,
+      "davies_bouldin_index": 1.160791051768809
+    },
+    {
+      "algorithm": "kmeans",
+      "k": 4,
+      "silhouette_score": 0.10989640648440907,
+      "davies_bouldin_index": 1.3194877792479438
+    },
+    {
+      "algorithm": "kmeans",
+      "k": 10,
+      "silhouette_score": 0.10716632468876318,
+      "davies_bouldin_index": 0.9750902625474286
+    },
+    {
+      "algorithm": "kmeans",
+      "k": 12,
+      "silhouette_score": 0.10685128632654675,
+      "davies_bouldin_index": 1.0857232494864493
+    },
+    {
+      "algorithm": "kmeans",
+      "k": 8,
+      "silhouette_score": 0.10348370382735925,
+      "davies_bouldin_index": 1.5014570209834912
+    },
+    {
+      "algorithm": "kmeans",
+      "k": 10,
+      "silhouette_score": 0.09877424369507612,
+      "davies_bouldin_index": 1.0440624388686506
+    },
+    {
+      "algorithm": "kmeans",
+      "k": 6,
+      "silhouette_score": 0.09432620816978435,
+      "davies_bouldin_index": 1.54766315850529
+    },
+    {
+      "algorithm": "kmeans",
+      "k": 4,
+      "silhouette_score": 0.09350496659329284,
+      "davies_bouldin_index": 2.207016536947637
+    },
+    {
+      "algorithm": "kmeans",
+      "k": 18,
+      "silhouette_score": 0.08339936265583901,
+      "davies_bouldin_index": 0.9298368626646657
+    },
+    {
+      "algorithm": "kmeans",
+      "k": 18,
+      "silhouette_score": 0.08029202201248739,
+      "davies_bouldin_index": 0.7489888358138999
+    },
+    {
+      "algorithm": "kmeans",
+      "k": 20,
+      "silhouette_score": 0.07873397818440939,
+      "davies_bouldin_index": 0.9951911028927931
+    },
+    {
+      "algorithm": "kmeans",
+      "k": 15,
+      "silhouette_score": 0.07861778861253331,
+      "davies_bouldin_index": 0.9434070088950367
+    },
+    {
+      "algorithm": "kmeans",
+      "k": 15,
+      "silhouette_score": 0.07828373454329747,
+      "davies_bouldin_index": 0.5933046272966854
+    },
+    {
+      "algorithm": "kmeans",
+      "k": 6,
+      "silhouette_score": 0.07736165899977955,
+      "davies_bouldin_index": 0.970934669689374
+    },
+    {
+      "algorithm": "kmeans",
+      "k": 20,
+      "silhouette_score": 0.07593423959401367,
+      "davies_bouldin_index": 0.9788248995118767
+    },
+    {
+      "algorithm": "kmeans",
+      "k": 15,
+      "silhouette_score": 0.06930872595683098,
+      "davies_bouldin_index": 0.887220672330412
+    },
+    {
+      "algorithm": "kmeans",
+      "k": 18,
+      "silhouette_score": 0.056793950874115526,
+      "davies_bouldin_index": 0.396420437753837
+    },
+    {
+      "algorithm": "kmeans",
+      "k": 20,
+      "silhouette_score": 0.021144109793295635,
+      "davies_bouldin_index": 0.27127337387770456
+    }
+  ],
+  "cluster_sizes": [
+    {
+      "cluster_id": 0,
+      "village_count": 439
+    },
+    {
+      "cluster_id": 1,
+      "village_count": 845
+    },
+    {
+      "cluster_id": 2,
+      "village_count": 6
+    },
+    {
+      "cluster_id": 3,
+      "village_count": 3
+    },
+    {
+      "cluster_id": 4,
+      "village_count": 142
+    },
+    {
+      "cluster_id": 5,
+      "village_count": 140
+    },
+    {
+      "cluster_id": 6,
+      "village_count": 2
+    },
+    {
+      "cluster_id": 7,
+      "village_count": 2
+    },
+    {
+      "cluster_id": 8,
+      "village_count": 5
+    },
+    {
+      "cluster_id": 9,
+      "village_count": 2
+    },
+    {
+      "cluster_id": 10,
+      "village_count": 1
+    },
+    {
+      "cluster_id": 11,
+      "village_count": 1
+    }
+  ],
+  "top_bigrams": [],
+  "top_trigrams": [],
+  "semantic_labels": [],
+  "high_significance": [
+    {
+      "region_name": "汕头市",
+      "char": "区",
+      "z_score": 194.37434107536632,
+      "lift": 38.87570438722268
+    },
+    {
+      "region_name": "汕头市",
+      "char": "片",
+      "z_score": 146.82602987530828,
+      "lift": 29.40907822658514
+    },
+    {
+      "region_name": "广州市",
+      "char": "庄",
+      "z_score": 118.73495642814326,
+      "lift": 20.69153066303764
+    },
+    {
+      "region_name": "中山市",
+      "char": "顷",
+      "z_score": 91.1067094732433,
+      "lift": 75.38875248341269
+    },
+    {
+      "region_name": "茂名市",
+      "char": "坡",
+      "z_score": 88.78234723118119,
+      "lift": 4.660691474598065
+    },
+    {
+      "region_name": "湛江市",
+      "char": "村",
+      "z_score": 85.52125300234411,
+      "lift": 2.7972606301807823
+    },
+    {
+      "region_name": "汕头市",
+      "char": "厝",
+      "z_score": 85.49780715955107,
+      "lift": 16.82508021782733
+    },
+    {
+      "region_name": "茂名市",
+      "char": "垌",
+      "z_score": 83.25145932363033,
+      "lift": 4.727821966436179
+    },
+    {
+      "region_name": "潮州市",
+      "char": "厝",
+      "z_score": 81.39975535689872,
+      "lift": 15.51081608743075
+    },
+    {
+      "region_name": "肇庆市",
+      "char": "崀",
+      "z_score": 71.74437442876,
+      "lift": 9.91509690790838
+    },
+    {
+      "region_name": "江门市",
+      "char": "安",
+      "z_score": 71.15452274373777,
+      "lift": 6.719769232119181
+    },
+    {
+      "region_name": "广州市",
+      "char": "冚",
+      "z_score": 62.57152653645443,
+      "lift": 22.76073219520387
+    },
+    {
+      "region_name": "揭阳市",
+      "char": "厝",
+      "z_score": 62.03007843994836,
+      "lift": 9.14567871079318
+    },
+    {
+      "region_name": "梅州市",
+      "char": "下",
+      "z_score": 57.232971896368994,
+      "lift": 2.071192444243315
+    },
+    {
+      "region_name": "茂名市",
+      "char": "土",
+      "z_score": 56.139062208091744,
+      "lift": 5.324055714037437
+    },
+    {
+      "region_name": "江门市",
+      "char": "里",
+      "z_score": 55.24093288504361,
+      "lift": 4.030640823467276
+    },
+    {
+      "region_name": "湛江市",
+      "char": "宅",
+      "z_score": 54.03889930026956,
+      "lift": 10.300757651572011
+    },
+    {
+      "region_name": "云浮市",
+      "char": "榃",
+      "z_score": 53.485627133118506,
+      "lift": 14.574470436477744
+    },
+    {
+      "region_name": "茂名市",
+      "char": "埇",
+      "z_score": 52.93933441749848,
+      "lift": 4.264278713272582
+    },
+    {
+      "region_name": "湛江市",
+      "char": "仔",
+      "z_score": 52.412369171997554,
+      "lift": 3.815823539840311
+    },
+    {
+      "region_name": "揭阳市",
+      "char": "局",
+      "z_score": 51.27358142664213,
+      "lift": 25.84997231306782
+    },
+    {
+      "region_name": "韶关市",
+      "char": "屋",
+      "z_score": 49.75108872173585,
+      "lift": 2.2687196609966778
+    },
+    {
+      "region_name": "广州市",
+      "char": "吓",
+      "z_score": 48.23386005463666,
+      "lift": 21.656955175551893
+    },
+    {
+      "region_name": "中山市",
+      "char": "围",
+      "z_score": 47.99339073412602,
+      "lift": 7.613606674317925
+    },
+    {
+      "region_name": "汕头市",
+      "char": "内",
+      "z_score": 46.43808635557059,
+      "lift": 14.813901937573982
+    },
+    {
+      "region_name": "梅州市",
+      "char": "子",
+      "z_score": 45.62708966393689,
+      "lift": 2.516651448609933
+    },
+    {
+      "region_name": "阳江市",
+      "char": "㙟",
+      "z_score": 45.295826404903465,
+      "lift": 15.334544782620174
+    },
+    {
+      "region_name": "汕头市",
+      "char": "后",
+      "z_score": 45.19034977872342,
+      "lift": 10.0913247281172
+    },
+    {
+      "region_name": "揭阳市",
+      "char": "寨",
+      "z_score": 44.98517838912768,
+      "lift": 4.33971837347376
+    },
+    {
+      "region_name": "梅州市",
+      "char": "里",
+      "z_score": 44.69076875506662,
+      "lift": 2.57401050346182
+    }
+  ],
+  "prefix_stats": []
+}

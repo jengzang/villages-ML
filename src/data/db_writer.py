@@ -1481,6 +1481,7 @@ def create_spatial_analysis_tables(conn: sqlite3.Connection) -> None:
     cursor.execute("""
         CREATE TABLE IF NOT EXISTS village_spatial_features (
             run_id TEXT NOT NULL,
+            village_id TEXT NOT NULL,
             village_name TEXT NOT NULL,
             city TEXT,
             county TEXT,
@@ -1498,7 +1499,7 @@ def create_spatial_analysis_tables(conn: sqlite3.Connection) -> None:
             spatial_cluster_id INTEGER,
             cluster_size INTEGER,
             created_at REAL NOT NULL,
-            PRIMARY KEY (run_id, village_name)
+            PRIMARY KEY (run_id, village_id)
         )
     """)
 
@@ -1687,7 +1688,7 @@ def write_spatial_features(conn: sqlite3.Connection, run_id: str, features_df: p
 
     # Select columns in correct order
     columns = [
-        'run_id', 'village_name', 'city', 'county', 'town',
+        'run_id', 'village_id', 'village_name', 'city', 'county', 'town',
         'longitude', 'latitude',
         'nn_distance_1', 'nn_distance_5', 'nn_distance_10',
         'local_density_1km', 'local_density_5km', 'local_density_10km',

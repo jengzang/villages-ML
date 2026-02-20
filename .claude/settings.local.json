@@ -28,7 +28,9 @@
       "Bash(\"C:/Users/joengzaang/PycharmProjects/villages-ML/test3_debug.py\":*)",
       "Bash(\"C:/Users/joengzaang/PycharmProjects/villages-ML/test3_final.py\":*)",
       "Bash(tee:*)",
-      "Bash(\"docs/分析结果展示_中文版.md\":*)"
+      "Bash(\"docs/分析结果展示_中文版.md\":*)",
+      "Bash(curl:*)",
+      "Bash(git -C /cygdrive/c/Users/joengzaang/PycharmProjects/villages-ML ls-files docs/)"
     ]
   }
 }
