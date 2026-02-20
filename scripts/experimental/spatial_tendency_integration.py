@@ -47,7 +47,7 @@ import numpy as np
 import pandas as pd
 
 # Add project root to path
-project_root = Path(__file__).parent.parent
+project_root = Path(__file__).parent.parent.parent
 sys.path.insert(0, str(project_root))
 
 from src.data.db_writer import (
@@ -130,6 +130,7 @@ def load_spatial_features(
 
     query = """
         SELECT
+            village_id,
             village_name,
             city,
             county,
@@ -170,15 +171,21 @@ def load_villages_with_chars(
 
     query = """
         SELECT
-            自然村 as village_name,
+            ROWID as row_id,
+            自然村_去前缀 as village_name,
             市级 as city,
-            县区级 as county,
-            乡镇 as town
-        FROM 广东省自然村
+            区县级 as county,
+            乡镇级 as town
+        FROM 广东省自然村_预处理
+        WHERE 有效 = 1
     """
 
     df = pd.read_sql_query(query, conn)
     logger.info(f"Loaded {len(df)} villages")
+
+    # Generate village_id to match spatial_features table format
+    df['village_id'] = 'v_' + df['row_id'].astype(str)
+    df = df.drop(columns=['row_id'])  # Clean up temporary column
 
     # Extract character sets
     df['char_set'] = df['village_name'].apply(lambda x: set(x) if pd.notna(x) else set())
@@ -256,10 +263,10 @@ def integrate_spatial_tendency(
 
     logger.info(f"Found {len(villages_with_char)} villages with character '{character}'")
 
-    # Merge with spatial features
+    # Merge with spatial features using unique village_id
     char_spatial = villages_with_char.merge(
         spatial_df,
-        on='village_name',
+        on='village_id',
         how='inner',
         suffixes=('_village', '_spatial')
     )
@@ -277,8 +284,13 @@ def integrate_spatial_tendency(
 
     # Group by cluster
     cluster_stats = []
+    n_clusters = char_spatial['spatial_cluster_id'].nunique()
+    logger.info(f"Processing {n_clusters} clusters...")
 
-    for cluster_id, cluster_df in char_spatial.groupby('spatial_cluster_id'):
+    for idx, (cluster_id, cluster_df) in enumerate(char_spatial.groupby('spatial_cluster_id')):
+        if idx % 100 == 0:
+            logger.info(f"  Processed {idx}/{n_clusters} clusters...")
+
         # Get cluster coordinates
         coords = cluster_df[['longitude', 'latitude']].values
 
@@ -290,8 +302,11 @@ def integrate_spatial_tendency(
         coherence = calculate_spatial_coherence(coords)
 
         # Get dominant region
-        dominant_city = cluster_df['city_spatial'].mode()[0] if len(cluster_df) > 0 else None
-        dominant_county = cluster_df['county_spatial'].mode()[0] if len(cluster_df) > 0 else None
+        city_mode = cluster_df['city_spatial'].mode()
+        dominant_city = city_mode.iloc[0] if len(city_mode) > 0 else None
+
+        county_mode = cluster_df['county_spatial'].mode()
+        dominant_county = county_mode.iloc[0] if len(county_mode) > 0 else None
 
         # Get tendency values for this region (use county as primary)
         region_tendency = char_tendency[char_tendency['region_name'] == dominant_county]
@@ -305,15 +320,14 @@ def integrate_spatial_tendency(
             p_value = None
             is_significant = False
 
-        # Calculate average distance within cluster
+        # Calculate average distance within cluster (optimized)
         if len(coords) > 1:
-            # Approximate distance in km (1 degree ≈ 111 km at equator)
-            distances = []
-            for i in range(len(coords)):
-                for j in range(i + 1, len(coords)):
-                    dist = np.linalg.norm(coords[i] - coords[j]) * 111
-                    distances.append(dist)
-            avg_distance_km = np.mean(distances) if distances else 0
+            # Use vectorized calculation: distance from each point to centroid
+            # This is O(n) instead of O(n^2) for pairwise distances
+            centroid = np.array([centroid_lon, centroid_lat])
+            distances_from_centroid = np.linalg.norm(coords - centroid, axis=1) * 111  # km
+            # Average distance from centroid is a good proxy for cluster spread
+            avg_distance_km = distances_from_centroid.mean()
         else:
             avg_distance_km = 0
 

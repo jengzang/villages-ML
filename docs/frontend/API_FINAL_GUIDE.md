@@ -1,5 +1,11 @@
 # 🚀 API 启动 - 最终指南
 
+> **📚 完整文档已更新！** 查看以下新文档获取详细信息：
+> - [API Reference](API_REFERENCE.md) - 完整的端点文档（18个端点）
+> - [Frontend Integration Guide](FRONTEND_INTEGRATION_GUIDE.md) - Vue 3 集成指南
+> - [API Deployment Guide](API_DEPLOYMENT_GUIDE.md) - 部署和配置指南
+> - [API Quick Reference](API_QUICK_REFERENCE.md) - 快速参考手册
+
 ## 你遇到的问题
 
 ### 问题1：ImportError

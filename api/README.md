@@ -2,6 +2,29 @@
 
 FastAPI-based REST API for querying analysis results of 285K+ natural villages in Guangdong Province.
 
+## 🆕 Latest Update (2026-02-21)
+
+**New Endpoints Added:** Spatial-Tendency Integration API
+
+- ✅ 4 new endpoints for querying spatial-tendency integration analysis
+- ✅ 643 integration records combining spatial clustering with character tendency
+- ✅ Complete documentation: `docs/SPATIAL_TENDENCY_INTEGRATION_API.md`
+
+See [API Implementation Update](../docs/API_IMPLEMENTATION_UPDATE_20260221.md) for details.
+
+---
+
+## 📚 完整文档
+
+**新增完整API文档！** 查看以下文档获取详细信息：
+
+- **[API Reference](../docs/frontend/API_REFERENCE.md)** - 完整的端点文档（18个端点，包含请求/响应示例）
+- **[Frontend Integration Guide](../docs/frontend/FRONTEND_INTEGRATION_GUIDE.md)** - Vue 3 集成指南（含代码示例）
+- **[API Deployment Guide](../docs/frontend/API_DEPLOYMENT_GUIDE.md)** - 部署和配置指南（Docker、Nginx、生产环境）
+- **[API Quick Reference](../docs/frontend/API_QUICK_REFERENCE.md)** - 快速参考手册（一页速查）
+
+---
+
 ## 架构设计
 
 ### 两阶段架构
@@ -27,11 +50,19 @@ api/
 ├── models.py                    # Pydantic响应模型
 ├── character/                   # 字符分析API
 │   ├── frequency.py            # 字符频率
-│   └── tendency.py             # 字符倾向性
+│   ├── tendency.py             # 字符倾向性
+│   ├── embeddings.py           # 字符嵌入
+│   └── significance.py         # 字符显著性
 ├── semantic/                    # 语义分析API
-│   └── category.py             # 语义类别
+│   ├── category.py             # 语义类别
+│   └── labels.py               # 语义标签
+├── spatial/                     # 空间分析API
+│   ├── hotspots.py             # 空间热点
+│   └── integration.py          # 空间-倾向性整合 (NEW)
 ├── clustering/                  # 聚类分析API
 │   └── assignments.py          # 聚类分配
+├── ngrams/                      # N-gram分析API
+│   └── frequency.py            # N-gram频率
 ├── village/                     # 村庄查询API
 │   └── search.py               # 搜索查询
 └── metadata/                    # 元数据API

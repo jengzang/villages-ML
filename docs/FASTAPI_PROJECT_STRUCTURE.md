@@ -1,5 +1,13 @@
 # FastAPI 项目结构总览
 
+> **📚 完整文档已更新！** 本文档仅作为架构概览。详细的API使用文档请查看：
+> - [API Reference](frontend/API_REFERENCE.md) - 完整的端点文档
+> - [Frontend Integration Guide](frontend/FRONTEND_INTEGRATION_GUIDE.md) - Vue 3 集成指南
+> - [API Deployment Guide](frontend/API_DEPLOYMENT_GUIDE.md) - 部署指南
+> - [API Quick Reference](frontend/API_QUICK_REFERENCE.md) - 快速参考
+
+---
+
 ```
 villages-ML/
 │
