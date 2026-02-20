@@ -34,7 +34,7 @@ def test_csv_export():
 
     # Export to CSV
     exporter = CSVExporter()
-    output_path = 'test_output/test_export.csv'
+    output_path = 'test-output/test_export.csv'
     exporter.export(data, output_path, metadata={'run_id': 'run_002', 'test': True})
 
     # Check file exists
@@ -64,7 +64,7 @@ def test_json_export():
         data = data.to_dict('records')
 
     exporter = JSONExporter()
-    output_path = 'test_output/test_export.json'
+    output_path = 'test-output/test_export.json'
     exporter.export(data, output_path, metadata={'run_id': 'run_002'})
 
     if Path(output_path).exists():
@@ -84,7 +84,7 @@ def test_report_generation():
 
     generator = ReportGenerator(conn)
     try:
-        output_path = 'test_output/test_report.md'
+        output_path = 'test-output/test_report.md'
         report = generator.generate_summary_report('run_002', output_path)
 
         if Path(output_path).exists():
