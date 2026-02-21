@@ -171,3 +171,99 @@ def get_structural_patterns(
 
     return results
 
+
+@router.get("/tendency")
+def get_ngram_tendency(
+    ngram: Optional[str] = Query(None, description="N-gram"),
+    region_level: str = Query("county", description="区域级别"),
+    min_tendency: Optional[float] = Query(None, description="最小倾向值"),
+    limit: int = Query(100, ge=1, le=1000, description="返回记录数"),
+    db: sqlite3.Connection = Depends(get_db)
+):
+    """
+    获取N-gram倾向性
+    Get n-gram tendency scores
+    """
+    query = """
+        SELECT
+            region_level,
+            region_name,
+            ngram,
+            n,
+            tendency_score,
+            frequency,
+            expected_frequency
+        FROM ngram_tendency
+        WHERE region_level = ?
+    """
+    params = [region_level]
+
+    if ngram is not None:
+        query += " AND ngram = ?"
+        params.append(ngram)
+
+    if min_tendency is not None:
+        query += " AND tendency_score >= ?"
+        params.append(min_tendency)
+
+    query += " ORDER BY tendency_score DESC LIMIT ?"
+    params.append(limit)
+
+    results = execute_query(db, query, tuple(params))
+
+    if not results:
+        raise HTTPException(
+            status_code=404,
+            detail="No n-gram tendency data found"
+        )
+
+    return results
+
+
+@router.get("/significance")
+def get_ngram_significance(
+    ngram: Optional[str] = Query(None, description="N-gram"),
+    region_level: str = Query("county", description="区域级别"),
+    is_significant: Optional[bool] = Query(None, description="仅显示显著结果"),
+    limit: int = Query(100, ge=1, le=1000, description="返回记录数"),
+    db: sqlite3.Connection = Depends(get_db)
+):
+    """
+    获取N-gram显著性
+    Get n-gram significance test results
+    """
+    query = """
+        SELECT
+            region_level,
+            region_name,
+            ngram,
+            n,
+            z_score,
+            p_value,
+            is_significant,
+            lift
+        FROM ngram_significance
+        WHERE region_level = ?
+    """
+    params = [region_level]
+
+    if ngram is not None:
+        query += " AND ngram = ?"
+        params.append(ngram)
+
+    if is_significant is not None:
+        query += " AND is_significant = ?"
+        params.append(1 if is_significant else 0)
+
+    query += " ORDER BY ABS(z_score) DESC LIMIT ?"
+    params.append(limit)
+
+    results = execute_query(db, query, tuple(params))
+
+    if not results:
+        raise HTTPException(
+            status_code=404,
+            detail="No n-gram significance data found"
+        )
+
+    return results
