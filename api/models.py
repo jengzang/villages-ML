@@ -200,10 +200,10 @@ class ClusterAssignment(BaseModel):
 class ClusterProfile(BaseModel):
     """聚类画像模型"""
     cluster_id: int = Field(..., description="聚类ID")
-    region_count: int = Field(..., description="区域数量")
-    top_semantic_features: Dict[str, float] = Field(..., description="语义特征")
-    top_morphology_features: Dict[str, float] = Field(..., description="形态特征")
-    distinguishing_features: List[str] = Field(..., description="区分性特征")
+    cluster_size: int = Field(..., description="聚类大小")
+    top_features_json: List = Field(..., description="顶级特征JSON")
+    top_semantic_categories_json: Dict = Field(..., description="顶级语义类别JSON")
+    top_suffixes_json: Optional[List] = Field(None, description="顶级后缀JSON")
 
 
 class ClusteringMetrics(BaseModel):
@@ -221,6 +221,7 @@ class ClusteringMetrics(BaseModel):
 
 class VillageBasic(BaseModel):
     """村庄基础信息模型"""
+    village_id: int = Field(..., description="村庄ID")
     village_name: str = Field(..., description="村名")
     city: str = Field(..., description="城市")
     county: str = Field(..., description="区县")

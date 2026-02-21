@@ -41,6 +41,7 @@ def search_villages(
     # 构建查询
     sql = """
         SELECT
+            ROWID as village_id,
             自然村 as village_name,
             市级 as city,
             区县级 as county,
@@ -62,7 +63,7 @@ def search_villages(
         params.append(county)
 
     if township is not None:
-        sql += " AND 乡镇 = ?"
+        sql += " AND 乡镇级 = ?"
         params.append(township)
 
     # 现场分页
@@ -101,7 +102,7 @@ def get_village_detail(
             自然村 as village_name,
             市级 as city,
             区县级 as county,
-            乡镇 as township,
+            乡镇级 as township,
             CAST(longitude AS REAL) as longitude,
             CAST(latitude AS REAL) as latitude
         FROM 广东省自然村
