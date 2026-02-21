@@ -58,12 +58,45 @@ Note: Column names and table names are in Chinese. When querying, use the exact 
 
 ```
 villages-ML/
-├── data/              # SQLite database and data files
-├── src/               # Source code
-├── notebooks/         # Jupyter notebooks for exploration
-├── tests/             # Unit tests
-└── .claude/skills/    # Custom Claude Code skills
+├── data/                        # SQLite database (villages.db, 5.59GB)
+│   └── villages.db             # 45 tables, 285K+ villages
+├── api/                         # FastAPI backend (30+ endpoints)
+│   ├── main.py                 # Main application
+│   ├── character/              # Character analysis endpoints
+│   ├── semantic/               # Semantic analysis endpoints
+│   ├── spatial/                # Spatial analysis endpoints
+│   ├── clustering/             # Clustering endpoints
+│   ├── ngrams/                 # N-gram analysis endpoints
+│   └── compute/                # Online compute endpoints
+├── scripts/                     # Analysis scripts
+│   ├── core/                   # Core analysis scripts (15 phases)
+│   ├── experimental/           # Experimental features
+│   └── debug/                  # Debugging utilities
+├── docs/                        # Documentation (40+ files)
+│   ├── README.md               # Documentation index
+│   ├── frontend/               # API & frontend docs
+│   ├── phases/                 # Phase summaries
+│   ├── guides/                 # Implementation guides
+│   └── reports/                # Analysis & status reports
+├── notebooks/                   # Jupyter notebooks
+├── tests/                       # Unit tests
+├── .claude/                     # Claude Code configuration
+│   └── skills/                 # Custom skills
+├── README.md                    # Project overview
+├── CLAUDE.md                    # This file
+├── requirements.txt             # Python dependencies
+├── run_all_phases.py           # Execute all analysis phases
+└── start_api.sh                # Start API server
 ```
+
+### Key Directories
+
+- **`data/`**: SQLite database with 45 tables (all populated)
+- **`api/`**: FastAPI backend with 30+ endpoints (~90% coverage)
+- **`scripts/`**: Analysis scripts organized by purpose
+- **`docs/`**: All documentation (organized by category)
+- **`notebooks/`**: Jupyter notebooks for exploration
+- **`.claude/`**: Claude Code configuration and custom skills
 
 ## Development Commands
 
@@ -102,45 +135,70 @@ To use a skill, type `/skill-name` in the Claude Code CLI. Skills can accept par
 
 ## Documentation Organization
 
-All project documentation must be placed in the `docs/` directory. This keeps the project root clean and makes documentation easy to find.
+All project documentation is organized in the `docs/` directory with a clear structure. This keeps the project root clean and makes documentation easy to find.
 
-### Documentation Types
+### Documentation Structure
 
-**Phase Summaries** (`docs/PHASE_XX_SUMMARY.md`)
-- Comprehensive summary of each implementation phase
-- Technical details, design decisions, performance metrics
-- Verification checklist and usage examples
-- Format: `PHASE_XX_SUMMARY.md` where XX is the phase number
+```
+docs/
+├── README.md                    # Documentation index (start here!)
+├── frontend/                    # Frontend & API documentation
+│   ├── API_REFERENCE.md        # Complete API endpoint reference
+│   ├── API_QUICK_REFERENCE.md  # Quick reference guide
+│   ├── FRONTEND_INTEGRATION_GUIDE.md  # Vue 3 integration
+│   └── API_DEPLOYMENT_GUIDE.md # Deployment instructions
+├── phases/                      # Phase implementation summaries
+│   ├── PHASE_0_PREPROCESSING_SUMMARY.md
+│   ├── PHASE_01_IMPLEMENTATION_SUMMARY.md
+│   ├── PHASE_02_IMPLEMENTATION_SUMMARY.md
+│   └── ... (15 phases total)
+├── guides/                      # Implementation guides
+│   ├── CHAR_EMBEDDINGS_GUIDE.md
+│   ├── SPATIAL_ANALYSIS_GUIDE.md
+│   ├── LLM_LABELING_GUIDE.md
+│   └── ... (8+ guides)
+└── reports/                     # Analysis & status reports
+    ├── COMPREHENSIVE_ANALYSIS_REPORT.md
+    ├── PROJECT_STATUS.md
+    ├── DATABASE_STATUS_REPORT.md
+    └── ... (15+ reports)
+```
 
-**Usage Guides** (`docs/*_GUIDE.md`)
-- Step-by-step guides for using specific features
-- API usage examples, CLI commands, troubleshooting
-- Format: `FEATURE_NAME_GUIDE.md` (e.g., `SPATIAL_ANALYSIS_GUIDE.md`)
+### Finding Documentation
 
-**Implementation Summaries** (`docs/IMPLEMENTATION_SUMMARY.md`)
-- Overall project implementation status
-- Cross-phase integration notes
-- Roadmap and future work
+**Start here**: `docs/README.md` - Comprehensive documentation index with:
+- Quick start guides
+- Documentation by category
+- Documentation by task
+- Documentation by topic
 
-**API Documentation** (`docs/api/`)
-- Module-level API documentation
-- Function signatures and parameters
-- Code examples
+**Common tasks**:
+- **Using the API**: `docs/frontend/API_QUICK_REFERENCE.md`
+- **Building frontend**: `docs/frontend/FRONTEND_INTEGRATION_GUIDE.md`
+- **Understanding analysis**: `docs/reports/COMPREHENSIVE_ANALYSIS_REPORT.md`
+- **Checking status**: `docs/reports/PROJECT_STATUS.md`
+- **Implementing features**: `docs/guides/` (relevant guide)
+
+### Documentation Standards
+
+- **Location**: All docs in `docs/` directory (organized by category)
+- **Format**: Markdown (.md)
+- **Naming**:
+  - Phase summaries: `PHASE_XX_SUMMARY.md`
+  - Guides: `FEATURE_NAME_GUIDE.md`
+  - Reports: `REPORT_TYPE_REPORT.md`
+- **Content**: Clear headings, table of contents, code examples
+- **Updates**: Keep documentation up-to-date with code changes
+- **Index**: Update `docs/README.md` when adding new documentation
 
 ### Files That Stay in Root
 
 - `README.md` - Project overview and quick start
 - `CLAUDE.md` - This file (Claude Code guidance)
 - `requirements.txt` - Python dependencies
-- `setup.py` / `pyproject.toml` - Package configuration (if applicable)
-
-### Documentation Standards
-
-- Use clear, descriptive filenames
-- Include table of contents for long documents
-- Provide code examples with expected output
-- Keep documentation up-to-date with code changes
-- Use consistent formatting (markdown)
+- `run_all_phases.py` - Main execution script
+- `start_api.sh` - API server startup script
+- `test_integration_endpoints.sh` - API testing script
 
 
 ## Data Assumptions & Statistical Rules
