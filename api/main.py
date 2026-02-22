@@ -21,7 +21,7 @@ from .spatial import hotspots as spatial_hotspots
 from .spatial import integration as spatial_integration
 from .ngrams import frequency as ngram_frequency
 from .patterns import router as patterns_router
-from .regional import aggregates as regional_aggregates
+from .regional import aggregates_realtime as regional_aggregates
 from .compute import clustering, semantic, features, subset
 from .admin import run_ids as admin_run_ids
 
