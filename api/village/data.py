@@ -160,7 +160,7 @@ def get_village_features(
     """
     # First get village info from main table using ROWID
     village_query = """
-        SELECT "自然村" as village_name, "市级" as city, "县区级" as county
+        SELECT "自然村" as village_name, "市级" as city, "区县级" as county
         FROM "广东省自然村"
         WHERE ROWID = ?
     """
@@ -274,7 +274,7 @@ def get_village_complete_profile(
             ROWID as village_id,
             "自然村" as village_name,
             "市级" as city,
-            "县区级" as county,
+            "区县级" as county,
             "乡镇级" as township,
             "村委会" as village_committee,
             "拼音" as pinyin,
