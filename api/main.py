@@ -20,9 +20,10 @@ from .clustering import assignments as cluster_assignments
 from .spatial import hotspots as spatial_hotspots
 from .spatial import integration as spatial_integration
 from .ngrams import frequency as ngram_frequency
-from .patterns import __init__ as patterns
+from .patterns import router as patterns_router
 from .regional import aggregates as regional_aggregates
 from .compute import clustering, semantic, features, subset
+from .admin import run_ids as admin_run_ids
 
 # 创建FastAPI应用
 app = FastAPI(
@@ -57,7 +58,7 @@ app.include_router(cluster_assignments.router, prefix="/api")
 app.include_router(spatial_hotspots.router, prefix="/api")
 app.include_router(spatial_integration.router, prefix="/api")
 app.include_router(ngram_frequency.router, prefix="/api")
-app.include_router(patterns.router, prefix="/api")
+app.include_router(patterns_router, prefix="/api")
 app.include_router(regional_aggregates.router, prefix="/api")
 
 # 注册计算模块路由
@@ -65,6 +66,9 @@ app.include_router(clustering.router, prefix="/api")
 app.include_router(semantic.router, prefix="/api")
 app.include_router(features.router, prefix="/api")
 app.include_router(subset.router, prefix="/api")
+
+# 注册管理模块路由
+app.include_router(admin_run_ids.router, prefix="/api/admin", tags=["Admin"])
 
 
 @app.get("/")

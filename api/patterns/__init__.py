@@ -7,6 +7,7 @@ from typing import List, Optional
 import sqlite3
 
 from ..dependencies import get_db, execute_query, execute_single
+from ..run_id_manager import run_id_manager
 
 router = APIRouter(prefix="/patterns", tags=["pattern-analysis"])
 
@@ -36,7 +37,7 @@ def get_global_pattern_frequency(
             pattern_type,
             frequency,
             village_count,
-            example_villages
+            rank
         FROM pattern_frequency_global
         WHERE 1=1
     """
@@ -92,7 +93,7 @@ def get_regional_pattern_frequency(
             pattern,
             pattern_type,
             frequency,
-            rank_in_region
+            rank_within_region as rank_in_region
         FROM pattern_frequency_regional
         WHERE region_level = ?
     """
@@ -122,6 +123,7 @@ def get_regional_pattern_frequency(
 
 @router.get("/tendency")
 def get_pattern_tendency(
+    run_id: Optional[str] = Query(None, description="分析运行ID（留空使用活跃版本）"),
     pattern: Optional[str] = Query(None, description="模式"),
     region_level: str = Query("county", description="区域级别"),
     min_tendency: Optional[float] = Query(None, description="最小倾向值"),
@@ -141,19 +143,23 @@ def get_pattern_tendency(
     Returns:
         List[dict]: 模式倾向性列表
     """
+    # 如果未指定run_id，使用活跃版本
+    if run_id is None:
+        run_id = run_id_manager.get_active_run_id("patterns")
+
     query = """
         SELECT
             region_level,
             region_name,
             pattern,
             pattern_type,
-            tendency_score,
+            lift as tendency_score,
             frequency,
-            expected_frequency
+            global_frequency
         FROM pattern_tendency
-        WHERE region_level = ?
+        WHERE run_id = ? AND region_level = ?
     """
-    params = [region_level]
+    params = [run_id, region_level]
 
     if pattern is not None:
         query += " AND pattern = ?"
@@ -196,12 +202,13 @@ def get_structural_patterns(
     """
     query = """
         SELECT
-            pattern_id,
             pattern,
             pattern_type,
+            n,
+            position,
             frequency,
-            description,
-            example_villages
+            example,
+            description
         FROM structural_patterns
         WHERE 1=1
     """

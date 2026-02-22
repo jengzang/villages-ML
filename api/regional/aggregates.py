@@ -33,10 +33,10 @@ def get_city_aggregates(
     params = []
 
     if city_name is not None:
-        query += " WHERE city_name = ?"
+        query += " WHERE city = ?"
         params.append(city_name)
 
-    query += " ORDER BY village_count DESC"
+    query += " ORDER BY total_villages DESC"
 
     results = execute_query(db, query, tuple(params)) if params else execute_query(db, query, ())
 
@@ -74,14 +74,14 @@ def get_county_aggregates(
     params = []
 
     if county_name is not None:
-        query += " AND county_name = ?"
+        query += " AND county = ?"
         params.append(county_name)
 
     if city_name is not None:
-        query += " AND city_name = ?"
+        query += " AND city = ?"
         params.append(city_name)
 
-    query += " ORDER BY village_count DESC"
+    query += " ORDER BY total_villages DESC"
 
     results = execute_query(db, query, tuple(params))
 
@@ -121,14 +121,14 @@ def get_town_aggregates(
     params = []
 
     if town_name is not None:
-        query += " AND town_name = ?"
+        query += " AND town = ?"
         params.append(town_name)
 
     if county_name is not None:
-        query += " AND county_name = ?"
+        query += " AND county = ?"
         params.append(county_name)
 
-    query += " ORDER BY village_count DESC LIMIT ?"
+    query += " ORDER BY total_villages DESC LIMIT ?"
     params.append(limit)
 
     results = execute_query(db, query, tuple(params))
@@ -165,11 +165,10 @@ def get_region_spatial_aggregates(
         SELECT
             region_level,
             region_name,
-            village_count,
-            avg_density,
-            total_area,
-            centroid_lon,
-            centroid_lat,
+            total_villages as village_count,
+            avg_local_density as avg_density,
+            avg_nn_distance,
+            avg_isolation_score,
             spatial_dispersion
         FROM region_spatial_aggregates
         WHERE region_level = ?
@@ -216,7 +215,7 @@ def get_region_vectors(
             region_id,
             region_name,
             region_level,
-            vector_dim,
+            N_villages,
             created_at
         FROM region_vectors
         WHERE 1=1

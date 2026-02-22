@@ -8,13 +8,14 @@ import sqlite3
 
 from ..dependencies import get_db, execute_query, execute_single
 from ..config import DEFAULT_RUN_ID
+from ..run_id_manager import run_id_manager
 
 router = APIRouter(prefix="/spatial", tags=["spatial-integration"])
 
 
 @router.get("/integration")
 def get_spatial_tendency_integration(
-    run_id: str = Query("integration_final_001", description="整合分析运行ID"),
+    run_id: Optional[str] = Query(None, description="整合分析运行ID（留空使用活跃版本）"),
     character: Optional[str] = Query(None, description="字符过滤"),
     cluster_id: Optional[int] = Query(None, description="聚类ID过滤"),
     min_cluster_size: Optional[int] = Query(None, ge=1, description="最小聚类大小"),
@@ -42,6 +43,10 @@ def get_spatial_tendency_integration(
     Returns:
         List[dict]: 整合分析结果列表
     """
+    # 如果未指定run_id，使用活跃版本
+    if run_id is None:
+        run_id = run_id_manager.get_active_run_id("spatial_integration")
+
     query = """
         SELECT
             id,
@@ -107,7 +112,7 @@ def get_spatial_tendency_integration(
 @router.get("/integration/by-character/{character}")
 def get_integration_by_character(
     character: str,
-    run_id: str = Query("integration_final_001", description="整合分析运行ID"),
+    run_id: Optional[str] = Query(None, description="整合分析运行ID（留空使用活跃版本）"),
     min_spatial_coherence: Optional[float] = Query(None, ge=0, le=1, description="最小空间一致性"),
     db: sqlite3.Connection = Depends(get_db)
 ):
@@ -123,6 +128,10 @@ def get_integration_by_character(
     Returns:
         List[dict]: 该字符在各聚类中的表现
     """
+    # 如果未指定run_id，使用活跃版本
+    if run_id is None:
+        run_id = run_id_manager.get_active_run_id("spatial_integration")
+
     query = """
         SELECT
             cluster_id,
@@ -168,7 +177,7 @@ def get_integration_by_character(
 @router.get("/integration/by-cluster/{cluster_id}")
 def get_integration_by_cluster(
     cluster_id: int,
-    run_id: str = Query("integration_final_001", description="整合分析运行ID"),
+    run_id: Optional[str] = Query(None, description="整合分析运行ID（留空使用活跃版本）"),
     min_tendency: Optional[float] = Query(None, description="最小倾向值"),
     db: sqlite3.Connection = Depends(get_db)
 ):
@@ -184,6 +193,10 @@ def get_integration_by_cluster(
     Returns:
         dict: 该聚类中各字符的表现
     """
+    # 如果未指定run_id，使用活跃版本
+    if run_id is None:
+        run_id = run_id_manager.get_active_run_id("spatial_integration")
+
     query = """
         SELECT
             character,
@@ -228,7 +241,7 @@ def get_integration_by_cluster(
 
 @router.get("/integration/summary")
 def get_integration_summary(
-    run_id: str = Query("integration_final_001", description="整合分析运行ID"),
+    run_id: Optional[str] = Query(None, description="整合分析运行ID（留空使用活跃版本）"),
     db: sqlite3.Connection = Depends(get_db)
 ):
     """
@@ -241,6 +254,10 @@ def get_integration_summary(
     Returns:
         dict: 汇总统计信息
     """
+    # 如果未指定run_id，使用活跃版本
+    if run_id is None:
+        run_id = run_id_manager.get_active_run_id("spatial_integration")
+
     # 总体统计
     overall_query = """
         SELECT

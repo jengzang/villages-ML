@@ -8,6 +8,7 @@ import sqlite3
 
 from ..dependencies import get_db, execute_query
 from ..config import DEFAULT_RUN_ID
+from ..run_id_manager import run_id_manager
 
 router = APIRouter(prefix="/character/significance", tags=["character"])
 
@@ -15,7 +16,7 @@ router = APIRouter(prefix="/character/significance", tags=["character"])
 @router.get("/by-character")
 def get_character_significance(
     char: str = Query(..., description="字符", min_length=1, max_length=1),
-    run_id: str = Query("test_sig_1771260439", description="分析运行ID"),
+    run_id: Optional[str] = Query(None, description="分析运行ID（留空使用活跃版本）"),
     region_level: str = Query("city", description="区域级别", pattern="^(city|county|township)$"),
     min_zscore: Optional[float] = Query(None, description="最小Z分数阈值"),
     db: sqlite3.Connection = Depends(get_db)
@@ -33,6 +34,10 @@ def get_character_significance(
     Returns:
         List[dict]: 区域显著性列表
     """
+    # 如果未指定run_id，使用活跃版本
+    if run_id is None:
+        run_id = run_id_manager.get_active_run_id("char_significance")
+
     query = """
         SELECT
             region_name,
@@ -66,7 +71,7 @@ def get_character_significance(
 @router.get("/by-region")
 def get_significant_characters_by_region(
     region_name: str = Query(..., description="区域名称"),
-    run_id: str = Query("test_sig_1771260439", description="分析运行ID"),
+    run_id: Optional[str] = Query(None, description="分析运行ID（留空使用活跃版本）"),
     region_level: str = Query("city", description="区域级别", pattern="^(city|county|township)$"),
     significance_only: bool = Query(True, description="仅返回显著字符"),
     top_k: int = Query(20, ge=1, le=100, description="返回前K个字符"),
@@ -86,6 +91,10 @@ def get_significant_characters_by_region(
     Returns:
         List[dict]: 显著字符列表
     """
+    # 如果未指定run_id，使用活跃版本
+    if run_id is None:
+        run_id = run_id_manager.get_active_run_id("char_significance")
+
     query = """
         SELECT
             char as character,
@@ -118,7 +127,7 @@ def get_significant_characters_by_region(
 
 @router.get("/summary")
 def get_significance_summary(
-    run_id: str = Query("test_sig_1771260439", description="分析运行ID"),
+    run_id: Optional[str] = Query(None, description="分析运行ID（留空使用活跃版本）"),
     region_level: str = Query("city", description="区域级别", pattern="^(city|county|township)$"),
     db: sqlite3.Connection = Depends(get_db)
 ):
@@ -133,6 +142,10 @@ def get_significance_summary(
     Returns:
         dict: 汇总统计信息
     """
+    # 如果未指定run_id，使用活跃版本
+    if run_id is None:
+        run_id = run_id_manager.get_active_run_id("char_significance")
+
     query = """
         SELECT
             COUNT(DISTINCT char) as total_characters,

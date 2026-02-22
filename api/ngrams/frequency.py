@@ -8,6 +8,7 @@ import sqlite3
 
 from ..dependencies import get_db, execute_query
 from ..config import DEFAULT_RUN_ID
+from ..run_id_manager import run_id_manager
 
 router = APIRouter(prefix="/ngrams", tags=["ngrams"])
 
@@ -15,7 +16,6 @@ router = APIRouter(prefix="/ngrams", tags=["ngrams"])
 @router.get("/frequency")
 def get_ngram_frequency(
     n: int = Query(..., ge=2, le=4, description="N-gram大小 (2=bigram, 3=trigram)"),
-    run_id: str = Query("ngram_001", description="N-gram分析运行ID"),
     top_k: int = Query(100, ge=1, le=1000, description="返回前K个n-grams"),
     min_frequency: Optional[int] = Query(None, ge=1, description="最小频次过滤"),
     db: sqlite3.Connection = Depends(get_db)
@@ -26,7 +26,6 @@ def get_ngram_frequency(
 
     Args:
         n: N-gram大小 (2, 3, 或 4)
-        run_id: N-gram分析运行ID
         top_k: 返回前K个高频n-grams
         min_frequency: 最小频次阈值（可选）
 
@@ -37,11 +36,11 @@ def get_ngram_frequency(
         SELECT
             ngram,
             frequency,
-            village_count
+            percentage
         FROM ngram_frequency
-        WHERE run_id = ? AND n = ?
+        WHERE n = ?
     """
-    params = [run_id, n]
+    params = [n]
 
     # 现场过滤：最小频次
     if min_frequency is not None:
@@ -51,12 +50,16 @@ def get_ngram_frequency(
     query += " ORDER BY frequency DESC LIMIT ?"
     params.append(top_k)
 
+    # Debug: print the query
+    print(f"DEBUG: Query = {query}")
+    print(f"DEBUG: Params = {params}")
+
     results = execute_query(db, query, tuple(params))
 
     if not results:
         raise HTTPException(
             status_code=404,
-            detail=f"No {n}-grams found for run_id: {run_id}"
+            detail=f"No {n}-grams found"
         )
 
     return results
@@ -65,7 +68,7 @@ def get_ngram_frequency(
 @router.get("/regional")
 def get_regional_ngram_frequency(
     n: int = Query(..., ge=2, le=4, description="N-gram大小"),
-    run_id: str = Query("ngram_001", description="N-gram分析运行ID"),
+    run_id: Optional[str] = Query(None, description="N-gram分析运行ID（留空使用活跃版本）"),
     region_level: str = Query(..., description="区域级别", pattern="^(city|county|township)$"),
     region_name: Optional[str] = Query(None, description="区域名称（不指定返回所有区域）"),
     top_k: int = Query(50, ge=1, le=500, description="每个区域返回前K个n-grams"),
@@ -85,6 +88,10 @@ def get_regional_ngram_frequency(
     Returns:
         List[dict]: 区域N-gram频率列表
     """
+    # 如果未指定run_id，使用活跃版本
+    if run_id is None:
+        run_id = run_id_manager.get_active_run_id("ngrams")
+
     query = """
         SELECT
             region_name,
@@ -118,7 +125,6 @@ def get_regional_ngram_frequency(
 
 @router.get("/patterns")
 def get_structural_patterns(
-    run_id: str = Query("ngram_001", description="N-gram分析运行ID"),
     pattern_type: Optional[str] = Query(None, description="模式类型过滤"),
     min_frequency: Optional[int] = Query(None, ge=1, description="最小频次过滤"),
     limit: int = Query(100, ge=1, le=500, description="返回记录数"),
@@ -129,7 +135,6 @@ def get_structural_patterns(
     Get structural naming patterns
 
     Args:
-        run_id: N-gram分析运行ID
         pattern_type: 模式类型（可选）
         min_frequency: 最小频次（可选）
         limit: 返回记录数
@@ -142,21 +147,24 @@ def get_structural_patterns(
             pattern,
             pattern_type,
             frequency,
-            example_villages
+            example
         FROM structural_patterns
-        WHERE run_id = ?
     """
-    params = [run_id]
+    params = []
 
     # 现场过滤：模式类型
+    conditions = []
     if pattern_type is not None:
-        query += " AND pattern_type = ?"
+        conditions.append("pattern_type = ?")
         params.append(pattern_type)
 
     # 现场过滤：最小频次
     if min_frequency is not None:
-        query += " AND frequency >= ?"
+        conditions.append("frequency >= ?")
         params.append(min_frequency)
+
+    if conditions:
+        query += " WHERE " + " AND ".join(conditions)
 
     query += " ORDER BY frequency DESC LIMIT ?"
     params.append(limit)
@@ -166,7 +174,7 @@ def get_structural_patterns(
     if not results:
         raise HTTPException(
             status_code=404,
-            detail=f"No structural patterns found for run_id: {run_id}"
+            detail="No structural patterns found"
         )
 
     return results

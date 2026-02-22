@@ -8,13 +8,14 @@ import sqlite3
 
 from ..dependencies import get_db, execute_query, execute_single
 from ..config import DEFAULT_RUN_ID
+from ..run_id_manager import run_id_manager
 
 router = APIRouter(prefix="/spatial", tags=["spatial"])
 
 
 @router.get("/hotspots")
 def get_spatial_hotspots(
-    run_id: str = Query("spatial_001", description="空间分析运行ID"),
+    run_id: Optional[str] = Query(None, description="空间分析运行ID（留空使用活跃版本）"),
     min_density: Optional[float] = Query(None, description="最小密度阈值"),
     min_village_count: Optional[int] = Query(None, ge=1, description="最小村庄数量"),
     db: sqlite3.Connection = Depends(get_db)
@@ -24,22 +25,25 @@ def get_spatial_hotspots(
     Get spatial density hotspots (KDE analysis results)
 
     Args:
-        run_id: 空间分析运行ID
+        run_id: 空间分析运行ID（留空使用活跃版本）
         min_density: 最小密度阈值（可选）
         min_village_count: 最小村庄数量（可选）
 
     Returns:
         List[dict]: 热点列表
     """
+    # 如果未指定run_id，使用活跃版本
+    if run_id is None:
+        run_id = run_id_manager.get_active_run_id("spatial_hotspots")
+
     query = """
         SELECT
             hotspot_id,
             center_lon,
             center_lat,
-            density_peak,
+            density_score,
             village_count,
-            radius_km,
-            representative_villages
+            radius_km
         FROM spatial_hotspots
         WHERE run_id = ?
     """
@@ -47,7 +51,7 @@ def get_spatial_hotspots(
 
     # 现场过滤：最小密度
     if min_density is not None:
-        query += " AND density_peak >= ?"
+        query += " AND density_score >= ?"
         params.append(min_density)
 
     # 现场过滤：最小村庄数
@@ -55,7 +59,7 @@ def get_spatial_hotspots(
         query += " AND village_count >= ?"
         params.append(min_village_count)
 
-    query += " ORDER BY density_peak DESC"
+    query += " ORDER BY density_score DESC"
 
     results = execute_query(db, query, tuple(params))
 
@@ -71,7 +75,7 @@ def get_spatial_hotspots(
 @router.get("/hotspots/{hotspot_id}")
 def get_hotspot_detail(
     hotspot_id: int,
-    run_id: str = Query("spatial_001", description="空间分析运行ID"),
+    run_id: Optional[str] = Query(None, description="空间分析运行ID（留空使用活跃版本）"),
     db: sqlite3.Connection = Depends(get_db)
 ):
     """
@@ -80,20 +84,23 @@ def get_hotspot_detail(
 
     Args:
         hotspot_id: 热点ID
-        run_id: 空间分析运行ID
+        run_id: 空间分析运行ID（留空使用活跃版本）
 
     Returns:
         dict: 热点详情
     """
+    # 如果未指定run_id，使用活跃版本
+    if run_id is None:
+        run_id = run_id_manager.get_active_run_id("spatial_hotspots")
+
     query = """
         SELECT
             hotspot_id,
             center_lon,
             center_lat,
-            density_peak,
+            density_score,
             village_count,
-            radius_km,
-            representative_villages
+            radius_km
         FROM spatial_hotspots
         WHERE run_id = ? AND hotspot_id = ?
     """
@@ -111,7 +118,7 @@ def get_hotspot_detail(
 
 @router.get("/clusters")
 def get_spatial_clusters(
-    run_id: str = Query("spatial_001", description="空间分析运行ID"),
+    run_id: Optional[str] = Query(None, description="空间分析运行ID（留空使用活跃版本）"),
     cluster_id: Optional[int] = Query(None, description="聚类ID过滤"),
     min_size: Optional[int] = Query(None, ge=1, description="最小聚类大小"),
     limit: int = Query(100, ge=1, le=1000, description="返回记录数"),
@@ -122,7 +129,7 @@ def get_spatial_clusters(
     Get DBSCAN spatial clustering results
 
     Args:
-        run_id: 空间分析运行ID
+        run_id: 空间分析运行ID（留空使用活跃版本）
         cluster_id: 聚类ID（可选，-1表示噪声点）
         min_size: 最小聚类大小（可选）
         limit: 返回记录数
@@ -130,12 +137,17 @@ def get_spatial_clusters(
     Returns:
         List[dict]: 聚类结果列表
     """
+    # 如果未指定run_id，使用活跃版本
+    if run_id is None:
+        run_id = run_id_manager.get_active_run_id("spatial_hotspots")
+
     query = """
         SELECT
-            village_id,
             cluster_id,
-            is_core_point,
-            neighbor_count
+            cluster_size,
+            centroid_lon,
+            centroid_lat,
+            avg_distance_km
         FROM spatial_clusters
         WHERE run_id = ?
     """
@@ -161,7 +173,7 @@ def get_spatial_clusters(
         """
         params.extend([run_id, min_size])
 
-    query += " ORDER BY cluster_id, village_id LIMIT ?"
+    query += " ORDER BY cluster_id LIMIT ?"
     params.append(limit)
 
     results = execute_query(db, query, tuple(params))
@@ -177,7 +189,7 @@ def get_spatial_clusters(
 
 @router.get("/clusters/summary")
 def get_cluster_summary(
-    run_id: str = Query("spatial_001", description="空间分析运行ID"),
+    run_id: Optional[str] = Query(None, description="空间分析运行ID（留空使用活跃版本）"),
     db: sqlite3.Connection = Depends(get_db)
 ):
     """
@@ -185,21 +197,25 @@ def get_cluster_summary(
     Get clustering summary statistics
 
     Args:
-        run_id: 空间分析运行ID
+        run_id: 空间分析运行ID（留空使用活跃版本）
 
     Returns:
         dict: 聚类汇总信息
     """
+    # 如果未指定run_id，使用活跃版本
+    if run_id is None:
+        run_id = run_id_manager.get_active_run_id("spatial_hotspots")
+
     query = """
         SELECT
             cluster_id,
-            COUNT(*) as size,
-            SUM(CASE WHEN is_core_point = 1 THEN 1 ELSE 0 END) as core_points,
-            AVG(neighbor_count) as avg_neighbors
+            cluster_size as size,
+            centroid_lon,
+            centroid_lat,
+            avg_distance_km
         FROM spatial_clusters
         WHERE run_id = ?
-        GROUP BY cluster_id
-        ORDER BY size DESC
+        ORDER BY cluster_size DESC
     """
 
     results = execute_query(db, query, (run_id,))

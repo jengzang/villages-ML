@@ -35,8 +35,8 @@ def get_semantic_bigrams(
             category1,
             category2,
             frequency,
-            pmi_score,
-            example_villages
+            percentage,
+            pmi as pmi_score
         FROM semantic_bigrams
         WHERE 1=1
     """
@@ -47,7 +47,7 @@ def get_semantic_bigrams(
         params.append(min_frequency)
 
     if min_pmi is not None:
-        query += " AND pmi_score >= ?"
+        query += " AND pmi >= ?"
         params.append(min_pmi)
 
     query += " ORDER BY frequency DESC LIMIT ?"
@@ -87,7 +87,7 @@ def get_semantic_trigrams(
             category2,
             category3,
             frequency,
-            example_villages
+            percentage
         FROM semantic_trigrams
         WHERE 1=1
     """
@@ -136,9 +136,9 @@ def get_semantic_pmi(
         SELECT
             category1,
             category2,
-            pmi_score,
+            pmi as pmi_score,
             frequency,
-            expected_frequency
+            is_positive
         FROM semantic_pmi
         WHERE 1=1
     """
@@ -153,10 +153,10 @@ def get_semantic_pmi(
         params.append(category2)
 
     if min_pmi is not None:
-        query += " AND pmi_score >= ?"
+        query += " AND pmi >= ?"
         params.append(min_pmi)
 
-    query += " ORDER BY pmi_score DESC LIMIT ?"
+    query += " ORDER BY pmi DESC LIMIT ?"
     params.append(limit)
 
     results = execute_query(db, query, tuple(params))
@@ -189,12 +189,13 @@ def get_composition_patterns(
     """
     query = """
         SELECT
-            pattern_id,
+            pattern,
             pattern_type,
-            category_sequence,
+            modifier,
+            head,
             frequency,
-            description,
-            example_villages
+            percentage,
+            description
         FROM semantic_composition_patterns
         WHERE 1=1
     """
@@ -246,10 +247,10 @@ def get_semantic_indices(
         SELECT
             region_level,
             region_name,
-            semantic_category,
-            semantic_index,
+            category as semantic_category,
+            raw_intensity as semantic_index,
             normalized_index,
-            rank_in_region
+            rank_within_province as rank_in_region
         FROM semantic_indices
         WHERE 1=1
     """

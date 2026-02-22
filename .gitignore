@@ -41,6 +41,7 @@ models/
 *.h5
 *.pkl
 *.joblib
+!api/models/
 
 # Data (keep structure, ignore large files)
 *.csv

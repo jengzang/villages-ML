@@ -9,6 +9,7 @@ import json
 
 from ..dependencies import get_db, execute_query, execute_single
 from ..config import DEFAULT_RUN_ID
+from ..run_id_manager import run_id_manager
 
 router = APIRouter(prefix="/character/embeddings", tags=["character"])
 
@@ -16,7 +17,7 @@ router = APIRouter(prefix="/character/embeddings", tags=["character"])
 @router.get("/vector")
 def get_character_embedding(
     char: str = Query(..., description="字符", min_length=1, max_length=1),
-    run_id: str = Query("embed_001", description="嵌入运行ID"),
+    run_id: Optional[str] = Query(None, description="嵌入运行ID（留空使用活跃版本）"),
     db: sqlite3.Connection = Depends(get_db)
 ):
     """
@@ -30,11 +31,14 @@ def get_character_embedding(
     Returns:
         dict: 字符嵌入信息（包含向量）
     """
+    # 如果未指定run_id，使用活跃版本
+    if run_id is None:
+        run_id = run_id_manager.get_active_run_id("char_embeddings")
+
     query = """
         SELECT
             char as character,
-            embedding_vector,
-            vector_dim
+            embedding_vector
         FROM char_embeddings
         WHERE run_id = ? AND char = ?
     """
@@ -57,7 +61,7 @@ def get_character_embedding(
 @router.get("/similarities")
 def get_similar_characters(
     char: str = Query(..., description="字符", min_length=1, max_length=1),
-    run_id: str = Query("embed_001", description="嵌入运行ID"),
+    run_id: Optional[str] = Query(None, description="嵌入运行ID（留空使用活跃版本）"),
     top_k: int = Query(10, ge=1, le=50, description="返回前K个相似字符"),
     min_similarity: Optional[float] = Query(None, ge=0.0, le=1.0, description="最小相似度阈值"),
     db: sqlite3.Connection = Depends(get_db)
@@ -75,11 +79,15 @@ def get_similar_characters(
     Returns:
         List[dict]: 相似字符列表
     """
+    # 如果未指定run_id，使用活跃版本
+    if run_id is None:
+        run_id = run_id_manager.get_active_run_id("char_embeddings")
+
     query = """
         SELECT
             char2 as similar_character,
-            similarity
-        FROM character_similarities
+            cosine_similarity as similarity
+        FROM char_similarity
         WHERE run_id = ? AND char1 = ?
     """
     params = [run_id, char]
@@ -105,7 +113,7 @@ def get_similar_characters(
 
 @router.get("/list")
 def list_character_embeddings(
-    run_id: str = Query("embed_001", description="嵌入运行ID"),
+    run_id: Optional[str] = Query(None, description="嵌入运行ID（留空使用活跃版本）"),
     limit: int = Query(100, ge=1, le=1000, description="返回记录数"),
     offset: int = Query(0, ge=0, description="偏移量"),
     db: sqlite3.Connection = Depends(get_db)
@@ -122,10 +130,13 @@ def list_character_embeddings(
     Returns:
         List[dict]: 字符嵌入元数据列表
     """
+    # 如果未指定run_id，使用活跃版本
+    if run_id is None:
+        run_id = run_id_manager.get_active_run_id("char_embeddings")
+
     query = """
         SELECT
-            char as character,
-            vector_dim
+            char as character
         FROM char_embeddings
         WHERE run_id = ?
         ORDER BY char

@@ -7,6 +7,7 @@ from typing import List, Optional
 import sqlite3
 
 from ..dependencies import get_db, execute_query, execute_single
+from ..run_id_manager import run_id_manager
 
 router = APIRouter(prefix="/village", tags=["village-data"])
 
@@ -144,7 +145,7 @@ def get_village_semantic_structure(
 @router.get("/features/{village_id}")
 def get_village_features(
     village_id: int,
-    run_id: str = Query("default", description="分析运行ID"),
+    run_id: Optional[str] = Query(None, description="分析运行ID（留空使用活跃版本）"),
     db: sqlite3.Connection = Depends(get_db)
 ):
     """
@@ -158,6 +159,10 @@ def get_village_features(
     Returns:
         dict: 村庄特征
     """
+    # 如果未指定run_id，使用活跃版本
+    if run_id is None:
+        run_id = run_id_manager.get_active_run_id("village_features")
+
     # First get village info from main table using ROWID
     village_query = """
         SELECT "自然村" as village_name, "市级" as city, "区县级" as county
@@ -201,7 +206,7 @@ def get_village_features(
 @router.get("/spatial-features/{village_id}")
 def get_village_spatial_features(
     village_id: int,
-    run_id: str = Query("default", description="分析运行ID"),
+    run_id: Optional[str] = Query(None, description="分析运行ID（留空使用活跃版本）"),
     db: sqlite3.Connection = Depends(get_db)
 ):
     """
@@ -215,6 +220,10 @@ def get_village_spatial_features(
     Returns:
         dict: 村庄空间特征
     """
+    # 如果未指定run_id，使用活跃版本
+    if run_id is None:
+        run_id = run_id_manager.get_active_run_id("village_features")
+
     # spatial_features table has village_id column, so we can query directly
     query = """
         SELECT
@@ -254,7 +263,7 @@ def get_village_spatial_features(
 @router.get("/complete/{village_id}")
 def get_village_complete_profile(
     village_id: int,
-    run_id: str = Query("default", description="分析运行ID"),
+    run_id: Optional[str] = Query(None, description="分析运行ID（留空使用活跃版本）"),
     db: sqlite3.Connection = Depends(get_db)
 ):
     """
@@ -268,6 +277,10 @@ def get_village_complete_profile(
     Returns:
         dict: 村庄完整档案
     """
+    # 如果未指定run_id，使用活跃版本
+    if run_id is None:
+        run_id = run_id_manager.get_active_run_id("village_features")
+
     # Get basic info from main table using ROWID
     basic_query = """
         SELECT

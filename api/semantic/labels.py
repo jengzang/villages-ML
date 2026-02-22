@@ -8,6 +8,7 @@ import sqlite3
 
 from ..dependencies import get_db, execute_query, execute_single
 from ..config import DEFAULT_RUN_ID
+from ..run_id_manager import run_id_manager
 
 router = APIRouter(prefix="/semantic/labels", tags=["semantic"])
 
@@ -15,7 +16,7 @@ router = APIRouter(prefix="/semantic/labels", tags=["semantic"])
 @router.get("/by-character")
 def get_semantic_label_by_character(
     char: str = Query(..., description="字符", min_length=1, max_length=1),
-    run_id: str = Query("semantic_001", description="语义分析运行ID"),
+    run_id: Optional[str] = Query(None, description="语义分析运行ID（留空使用活跃版本）"),
     db: sqlite3.Connection = Depends(get_db)
 ):
     """
@@ -29,6 +30,10 @@ def get_semantic_label_by_character(
     Returns:
         dict: 语义标签信息
     """
+    # 如果未指定run_id，使用活跃版本
+    if run_id is None:
+        run_id = run_id_manager.get_active_run_id("semantic")
+
     query = """
         SELECT
             char as character,
@@ -53,7 +58,7 @@ def get_semantic_label_by_character(
 @router.get("/by-category")
 def get_characters_by_semantic_category(
     category: str = Query(..., description="语义类别"),
-    run_id: str = Query("semantic_001", description="语义分析运行ID"),
+    run_id: Optional[str] = Query(None, description="语义分析运行ID（留空使用活跃版本）"),
     min_confidence: Optional[float] = Query(None, ge=0.0, le=1.0, description="最小置信度"),
     limit: int = Query(100, ge=1, le=500, description="返回记录数"),
     db: sqlite3.Connection = Depends(get_db)
@@ -71,6 +76,10 @@ def get_characters_by_semantic_category(
     Returns:
         List[dict]: 字符列表
     """
+    # 如果未指定run_id，使用活跃版本
+    if run_id is None:
+        run_id = run_id_manager.get_active_run_id("semantic")
+
     query = """
         SELECT
             char as character,
@@ -103,7 +112,7 @@ def get_characters_by_semantic_category(
 
 @router.get("/categories")
 def list_semantic_categories(
-    run_id: str = Query("semantic_001", description="语义分析运行ID"),
+    run_id: Optional[str] = Query(None, description="语义分析运行ID（留空使用活跃版本）"),
     db: sqlite3.Connection = Depends(get_db)
 ):
     """
@@ -116,6 +125,10 @@ def list_semantic_categories(
     Returns:
         List[dict]: 类别统计列表
     """
+    # 如果未指定run_id，使用活跃版本
+    if run_id is None:
+        run_id = run_id_manager.get_active_run_id("semantic")
+
     query = """
         SELECT
             semantic_category,
