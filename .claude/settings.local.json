@@ -30,7 +30,27 @@
       "Bash(tee:*)",
       "Bash(\"docs/分析结果展示_中文版.md\":*)",
       "Bash(curl:*)",
-      "Bash(git -C /cygdrive/c/Users/joengzaang/PycharmProjects/villages-ML ls-files docs/)"
+      "Bash(git -C /cygdrive/c/Users/joengzaang/PycharmProjects/villages-ML ls-files docs/)",
+      "Bash(echo:*)",
+      "Bash(git -C /cygdrive/c/Users/joengzaang/PycharmProjects/villages-ML log --all --full-history --oneline -- \"*test*output*\")",
+      "Bash(cat:*)",
+      "Bash(head:*)",
+      "Bash(netstat:*)",
+      "Bash(taskkill:*)",
+      "Bash(xargs -I {} taskkill //F //PID {})",
+      "Bash(tasklist:*)",
+      "Bash(export:*)",
+      "Bash(while read pid)",
+      "Bash(do taskkill //F //PID $pid)",
+      "Bash(xargs kill -9)",
+      "Bash(kill:*)",
+      "Bash(cmd.exe:*)",
+      "Bash(ps:*)",
+      "Bash(xargs -r kill -9)",
+      "Bash(find .:*)",
+      "Bash(http_proxy=\"\" https_proxy=\"\" curl:*)",
+      "Bash(./start_api.sh:*)",
+      "Bash(pkill:*)"
     ]
   }
 }
