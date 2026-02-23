@@ -92,6 +92,43 @@ class SemanticNetwork:
         self.graph = G
         return G
 
+    def build_network_from_bigrams(
+        self,
+        min_pmi: float = 0.0,
+        min_frequency: int = 100
+    ) -> nx.Graph:
+        """
+        Build semantic network from semantic_bigrams table.
+
+        Args:
+            min_pmi: Minimum PMI threshold for edges
+            min_frequency: Minimum co-occurrence frequency
+
+        Returns:
+            NetworkX graph with categories as nodes
+        """
+        conn = sqlite3.connect(self.db_path)
+
+        query = """
+        SELECT category1, category2, frequency, pmi
+        FROM semantic_bigrams
+        WHERE pmi >= ? AND frequency >= ?
+        """
+        df = pd.read_sql_query(query, conn, params=(min_pmi, min_frequency))
+        conn.close()
+
+        # Build graph
+        G = nx.Graph()
+        for _, row in df.iterrows():
+            G.add_edge(
+                row['category1'], row['category2'],
+                weight=row['pmi'],
+                frequency=row['frequency']
+            )
+
+        self.graph = G
+        return G
+
     def detect_communities(
         self,
         method: str = 'louvain',
@@ -180,16 +217,39 @@ class SemanticNetwork:
         except nx.PowerIterationFailedConvergence:
             eigenvector_cent = {node: 0.0 for node in self.graph.nodes()}
 
+        # PageRank centrality
+        pagerank_cent = self.compute_pagerank()
+
         # Combine all metrics
         for node in self.graph.nodes():
             centrality_metrics[node] = {
                 'degree': degree_cent.get(node, 0.0),
                 'betweenness': betweenness_cent.get(node, 0.0),
                 'closeness': closeness_cent.get(node, 0.0),
-                'eigenvector': eigenvector_cent.get(node, 0.0)
+                'eigenvector': eigenvector_cent.get(node, 0.0),
+                'pagerank': pagerank_cent.get(node, 0.0)
             }
 
         return centrality_metrics
+
+    def compute_pagerank(self, alpha: float = 0.85) -> Dict[str, float]:
+        """
+        Compute PageRank centrality.
+
+        Args:
+            alpha: Damping parameter (default 0.85)
+
+        Returns:
+            Dictionary mapping node to PageRank score
+        """
+        if self.graph is None:
+            raise ValueError("Must build network first")
+
+        return nx.pagerank(
+            self.graph,
+            alpha=alpha,
+            weight='weight'
+        )
 
     def get_network_stats(self) -> Dict:
         """
@@ -393,6 +453,7 @@ class SemanticNetwork:
             betweenness_centrality REAL,
             closeness_centrality REAL,
             eigenvector_centrality REAL,
+            pagerank REAL,
             community_id INTEGER,
             PRIMARY KEY (run_id, category)
         )
@@ -424,7 +485,7 @@ class SemanticNetwork:
             community_id = self.communities.get(category) if self.communities else None
             cursor.execute("""
             INSERT OR REPLACE INTO semantic_network_centrality
-            VALUES (?, ?, ?, ?, ?, ?, ?)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
             """, (
                 run_id,
                 category,
@@ -432,6 +493,7 @@ class SemanticNetwork:
                 metrics['betweenness'],
                 metrics['closeness'],
                 metrics['eigenvector'],
+                metrics['pagerank'],
                 community_id
             ))
 

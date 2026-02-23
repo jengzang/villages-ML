@@ -16,6 +16,7 @@ from .metadata import stats as metadata_stats
 from .semantic import category as semantic_category
 from .semantic import labels as semantic_labels
 from .semantic import composition as semantic_composition
+from .semantic import centrality as semantic_centrality
 from .clustering import assignments as cluster_assignments
 from .spatial import hotspots as spatial_hotspots
 from .spatial import integration as spatial_integration
@@ -24,6 +25,7 @@ from .patterns import router as patterns_router
 from .regional import aggregates_realtime as regional_aggregates
 from .compute import clustering, semantic, features, subset
 from .admin import run_ids as admin_run_ids
+from .regions import similarity as region_similarity
 
 # 创建FastAPI应用
 app = FastAPI(
@@ -54,6 +56,7 @@ app.include_router(metadata_stats.router, prefix="/api")
 app.include_router(semantic_category.router, prefix="/api")
 app.include_router(semantic_labels.router, prefix="/api")
 app.include_router(semantic_composition.router, prefix="/api")
+app.include_router(semantic_centrality.router, prefix="/api")
 app.include_router(cluster_assignments.router, prefix="/api")
 app.include_router(spatial_hotspots.router, prefix="/api")
 app.include_router(spatial_integration.router, prefix="/api")
@@ -69,6 +72,9 @@ app.include_router(subset.router, prefix="/api")
 
 # 注册管理模块路由
 app.include_router(admin_run_ids.router, prefix="/api/admin", tags=["Admin"])
+
+# 注册Phase 15-16路由
+app.include_router(region_similarity.router, prefix="/api")
 
 
 @app.get("/")
