@@ -35,6 +35,15 @@ These endpoints query precomputed results from the database:
 | `/api/village/search/detail` | GET | Get village detail information |
 | `/api/metadata/stats/overview` | GET | System overview statistics |
 | `/api/metadata/stats/tables` | GET | Database table information |
+| `/api/regions/similarity/search` | GET | Find similar regions to target region |
+| `/api/regions/similarity/pair` | GET | Get similarity between two regions |
+| `/api/regions/similarity/matrix` | GET | Get similarity matrix for multiple regions |
+| `/api/regions/list` | GET | List all available regions |
+| `/api/semantic/centrality/ranking` | GET | Get categories ranked by centrality |
+| `/api/semantic/centrality/category` | GET | Get centrality metrics for one category |
+| `/api/semantic/centrality/compare` | GET | Compare centrality across all categories |
+| `/api/semantic/network/stats` | GET | Get semantic network statistics |
+| `/api/semantic/communities` | GET | Get semantic community structure |
 
 ### Online Compute Endpoints (Slower, >1s)
 
@@ -999,6 +1008,264 @@ app.add_middleware(
     allow_methods=["GET", "POST"],
     allow_headers=["*"],
 )
+```
+
+---
+
+## Phase 15-16: Region Similarity & Semantic Centrality
+
+### Region Similarity Endpoints
+
+#### 1. Search Similar Regions
+
+**GET** `/api/regions/similarity/search`
+
+Find regions similar to a target region based on naming patterns.
+
+**Query Parameters:**
+
+| Parameter | Type | Required | Default | Description |
+|-----------|------|----------|---------|-------------|
+| `region` | string | Yes | - | Target region name |
+| `top_k` | integer | No | 10 | Number of similar regions (1-50) |
+| `metric` | string | No | cosine | Similarity metric ('cosine' or 'jaccard') |
+| `min_similarity` | float | No | 0.0 | Minimum similarity threshold (0.0-1.0) |
+
+**Response:**
+
+```json
+{
+  "target_region": "广州市",
+  "metric": "cosine",
+  "count": 5,
+  "similar_regions": [
+    {
+      "region": "深圳市",
+      "similarity": 0.913,
+      "common_chars": ["村", "新", "大", "沙", "涌"],
+      "distinctive_chars": ["湾", "坑", "围"]
+    }
+  ]
+}
+```
+
+#### 2. Get Pair Similarity
+
+**GET** `/api/regions/similarity/pair`
+
+Get all similarity metrics between two specific regions.
+
+**Query Parameters:**
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `region1` | string | Yes | First region name |
+| `region2` | string | Yes | Second region name |
+
+**Response:**
+
+```json
+{
+  "region1": "广州市",
+  "region2": "深圳市",
+  "cosine_similarity": 0.913,
+  "jaccard_similarity": 0.1825,
+  "euclidean_distance": 12.45,
+  "common_chars": ["村", "新", "大"],
+  "distinctive_chars_r1": ["涌", "坑", "围"],
+  "distinctive_chars_r2": ["湾", "井", "寨"],
+  "feature_dimension": 3827
+}
+```
+
+#### 3. Get Similarity Matrix
+
+**GET** `/api/regions/similarity/matrix`
+
+Get similarity matrix for multiple regions.
+
+**Query Parameters:**
+
+| Parameter | Type | Required | Default | Description |
+|-----------|------|----------|---------|-------------|
+| `regions` | string | No | top 20 | Comma-separated region names |
+| `metric` | string | No | cosine | Similarity metric |
+
+**Response:**
+
+```json
+{
+  "regions": ["广州市", "深圳市", "佛山市"],
+  "metric": "cosine",
+  "matrix": [
+    [1.0, 0.913, 0.856],
+    [0.913, 1.0, 0.892],
+    [0.856, 0.892, 1.0]
+  ]
+}
+```
+
+#### 4. List Regions
+
+**GET** `/api/regions/list`
+
+Get list of all available regions with village counts.
+
+**Query Parameters:**
+
+| Parameter | Type | Required | Default | Description |
+|-----------|------|----------|---------|-------------|
+| `region_level` | string | No | county | Region level ('city', 'county', 'township') |
+
+**Response:**
+
+```json
+{
+  "region_level": "county",
+  "count": 123,
+  "regions": [
+    {
+      "region_name": "番禺区",
+      "village_count": 11208
+    }
+  ]
+}
+```
+
+### Semantic Centrality Endpoints
+
+#### 1. Get Centrality Ranking
+
+**GET** `/api/semantic/centrality/ranking`
+
+Get semantic categories ranked by centrality metric.
+
+**Query Parameters:**
+
+| Parameter | Type | Required | Default | Description |
+|-----------|------|----------|---------|-------------|
+| `metric` | string | No | pagerank | Centrality metric ('pagerank', 'degree', 'betweenness', 'closeness', 'eigenvector') |
+| `top_k` | integer | No | all | Number of top categories |
+
+**Response:**
+
+```json
+{
+  "metric": "pagerank",
+  "count": 10,
+  "categories": [
+    {
+      "category": "settlement",
+      "degree_centrality": 0.8889,
+      "betweenness_centrality": 0.3056,
+      "closeness_centrality": 5.0852,
+      "eigenvector_centrality": 0.4159,
+      "pagerank": 0.1528,
+      "community_id": 0
+    }
+  ]
+}
+```
+
+#### 2. Get Category Centrality
+
+**GET** `/api/semantic/centrality/category`
+
+Get all centrality metrics for a specific semantic category.
+
+**Query Parameters:**
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `category` | string | Yes | Category name |
+
+**Response:**
+
+```json
+{
+  "category": "settlement",
+  "degree_centrality": 0.8889,
+  "betweenness_centrality": 0.3056,
+  "closeness_centrality": 5.0852,
+  "eigenvector_centrality": 0.4159,
+  "pagerank": 0.1528,
+  "community_id": 0
+}
+```
+
+#### 3. Compare Centrality
+
+**GET** `/api/semantic/centrality/compare`
+
+Compare centrality metrics across all semantic categories.
+
+**Response:**
+
+```json
+{
+  "count": 10,
+  "categories": [
+    {
+      "category": "settlement",
+      "degree_centrality": 0.8889,
+      "betweenness_centrality": 0.3056,
+      "closeness_centrality": 5.0852,
+      "eigenvector_centrality": 0.4159,
+      "pagerank": 0.1528,
+      "community_id": 0
+    }
+  ]
+}
+```
+
+#### 4. Get Network Stats
+
+**GET** `/api/semantic/network/stats`
+
+Get semantic network-level statistics.
+
+**Response:**
+
+```json
+{
+  "run_id": "20260224_123456",
+  "num_nodes": 10,
+  "num_edges": 35,
+  "density": 0.7778,
+  "is_connected": true,
+  "num_components": 1,
+  "avg_clustering": 0.8333,
+  "diameter": 2,
+  "avg_shortest_path": 1.2222,
+  "modularity": 0.2456,
+  "num_communities": 4
+}
+```
+
+#### 5. Get Communities
+
+**GET** `/api/semantic/communities`
+
+Get semantic network community structure.
+
+**Response:**
+
+```json
+{
+  "count": 4,
+  "communities": [
+    {
+      "community_id": 0,
+      "size": 4,
+      "members": ["clan", "other", "settlement", "water"]
+    },
+    {
+      "community_id": 1,
+      "size": 3,
+      "members": ["agriculture", "mountain", "vegetation"]
+    }
+  ]
+}
 ```
 
 ---
