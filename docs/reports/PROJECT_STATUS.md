@@ -1,6 +1,6 @@
 # Project Status Summary & Performance Clarification
 
-**Last Updated:** 2026-02-17
+**Last Updated:** 2026-02-24
 
 ---
 
@@ -15,14 +15,14 @@ This document provides a comprehensive overview of the villages-ML project, clar
 ### Codebase Metrics
 - **60+ Python modules** (~10,000+ lines)
 - **45+ scripts** (~6,000+ lines)
-- **26 database tables** in villages.db (1.7GB)
+- **44 database tables** in villages.db (2.3GB, optimized)
 - **15+ documentation guides** (~15,000+ lines)
 - **Total: ~31,000+ lines of code and documentation**
 
 ### Dataset Scale
 - **285,000+ natural villages** across Guangdong Province
 - **3,876 unique characters** in village names
-- **12 cities, 100+ counties, 1,500+ townships**
+- **12 cities, 121 counties, 1,500+ townships**
 
 ---
 
@@ -385,6 +385,35 @@ Looking back at implementations, the following concerns were overly cautious for
 - Pagination support
 - Full scan prevention
 
+### Phase 12: N-gram Analysis
+- 1-gram, 2-gram, 3-gram pattern extraction
+- 1,909,959 patterns identified
+- Regional tendency analysis for patterns
+
+### Phase 13: Spatial Hotspots
+- KDE-based hotspot detection
+- 8 major hotspots identified
+- Intensity and village count metrics
+
+### Phase 14: Semantic Composition
+- 8 semantic composition patterns
+- Pattern frequency and regional distribution
+
+### Phase 15: Region Similarity Analysis (NEW - 2026-02-24)
+- Pairwise similarity between 121 counties
+- 7,260 region comparisons
+- Cosine and Jaccard similarity metrics
+- Feature dimension: 3,827 characters
+- Distinctive and common character extraction
+- 4 API endpoints for similarity queries
+
+### Phase 16: Semantic Network Centrality (NEW - 2026-02-24)
+- Semantic network construction (10 nodes, 35 edges)
+- 5 centrality metrics: degree, betweenness, closeness, eigenvector, PageRank
+- Community detection (4 communities identified)
+- Network density: 0.78 (highly connected)
+- 5 API endpoints for centrality analysis
+
 ---
 
 ## Key Architectural Principles
@@ -406,11 +435,25 @@ Looking back at implementations, the following concerns were overly cautious for
 - Comprehensive feature extraction
 - Statistical significance testing
 - Results stored in database for future use
+- **NEW (2026-02-24):** Phase 15-16 completed with full API coverage
+  - **Phase 15: Region Similarity Analysis**
+    - 7,260 pairwise region comparisons (121 counties)
+    - Cosine similarity (continuous) and Jaccard similarity (binary)
+    - Feature dimension: 3,827 characters
+    - Distinctive character extraction per region
+    - 4 API endpoints: search, pair, matrix, list
+  - **Phase 16: Semantic Network Centrality**
+    - Network: 10 nodes, 35 edges, density 0.78
+    - 5 centrality metrics including PageRank
+    - 4 communities detected (Louvain algorithm)
+    - Top categories: settlement (0.153), vegetation (0.127), clan (0.125)
+    - 5 API endpoints: ranking, category, compare, stats, communities
 
-**Phase 2 (Online API):** 🔄 Future work
+**Phase 2 (Online API):** 🔄 Partially implemented
+- 30+ API endpoints operational
 - Query policy framework in place
-- Ready for lightweight API implementation
-- Will use precomputed results only
+- Phase 15-16 endpoints tested and verified
+- All endpoints query precomputed results (<100ms response)
 
 ---
 
