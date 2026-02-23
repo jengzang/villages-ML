@@ -29,9 +29,14 @@ The project uses a SQLite database located at `data/villages.db` containing a si
 
 **Table: 广东省自然村 (Guangdong Province Natural Villages)**
 
+CRITICAL: Use exact column names as shown below. Common mistakes to avoid:
+- ❌ "县区级" → ✅ "区县级" (District/County level)
+- ❌ "乡镇" → ✅ "乡镇级" (Township level)
+
+Column schema:
 - 市级 (City level) - TEXT
-- 县区级 (County/District level) - TEXT
-- 乡镇 (Township) - TEXT
+- 区县级 (District/County level) - TEXT  ← NOTE: 区县级, NOT 县区级
+- 乡镇级 (Township level) - TEXT  ← NOTE: 乡镇级, NOT 乡镇
 - 村委会 (Village Committee) - TEXT
 - 自然村 (Natural Village name) - TEXT
 - 拼音 (Pinyin romanization) - TEXT
@@ -41,6 +46,21 @@ The project uses a SQLite database located at `data/villages.db` containing a si
 - 备注 (Notes) - TEXT
 - 更新时间 (Update time) - REAL
 - 数据来源 (Data source) - TEXT
+
+**Table: 广东省自然村_预处理 (Preprocessed Villages)**
+
+Optimized schema (11 columns retained for space efficiency):
+- 市级 (City level) - TEXT
+- 区县级 (District/County level) - TEXT
+- 乡镇级 (Township level) - TEXT
+- 村委会 (Village Committee) - TEXT
+- 自然村_规范名 (Normalized village name) - TEXT
+- 自然村_去前缀 (Village name with prefix removed) - TEXT
+- longitude - TEXT
+- latitude - TEXT
+- 语言分布 (Language distribution) - TEXT
+- 字符集 (Character set as JSON array) - TEXT
+- 字符数量 (Character count) - INTEGER
 
 ## Working with the Database
 
@@ -58,8 +78,8 @@ Note: Column names and table names are in Chinese. When querying, use the exact 
 
 ```
 villages-ML/
-├── data/                        # SQLite database (villages.db, 5.59GB)
-│   └── villages.db             # 45 tables, 285K+ villages
+├── data/                        # SQLite database (villages.db, 2.3GB - optimized)
+│   └── villages.db             # 44 tables, 285K+ villages
 ├── api/                         # FastAPI backend (30+ endpoints)
 │   ├── main.py                 # Main application
 │   ├── character/              # Character analysis endpoints
@@ -91,12 +111,35 @@ villages-ML/
 
 ### Key Directories
 
-- **`data/`**: SQLite database with 45 tables (all populated)
+- **`data/`**: SQLite database with 44 tables (all populated, optimized 2.3GB)
 - **`api/`**: FastAPI backend with 30+ endpoints (~90% coverage)
 - **`scripts/`**: Analysis scripts organized by purpose
 - **`docs/`**: All documentation (organized by category)
 - **`notebooks/`**: Jupyter notebooks for exploration
 - **`.claude/`**: Claude Code configuration and custom skills
+
+## Database Optimization (2026-02-24)
+
+**IMPORTANT**: The database has been optimized, reducing size from 5.45 GB to 2.3 GB (58% reduction).
+
+### Key Changes
+
+1. **Removed run_id redundancy**: Only active versions retained
+2. **Merged tables**: Frequency + tendency tables combined into single analysis tables
+3. **New table names**:
+   - `char_frequency_regional` + `regional_tendency` → `char_regional_analysis`
+   - `pattern_frequency_regional` + `pattern_tendency` → `pattern_regional_analysis`
+   - `semantic_vtf_regional` + `semantic_tendency` → `semantic_regional_analysis`
+4. **Added indexes**: 17 new indexes for query performance
+
+### Migration Guide
+
+**For backend developers**: See `docs/guides/DATABASE_MIGRATION_FOR_BACKEND.md` for complete migration instructions.
+
+**Key points**:
+- Remove `run_id` parameter from all API queries
+- Update table names in SQL queries
+- No data loss - all active data preserved
 
 ## Development Commands
 

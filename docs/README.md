@@ -64,6 +64,7 @@ Detailed implementation summaries for each analysis phase:
 
 Step-by-step guides for specific features:
 
+- **`DATABASE_MIGRATION_FOR_BACKEND.md`** - ⭐ Database schema migration guide (2026-02-24)
 - **`CHAR_EMBEDDINGS_GUIDE.md`** - Character embedding generation
 - **`LLM_LABELING_GUIDE.md`** - LLM-assisted semantic labeling
 - **`LLM_SETUP_GUIDE.md`** - LLM API setup instructions
@@ -72,6 +73,7 @@ Step-by-step guides for specific features:
 - **`SPATIAL_TENDENCY_INTEGRATION_GUIDE.md`** - Spatial-tendency integration
 - **`TENDENCY_SIGNIFICANCE_GUIDE.md`** - Statistical significance testing
 - **`ZSCORE_NORMALIZATION_GUIDE.md`** - Z-score normalization
+- **`DATABASE_OPTIMIZATION_COMPLETE.md`** - Database optimization details
 
 **Use Case**: Implementing or modifying specific analysis features
 
@@ -89,13 +91,18 @@ Step-by-step guides for specific features:
 #### Database & Implementation Status
 
 - **`PROJECT_STATUS.md`** - Overall project status
-- **`DATABASE_STATUS_REPORT.md`** - Database verification (45 tables)
+- **`DATABASE_STATUS_REPORT.md`** - Database verification (44 tables, 2.3 GB)
 - **`DATABASE_VERIFICATION_SUMMARY.md`** - Data quality metrics
 - **`API_IMPLEMENTATION_SUMMARY.md`** - API implementation status
 - **`API_AUDIT_ACTUAL_STATUS.md`** - API audit report
 - **`FASTAPI_PROJECT_STRUCTURE.md`** - FastAPI project structure
 
-#### Recent Updates (2026-02-21)
+#### Recent Updates (2026-02-24)
+
+- **`DATABASE_MIGRATION_FOR_BACKEND.md`** - ⭐ Database schema migration guide (guides/)
+- **`DATABASE_OPTIMIZATION_COMPLETE.md`** - Database optimization details (guides/)
+
+#### Previous Updates (2026-02-21)
 
 - **`API_IMPLEMENTATION_UPDATE_20260221.md`** - Latest API updates
 - **`IMPLEMENTATION_COMPLETE_SPATIAL_INTEGRATION.md`** - Spatial integration completion
@@ -118,6 +125,7 @@ Step-by-step guides for specific features:
 
 | Task | Documentation |
 |------|---------------|
+| **Migrate backend after DB optimization** | `guides/DATABASE_MIGRATION_FOR_BACKEND.md` |
 | **Start using the API** | `frontend/API_QUICK_REFERENCE.md` |
 | **Build a frontend** | `frontend/FRONTEND_INTEGRATION_GUIDE.md` |
 | **Deploy the API** | `frontend/API_DEPLOYMENT_GUIDE.md` |

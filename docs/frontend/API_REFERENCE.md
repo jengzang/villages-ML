@@ -74,7 +74,6 @@ Get global character frequency statistics from precomputed data.
 
 | Parameter | Type | Required | Default | Description |
 |-----------|------|----------|---------|-------------|
-| `run_id` | string | No | "default" | Analysis run ID |
 | `top_n` | integer | No | 100 | Return top N characters (1-1000) |
 | `min_frequency` | integer | No | null | Minimum frequency filter |
 
@@ -98,7 +97,8 @@ Get global character frequency statistics from precomputed data.
 ```
 
 **Error Responses:**
-- `404`: No data found for specified run_id
+- `404`: No data found
+- `422`: Invalid parameters
 
 **Performance:** <50ms
 
@@ -114,7 +114,6 @@ Get character frequency statistics by region.
 
 | Parameter | Type | Required | Default | Description |
 |-----------|------|----------|---------|-------------|
-| `run_id` | string | No | "default" | Analysis run ID |
 | `region_level` | string | Yes | - | Region level: "city", "county", or "township" |
 | `region_name` | string | No | null | Specific region name (returns all if not specified) |
 | `top_n` | integer | No | 50 | Top N characters per region (1-500) |
@@ -139,7 +138,7 @@ Get character frequency statistics by region.
 ```
 
 **Error Responses:**
-- `404`: No data found for specified region_level/run_id
+- `404`: No data found for specified region
 - `422`: Invalid region_level (must be city/county/township)
 
 **Performance:** <100ms
@@ -156,7 +155,6 @@ Get character tendency (lift, z-score) for a specific region.
 
 | Parameter | Type | Required | Default | Description |
 |-----------|------|----------|---------|-------------|
-| `run_id` | string | No | "default" | Analysis run ID |
 | `region_level` | string | Yes | - | Region level: "city", "county", or "township" |
 | `region_name` | string | Yes | - | Region name |
 | `top_n` | integer | No | 50 | Top N characters (1-500) |
@@ -194,7 +192,6 @@ Get tendency of a specific character across all regions.
 
 | Parameter | Type | Required | Default | Description |
 |-----------|------|----------|---------|-------------|
-| `run_id` | string | No | "default" | Analysis run ID |
 | `character` | string | Yes | - | Single Chinese character |
 | `region_level` | string | Yes | - | Region level: "city", "county", or "township" |
 
@@ -275,7 +272,6 @@ Get detailed information for a specific village.
 | `village_name` | string | Yes | - | Village name |
 | `city` | string | Yes | - | City name |
 | `county` | string | Yes | - | County name |
-| `run_id` | string | No | "default" | Analysis run ID |
 
 **Response:** `VillageDetail`
 
@@ -931,7 +927,7 @@ All endpoints return errors in the following format:
 | Code | Meaning | Common Causes |
 |------|---------|---------------|
 | `400` | Bad Request | Invalid parameters, missing required fields |
-| `404` | Not Found | Resource not found (village, run_id, region) |
+| `404` | Not Found | Resource not found (village, region) |
 | `408` | Request Timeout | Computation exceeded 30-second timeout |
 | `422` | Validation Error | Invalid parameter types or values |
 | `500` | Internal Server Error | Database error, computation failure |
@@ -981,15 +977,6 @@ Tendency endpoints support custom sorting:
 
 ```
 GET /api/character/tendency/by-region?region_name=广州市&sort_by=z_score
-```
-
-### Run ID Versioning
-
-Precomputed endpoints support multiple analysis versions:
-
-```
-GET /api/character/frequency/global?run_id=default
-GET /api/character/frequency/global?run_id=2024-02-20
 ```
 
 ### Caching
