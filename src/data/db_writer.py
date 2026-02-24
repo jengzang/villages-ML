@@ -1568,13 +1568,12 @@ def create_spatial_analysis_indexes(conn: sqlite3.Connection) -> None:
     """
     cursor = conn.cursor()
 
-    # Indexes for village_spatial_features
-    cursor.execute("CREATE INDEX IF NOT EXISTS idx_village_spatial_run_id ON village_spatial_features(run_id)")
+    # Indexes for village_spatial_features (optimized table without run_id)
     cursor.execute("CREATE INDEX IF NOT EXISTS idx_village_spatial_coords ON village_spatial_features(longitude, latitude)")
-    cursor.execute("CREATE INDEX IF NOT EXISTS idx_village_spatial_cluster ON village_spatial_features(run_id, spatial_cluster_id)")
-    cursor.execute("CREATE INDEX IF NOT EXISTS idx_village_spatial_city ON village_spatial_features(run_id, city)")
-    cursor.execute("CREATE INDEX IF NOT EXISTS idx_village_spatial_county ON village_spatial_features(run_id, county)")
-    cursor.execute("CREATE INDEX IF NOT EXISTS idx_village_spatial_isolated ON village_spatial_features(run_id, is_isolated)")
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_village_spatial_cluster ON village_spatial_features(spatial_cluster_id)")
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_village_spatial_city ON village_spatial_features(city)")
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_village_spatial_county ON village_spatial_features(county)")
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_village_spatial_isolated ON village_spatial_features(is_isolated)")
 
     # Indexes for spatial_clusters
     cursor.execute("CREATE INDEX IF NOT EXISTS idx_spatial_clusters_run_id ON spatial_clusters(run_id)")
@@ -1688,8 +1687,8 @@ def write_spatial_features(conn: sqlite3.Connection, run_id: str, features_df: p
         'spatial_cluster_id', 'cluster_size'
     ]
 
-    # Write to database
-    features_df[columns].to_sql('village_spatial_features', conn, if_exists='append', index=False)
+    # Write to database (replace existing data since table has no run_id)
+    features_df[columns].to_sql('village_spatial_features', conn, if_exists='replace', index=False)
 
     logger.info("Village spatial features written successfully")
 

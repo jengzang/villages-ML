@@ -31,7 +31,7 @@ class HotspotDetector:
         self,
         coords: np.ndarray,
         df: pd.DataFrame,
-        sample_size: int = 10000
+        sample_size: int = None
     ) -> pd.DataFrame:
         """
         Detect high-density hotspots using KDE.
@@ -39,7 +39,7 @@ class HotspotDetector:
         Args:
             coords: Array of shape (n_points, 2) with [latitude, longitude]
             df: DataFrame with village data
-            sample_size: Number of points to sample for KDE evaluation (default: 10000)
+            sample_size: Number of points to sample for KDE evaluation (None = use all data)
 
         Returns:
             DataFrame with hotspot information
@@ -53,13 +53,14 @@ class HotspotDetector:
         logger.info(f"Computing KDE with bandwidth={self.bandwidth_deg:.4f} degrees")
         kde = gaussian_kde(coords_t, bw_method=self.bandwidth_deg)
 
-        # For large datasets, sample points for density evaluation
+        # Use all data or sample for density evaluation
         n_points = coords.shape[0]
-        if n_points > sample_size:
+        if sample_size is not None and n_points > sample_size:
             logger.info(f"Sampling {sample_size} points from {n_points} for density evaluation")
             sample_indices = np.random.choice(n_points, size=sample_size, replace=False)
             eval_coords_t = coords_t[:, sample_indices]
         else:
+            logger.info(f"Using all {n_points} points for density evaluation (no sampling)")
             eval_coords_t = coords_t
             sample_indices = np.arange(n_points)
 
@@ -109,8 +110,9 @@ class HotspotDetector:
         """
         from sklearn.cluster import DBSCAN
 
-        # Cluster hotspot points (eps=0.05 degrees ≈ 5km)
-        clusterer = DBSCAN(eps=0.05, min_samples=3, metric='euclidean')
+        # Cluster hotspot points (eps=0.01 degrees ≈ 1.1km for finer granularity)
+        # Reduced from 0.05 to detect more distinct hotspots
+        clusterer = DBSCAN(eps=0.01, min_samples=3, metric='euclidean')
         labels = clusterer.fit_predict(coords)
 
         hotspots = []

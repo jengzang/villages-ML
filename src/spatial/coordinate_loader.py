@@ -52,27 +52,22 @@ class CoordinateLoader:
         logger.info("Loading coordinates from database")
 
         # Query from preprocessed table with cleaned village names
-        # Use ROWID to ensure absolute uniqueness (handles duplicate rows in source data)
+        # Use village_id for uniqueness (optimized table)
         query = """
         SELECT
-            ROWID as row_id,
+            village_id,
             市级 as city,
             区县级 as county,
             乡镇级 as town,
             村委会 as village_committee,
-            自然村 as village_name_original,
+            自然村_规范名 as village_name_original,
             自然村_去前缀 as village_name,
-            拼音 as pinyin,
             语言分布 as language_distribution,
             longitude,
             latitude
         FROM 广东省自然村_预处理
-        WHERE 有效 = 1
         """
         df = pd.read_sql_query(query, conn)
-
-        # Create unique village_id using ROWID (guaranteed unique)
-        df['village_id'] = 'v_' + df['row_id'].astype(str)
 
         logger.info(f"Loaded {len(df)} total villages")
 
