@@ -144,13 +144,15 @@ class SemanticCompositionAnalyzer:
 
     def detect_modifier_head_patterns(self, bigrams: Counter) -> List[Dict]:
         """
-        Detect modifier-head patterns in semantic bigrams.
+        Detect modifier-head patterns in semantic bigrams (Enhanced Version).
 
-        Common patterns:
-        - size + X (e.g., 大水, 小山)
-        - direction + X (e.g., 东村, 南坑)
-        - number + X (e.g., 三水, 五里)
-        - X + settlement (e.g., 水村, 山村)
+        Pattern types:
+        1. Modifier + Head (e.g., 东村, 大山)
+        2. Head + Settlement (e.g., 水村, 山村)
+        3. Clan + Settlement (e.g., 陈村, 李屋) - Cultural pattern
+        4. Symbolic + X (e.g., 福田, 吉水) - Auspicious meanings
+        5. Head + Direction (e.g., 山东, 水南) - Bidirectional pattern
+        6. Agriculture + Settlement (e.g., 田村, 禾村)
 
         Args:
             bigrams: Counter of semantic bigrams
@@ -158,14 +160,61 @@ class SemanticCompositionAnalyzer:
         Returns:
             List of modifier-head patterns
         """
-        modifier_categories = ['size', 'direction', 'number']
-        head_categories = ['water', 'mountain', 'landform', 'vegetation', 'settlement']
+        # Category definitions
+        basic_modifiers = ['size', 'direction', 'number']  # Basic modifiers (not symbolic)
+        head_categories = ['water', 'mountain', 'landform', 'vegetation',
+                          'settlement', 'agriculture']
 
         patterns = []
+        processed = set()  # Track processed patterns to avoid duplicates
 
         for (cat1, cat2), count in bigrams.most_common():
-            # Modifier + Head pattern
-            if cat1 in modifier_categories and cat2 in head_categories:
+            # Skip 'other' category to reduce noise
+            if cat1 == 'other' or cat2 == 'other':
+                continue
+
+            pattern_key = (cat1, cat2)
+            if pattern_key in processed:
+                continue
+
+            # Priority 1: Clan + Settlement (most important cultural pattern)
+            if cat1 == 'clan' and cat2 == 'settlement':
+                patterns.append({
+                    'pattern': 'clan + settlement',
+                    'type': 'clan_settlement',
+                    'modifier': 'clan',
+                    'head': 'settlement',
+                    'frequency': count
+                })
+                processed.add(pattern_key)
+                continue
+
+            # Priority 2: Clan + Other heads
+            if cat1 == 'clan' and cat2 in head_categories:
+                patterns.append({
+                    'pattern': f'clan + {cat2}',
+                    'type': 'clan_head',
+                    'modifier': 'clan',
+                    'head': cat2,
+                    'frequency': count
+                })
+                processed.add(pattern_key)
+                continue
+
+            # Priority 3: Symbolic + X (auspicious meanings)
+            if cat1 == 'symbolic' and cat2 in head_categories:
+                patterns.append({
+                    'pattern': f'symbolic + {cat2}',
+                    'type': 'symbolic_head',
+                    'modifier': 'symbolic',
+                    'head': cat2,
+                    'frequency': count
+                })
+                processed.add(pattern_key)
+                continue
+
+            # Priority 4: Basic Modifier + Head
+            if cat1 in basic_modifiers and cat2 in head_categories:
                 patterns.append({
                     'pattern': f'{cat1} + {cat2}',
                     'type': 'modifier_head',
@@ -173,8 +222,10 @@ class SemanticCompositionAnalyzer:
                     'head': cat2,
                     'frequency': count
                 })
+                processed.add(pattern_key)
+                continue
 
-            # Head + Settlement pattern
+            # Priority 5: Head + Settlement
             if cat1 in head_categories and cat2 == 'settlement':
                 patterns.append({
                     'pattern': f'{cat1} + settlement',
@@ -182,6 +233,20 @@ class SemanticCompositionAnalyzer:
                     'head': cat1,
                     'frequency': count
                 })
+                processed.add(pattern_key)
+                continue
+
+            # Priority 6: Head + Direction (bidirectional pattern)
+            if cat1 in head_categories and cat2 == 'direction':
+                patterns.append({
+                    'pattern': f'{cat1} + direction',
+                    'type': 'head_direction',
+                    'head': cat1,
+                    'modifier': 'direction',
+                    'frequency': count
+                })
+                processed.add(pattern_key)
+                continue
 
         return patterns
 

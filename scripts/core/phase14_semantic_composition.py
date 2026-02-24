@@ -222,7 +222,6 @@ def step6_extract_village_structures(db_path: str):
         cursor.execute("""
             SELECT village_id, 村委会, 自然村_去前缀
             FROM 广东省自然村_预处理
-            WHERE 有效 = 1
         """)
 
         # Fetch all rows into memory
