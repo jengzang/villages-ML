@@ -1,0 +1,99 @@
+{
+  "version": "3.0.0",
+  "created_at": "2026-02-24",
+  "description": "Expanded semantic lexicon with 50+ fine-grained categories for village name analysis",
+  "categories": {
+    "mountain_peak": ["山", "峰", "岭", "顶", "巅"],
+    "mountain_slope": ["坡", "坳", "坎", "岗", "冈"],
+    "mountain_valley": ["峡", "峪", "峒", "坑", "谷"],
+    "mountain_ridge": ["脊", "岐", "嶂", "峦"],
+    "mountain_rock": ["石", "岩", "崖", "壁"],
+    "mountain_plateau": ["台", "坪", "坝", "塱"],
+
+    "water_river": ["江", "河", "溪", "涧", "川"],
+    "water_stream": ["涌", "沥", "渠", "沟", "圳"],
+    "water_port": ["港", "津", "渡", "埠", "码"],
+    "water_pond": ["塘", "池", "潭", "泊", "淀"],
+    "water_lake": ["湖", "泽", "洼"],
+    "water_bay": ["湾", "浦", "滘", "濠"],
+    "water_shore": ["滨", "岸", "汀", "渚", "沿"],
+    "water_island": ["洲", "屿", "岛"],
+    "water_beach": ["滩", "沙"],
+    "water_spring": ["泉", "井"],
+
+    "settlement_village": ["村", "庄", "寨", "屯", "塆"],
+    "settlement_market": ["墟", "圩", "市", "场", "集"],
+    "settlement_district": ["围", "坊", "里", "巷", "街"],
+    "settlement_building": ["屋", "楼", "堂", "祠", "宅"],
+    "settlement_fort": ["堡", "寨", "城", "关"],
+    "settlement_group": ["社", "队", "组", "片"],
+
+    "direction_cardinal": ["东", "西", "南", "北"],
+    "direction_center": ["中", "央", "心"],
+    "direction_vertical": ["上", "下", "高", "低"],
+    "direction_horizontal": ["前", "后", "左", "右"],
+    "direction_inside": ["内", "里", "中"],
+    "direction_outside": ["外", "边", "旁", "侧"],
+    "direction_end": ["头", "尾", "端", "角"],
+    "direction_opening": ["口", "门", "关"],
+
+    "clan_chen": ["陈"],
+    "clan_li": ["李"],
+    "clan_huang": ["黄"],
+    "clan_zhang": ["张"],
+    "clan_liu": ["刘"],
+    "clan_lin": ["林"],
+    "clan_he": ["何"],
+    "clan_liang": ["梁"],
+    "clan_luo": ["罗"],
+    "clan_wu": ["吴"],
+    "clan_other": ["周", "徐", "郑", "谢", "赖", "邓", "曾", "叶", "冯", "朱", "钟", "卢", "潘", "蔡", "郭", "邱", "苏", "曹", "高", "袁", "许", "唐", "戴", "萧", "欧"],
+
+    "symbolic_animal": ["龙", "凤", "虎", "龟", "麟", "鹤", "鹿"],
+    "symbolic_religion": ["仙", "佛", "观", "寺", "庙", "堂", "宫", "神", "灵"],
+    "symbolic_fortune": ["福", "禄", "寿", "吉", "祥", "瑞", "喜"],
+    "symbolic_peace": ["安", "泰", "宁", "康", "和", "平"],
+    "symbolic_prosperity": ["昌", "兴", "盛", "荣", "华", "富", "贵"],
+    "symbolic_treasure": ["宝", "珍", "玉", "金", "银"],
+    "symbolic_light": ["明", "光", "辉", "耀", "朗"],
+    "symbolic_virtue": ["文", "武", "圣", "贤", "德", "信", "义", "仁", "礼", "智"],
+
+    "agriculture_field": ["田", "地", "畔", "畴", "畲"],
+    "agriculture_garden": ["圃", "园", "场"],
+    "agriculture_crop": ["禾", "稻", "谷", "麦"],
+    "agriculture_storage": ["仓", "廪"],
+    "agriculture_irrigation": ["堤", "坝", "渠"],
+    "agriculture_activity": ["农", "耕", "牧", "畜"],
+
+    "vegetation_forest": ["林", "木", "树", "森"],
+    "vegetation_bamboo": ["竹", "笋"],
+    "vegetation_pine": ["松", "柏", "杉"],
+    "vegetation_fruit": ["果", "桃", "杏", "梅", "李", "榄", "蕉"],
+    "vegetation_flower": ["花", "荷", "莲", "菊"],
+    "vegetation_tea": ["茶"],
+    "vegetation_other": ["草", "榕", "柳", "枫", "杨", "桐", "藤", "蔗", "槐", "樟", "桉"],
+
+    "infrastructure_bridge": ["桥"],
+    "infrastructure_road": ["路", "道", "街", "巷"],
+    "infrastructure_station": ["站", "驿", "亭"],
+    "infrastructure_port": ["埠", "码", "渡"],
+    "infrastructure_transport": ["车", "铁", "隧"],
+
+    "number_small": ["一", "二", "三", "四", "五"],
+    "number_large": ["六", "七", "八", "九", "十"],
+    "number_ordinal": ["第", "初", "新", "老"],
+
+    "size_large": ["大", "巨", "广", "宽"],
+    "size_small": ["小", "微", "细"],
+    "size_long": ["长", "远", "深"],
+    "size_short": ["短", "近", "浅"],
+
+    "color": ["红", "黄", "蓝", "绿", "白", "黑", "青", "紫", "金", "银"],
+
+    "shape": ["圆", "方", "扁", "尖", "平", "曲", "直"],
+
+    "time": ["春", "夏", "秋", "冬", "朝", "晚", "新", "旧", "古", "今"],
+
+    "other": []
+  }
+}

@@ -302,7 +302,7 @@ class StructuralPatternDetector:
 
     def detect_templates(self, ngrams: Counter, min_freq: int = 100) -> List[Dict]:
         """
-        Detect common templates (e.g., "XX村", "大XX").
+        Detect common templates (e.g., "XX村", "大XX", "XXX村", "大XX村").
 
         Args:
             ngrams: Counter of n-grams
@@ -317,9 +317,10 @@ class StructuralPatternDetector:
             if count < min_freq:
                 break
 
-            # Check if it's a potential template
+            n = len(ngram)
+
             # For bigrams: check if first or last char is very common
-            if len(ngram) == 2:
+            if n == 2:
                 first_char, second_char = ngram[0], ngram[1]
 
                 # Suffix template (e.g., "X村", "X坑")
@@ -340,6 +341,86 @@ class StructuralPatternDetector:
                         'frequency': count
                     })
 
+            # For trigrams: detect various patterns
+            elif n == 3:
+                first_char, second_char, third_char = ngram[0], ngram[1], ngram[2]
+
+                # Suffix template (e.g., "XX村", "XX坑")
+                if self._is_common_suffix(third_char, ngrams):
+                    templates.append({
+                        'pattern': f'XX{third_char}',
+                        'type': 'suffix',
+                        'example': ngram,
+                        'frequency': count
+                    })
+
+                # Prefix template (e.g., "大XX", "新XX")
+                if self._is_common_prefix(first_char, ngrams):
+                    templates.append({
+                        'pattern': f'{first_char}XX',
+                        'type': 'prefix',
+                        'example': ngram,
+                        'frequency': count
+                    })
+
+                # Middle template (e.g., "X村X", "X坑X")
+                if self._is_common_middle(second_char, ngrams, n=3):
+                    templates.append({
+                        'pattern': f'X{second_char}X',
+                        'type': 'middle',
+                        'example': ngram,
+                        'frequency': count
+                    })
+
+                # Prefix-suffix template (e.g., "大X村", "新X坑")
+                if self._is_common_prefix(first_char, ngrams) and self._is_common_suffix(third_char, ngrams):
+                    templates.append({
+                        'pattern': f'{first_char}X{third_char}',
+                        'type': 'prefix-suffix',
+                        'example': ngram,
+                        'frequency': count
+                    })
+
+            # For 4-grams: detect various patterns
+            elif n == 4:
+                first_char, second_char, third_char, fourth_char = ngram[0], ngram[1], ngram[2], ngram[3]
+
+                # Suffix template (e.g., "XXX村", "XXX坑")
+                if self._is_common_suffix(fourth_char, ngrams):
+                    templates.append({
+                        'pattern': f'XXX{fourth_char}',
+                        'type': 'suffix',
+                        'example': ngram,
+                        'frequency': count
+                    })
+
+                # Prefix template (e.g., "大XXX", "新XXX")
+                if self._is_common_prefix(first_char, ngrams):
+                    templates.append({
+                        'pattern': f'{first_char}XXX',
+                        'type': 'prefix',
+                        'example': ngram,
+                        'frequency': count
+                    })
+
+                # Prefix-suffix template (e.g., "大XX村", "新XX坑")
+                if self._is_common_prefix(first_char, ngrams) and self._is_common_suffix(fourth_char, ngrams):
+                    templates.append({
+                        'pattern': f'{first_char}XX{fourth_char}',
+                        'type': 'prefix-suffix',
+                        'example': ngram,
+                        'frequency': count
+                    })
+
+                # Double middle template (e.g., "X村X村", "X坑X坑")
+                if self._is_common_middle(second_char, ngrams, n=4) and self._is_common_middle(fourth_char, ngrams, n=4):
+                    templates.append({
+                        'pattern': f'X{second_char}X{fourth_char}',
+                        'type': 'double-middle',
+                        'example': ngram,
+                        'frequency': count
+                    })
+
         return templates
 
     def _is_common_suffix(self, char: str, ngrams: Counter, threshold: int = 50) -> bool:
@@ -352,4 +433,16 @@ class StructuralPatternDetector:
         """Check if character is a common prefix."""
         # Count how many different n-grams start with this character
         count = sum(1 for ngram in ngrams if ngram.startswith(char))
+        return count >= threshold
+
+    def _is_common_middle(self, char: str, ngrams: Counter, n: int, threshold: int = 30) -> bool:
+        """Check if character is a common middle character in n-grams of length n."""
+        # For trigrams (n=3), check position 1 (middle)
+        # For 4-grams (n=4), check positions 1 or 2 (middle positions)
+        if n == 3:
+            count = sum(1 for ngram in ngrams if len(ngram) == 3 and ngram[1] == char)
+        elif n == 4:
+            count = sum(1 for ngram in ngrams if len(ngram) == 4 and (ngram[1] == char or ngram[2] == char))
+        else:
+            return False
         return count >= threshold

@@ -54,6 +54,10 @@ def step2_extract_global_ngrams(db_path: str):
         print("Extracting trigrams...")
         trigram_data = extractor.extract_all_ngrams(n=3)
 
+        # Extract 4-grams
+        print("Extracting 4-grams...")
+        fourgram_data = extractor.extract_all_ngrams(n=4)
+
     # Store bigrams
     print("\nStoring bigram frequencies...")
     for position, counter in bigram_data.items():
@@ -78,6 +82,18 @@ def step2_extract_global_ngrams(db_path: str):
                 VALUES (?, ?, ?, ?, ?, ?)
             """, (ngram, 3, position, freq, total, percentage))
 
+    # Store 4-grams
+    print("Storing 4-gram frequencies...")
+    for position, counter in fourgram_data.items():
+        total = sum(counter.values())
+        for ngram, freq in counter.items():
+            percentage = (freq / total * 100) if total > 0 else 0
+            cursor.execute("""
+                INSERT OR REPLACE INTO ngram_frequency
+                (ngram, n, position, frequency, total_count, percentage)
+                VALUES (?, ?, ?, ?, ?, ?)
+            """, (ngram, 4, position, freq, total, percentage))
+
     conn.commit()
 
     # Print statistics
@@ -85,9 +101,12 @@ def step2_extract_global_ngrams(db_path: str):
     bigram_count = cursor.fetchone()[0]
     cursor.execute("SELECT COUNT(DISTINCT ngram) FROM ngram_frequency WHERE n = 3")
     trigram_count = cursor.fetchone()[0]
+    cursor.execute("SELECT COUNT(DISTINCT ngram) FROM ngram_frequency WHERE n = 4")
+    fourgram_count = cursor.fetchone()[0]
 
     print(f"\n[OK] Extracted {bigram_count:,} unique bigrams")
     print(f"[OK] Extracted {trigram_count:,} unique trigrams")
+    print(f"[OK] Extracted {fourgram_count:,} unique 4-grams")
 
     conn.close()
 
@@ -346,7 +365,7 @@ def step6_detect_patterns(db_path: str):
 
     detector = StructuralPatternDetector(db_path)
 
-    # Get bigrams and trigrams
+    # Get bigrams, trigrams, and 4-grams
     from collections import Counter
 
     cursor.execute("""
@@ -364,6 +383,14 @@ def step6_detect_patterns(db_path: str):
         ORDER BY frequency DESC
     """)
     trigrams = Counter({ngram: freq for ngram, freq in cursor.fetchall()})
+
+    cursor.execute("""
+        SELECT ngram, frequency
+        FROM ngram_frequency
+        WHERE n = 4 AND position = 'all'
+        ORDER BY frequency DESC
+    """)
+    fourgrams = Counter({ngram: freq for ngram, freq in cursor.fetchall()})
 
     # Detect bigram templates
     print("\nDetecting bigram templates...")
@@ -406,6 +433,27 @@ def step6_detect_patterns(db_path: str):
         ))
 
     print(f"  [OK] Found {len(trigram_templates)} trigram templates")
+
+    # Detect 4-gram templates
+    print("Detecting 4-gram templates...")
+    fourgram_templates = detector.detect_templates(fourgrams, min_freq=30)
+
+    for template in fourgram_templates:
+        cursor.execute("""
+            INSERT OR REPLACE INTO structural_patterns
+            (pattern, pattern_type, n, position, frequency, example, description)
+            VALUES (?, ?, ?, ?, ?, ?, ?)
+        """, (
+            template['pattern'],
+            template['type'],
+            4,
+            'all',
+            template['frequency'],
+            template['example'],
+            f"{template['type']} pattern"
+        ))
+
+    print(f"  [OK] Found {len(fourgram_templates)} 4-gram templates")
 
     conn.commit()
     conn.close()
