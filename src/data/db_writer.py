@@ -977,6 +977,10 @@ def write_semantic_indices(conn: sqlite3.Connection, run_id: str, df: pd.DataFra
         conn: SQLite database connection
         run_id: Run identifier
         df: DataFrame with index columns
+
+    Note (2026-02-25):
+        Automatically calculates and adds village_count for each region.
+        This enables fast filtering by min_villages parameter in API.
     """
     cursor = conn.cursor()
 
@@ -986,15 +990,64 @@ def write_semantic_indices(conn: sqlite3.Connection, run_id: str, df: pd.DataFra
     # Handle NaN values
     df_copy['z_score'] = df_copy['z_score'].where(pd.notna(df_copy['z_score']), None)
 
+    # Calculate village_count for each region (NEW: 2026-02-25)
+    logger.info("Calculating village_count for each region...")
+
+    # Get column indices for the preprocessed table
+    cursor.execute("PRAGMA table_info(广东省自然村_预处理)")
+    columns_info = cursor.fetchall()
+
+    # Map region_level to column index (0=市级, 1=区县级, 2=乡镇级)
+    level_column_index = {
+        'city': 0,
+        'county': 1,
+        'township': 2
+    }
+
+    # Calculate village_count for each unique region
+    village_counts = {}
+
+    for _, row in df_copy[['region_level', 'region_name']].drop_duplicates().iterrows():
+        region_level = row['region_level']
+        region_name = row['region_name']
+
+        col_idx = level_column_index.get(region_level)
+        if col_idx is None:
+            logger.warning(f"Unknown region_level: {region_level}")
+            village_counts[(region_level, region_name)] = 0
+            continue
+
+        col_name = columns_info[col_idx][1]
+
+        # Count villages using village_id
+        query = f"""
+            SELECT COUNT(DISTINCT village_id)
+            FROM 广东省自然村_预处理
+            WHERE "{col_name}" = ?
+        """
+        cursor.execute(query, (region_name,))
+        count = cursor.fetchone()[0]
+
+        village_counts[(region_level, region_name)] = count
+
+    # Add village_count to dataframe
+    df_copy['village_count'] = df_copy.apply(
+        lambda row: village_counts.get((row['region_level'], row['region_name']), 0),
+        axis=1
+    )
+
+    logger.info(f"Calculated village_count for {len(village_counts)} unique regions")
+
+    # Prepare data for insertion
     columns = ['run_id', 'region_level', 'region_name', 'category', 'raw_intensity',
-               'normalized_index', 'z_score', 'rank_within_province']
+               'normalized_index', 'z_score', 'rank_within_province', 'village_count']
     data = df_copy[columns].values.tolist()
 
     cursor.executemany("""
         INSERT OR REPLACE INTO semantic_indices
         (run_id, region_level, region_name, category, raw_intensity, normalized_index,
-         z_score, rank_within_province)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+         z_score, rank_within_province, village_count)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
     """, data)
 
     conn.commit()

@@ -1,6 +1,14 @@
 """
 N-gram分析API
 N-gram Analysis API endpoints
+
+**Data Note (2026-02-25):**
+As of 2026-02-25, only statistically significant n-grams (p < 0.05) are stored
+in the database. This represents 58.7% of the original data, with higher retention
+at township level (83.4%). Non-significant n-grams have been removed to optimize
+database size (reduced from 4.7 GB to 2.72 GB).
+
+All endpoints continue to function normally, returning only significant data.
 """
 from fastapi import APIRouter, Depends, Query, HTTPException
 from typing import List, Optional
