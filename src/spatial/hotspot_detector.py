@@ -6,7 +6,7 @@ Identifies spatial hotspots and naming pattern concentrations.
 
 import numpy as np
 import pandas as pd
-from scipy.stats import gaussian_kde
+from sklearn.neighbors import KernelDensity
 from typing import List, Dict, Optional
 import logging
 
@@ -34,7 +34,7 @@ class HotspotDetector:
         sample_size: int = None
     ) -> pd.DataFrame:
         """
-        Detect high-density hotspots using KDE.
+        Detect high-density hotspots using KDE (optimized with sklearn).
 
         Args:
             coords: Array of shape (n_points, 2) with [latitude, longitude]
@@ -44,28 +44,35 @@ class HotspotDetector:
         Returns:
             DataFrame with hotspot information
         """
-        logger.info("Detecting density hotspots using KDE")
+        logger.info("Detecting density hotspots using KDE (sklearn implementation)")
 
-        # Transpose for KDE (expects shape (2, n_points))
-        coords_t = coords.T
+        # Use sklearn's KernelDensity (much faster than scipy)
+        n_points = coords.shape[0]
 
-        # Compute KDE
+        # Compute KDE using sklearn (supports tree-based algorithms for speed)
         logger.info(f"Computing KDE with bandwidth={self.bandwidth_deg:.4f} degrees")
-        kde = gaussian_kde(coords_t, bw_method=self.bandwidth_deg)
+        kde = KernelDensity(
+            bandwidth=self.bandwidth_deg,
+            algorithm='ball_tree',  # Use ball_tree for faster computation
+            kernel='gaussian',
+            metric='euclidean'
+        )
+        kde.fit(coords)
 
         # Use all data or sample for density evaluation
-        n_points = coords.shape[0]
         if sample_size is not None and n_points > sample_size:
             logger.info(f"Sampling {sample_size} points from {n_points} for density evaluation")
             sample_indices = np.random.choice(n_points, size=sample_size, replace=False)
-            eval_coords_t = coords_t[:, sample_indices]
+            eval_coords = coords[sample_indices]
         else:
             logger.info(f"Using all {n_points} points for density evaluation (no sampling)")
-            eval_coords_t = coords_t
+            eval_coords = coords
             sample_indices = np.arange(n_points)
 
-        # Evaluate density at sampled points
-        density = kde(eval_coords_t)
+        # Evaluate density at sampled points (returns log density)
+        logger.info("Evaluating density at sample points...")
+        log_density = kde.score_samples(eval_coords)
+        density = np.exp(log_density)  # Convert log density to density
 
         # Find threshold
         threshold = np.percentile(density, self.threshold_percentile)
@@ -200,10 +207,16 @@ class HotspotDetector:
             category_coords = coords[mask]
             category_df = df[mask]
 
-            # Compute KDE for this category
-            coords_t = category_coords.T
-            kde = gaussian_kde(coords_t, bw_method=self.bandwidth_deg)
-            density = kde(coords_t)
+            # Compute KDE for this category using sklearn
+            kde = KernelDensity(
+                bandwidth=self.bandwidth_deg,
+                algorithm='ball_tree',
+                kernel='gaussian',
+                metric='euclidean'
+            )
+            kde.fit(category_coords)
+            log_density = kde.score_samples(category_coords)
+            density = np.exp(log_density)
 
             # Find high-density areas for this category
             threshold = np.percentile(density, 90)  # Lower threshold for categories

@@ -34,7 +34,7 @@ logger = logging.getLogger(__name__)
 def run_spatial_analysis_pipeline(
     db_path: str,
     run_id: str,
-    eps_km: float = 2.0,
+    eps_km: float = 0.5,
     min_samples: int = 5,
     feature_run_id: Optional[str] = None,
     output_dir: Optional[str] = None,
@@ -57,7 +57,7 @@ def run_spatial_analysis_pipeline(
     Args:
         db_path: Path to SQLite database
         run_id: Unique identifier for this spatial analysis run
-        eps_km: DBSCAN epsilon in kilometers (default: 2.0)
+        eps_km: DBSCAN epsilon in kilometers (default: 0.5, reduced from 2.0 for finer clustering)
         min_samples: DBSCAN min_samples (default: 5)
         feature_run_id: Optional run_id to integrate with semantic features
         output_dir: Optional directory for maps and exports
