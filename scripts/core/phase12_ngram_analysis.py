@@ -9,6 +9,7 @@ This script performs comprehensive n-gram analysis on village names:
 4. Statistical significance testing
 5. Clean up non-significant data (NEW: 2026-02-25)
 6. Detect structural patterns
+7. Auto-update active_run_ids (NEW: 2026-02-25)
 
 Approach: Offline-heavy, maximum accuracy, full dataset
 
@@ -16,6 +17,7 @@ IMPORTANT (2026-02-25):
 - Only statistically significant n-grams (p < 0.05) are stored in the database
 - Non-significant n-grams are filtered out during generation to optimize storage
 - This reduces database size by ~40% while maintaining analytical quality
+- Automatically updates active_run_ids table after completion
 """
 
 import sqlite3
@@ -30,6 +32,10 @@ sys.path.insert(0, str(project_root))
 
 from src.ngram_analysis import NgramExtractor, NgramAnalyzer, StructuralPatternDetector
 from src.ngram_schema import create_ngram_tables
+
+# Import run_id manager for auto-update (NEW: 2026-02-25)
+sys.path.insert(0, str(project_root / 'scripts'))
+from utils.update_run_id import update_active_run_id
 
 
 def step1_create_tables(db_path: str):
@@ -575,6 +581,10 @@ def main():
 
     start_time = datetime.now()
 
+    # Generate run_id for this analysis
+    run_id = f"ngram_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
+    print(f"Run ID: {run_id}")
+
     try:
         step1_create_tables(db_path)
         step2_extract_global_ngrams(db_path)
@@ -594,6 +604,26 @@ def main():
         print(f"Duration: {duration:.1f} seconds ({duration/60:.1f} minutes)")
         print("\nAll n-gram analysis results stored in database.")
         print("NOTE: Only statistically significant n-grams (p < 0.05) are retained.")
+
+        # Auto-update active_run_ids (NEW: 2026-02-25)
+        print("\n" + "="*60)
+        print("Updating active_run_ids...")
+        print("="*60)
+
+        # Count significant n-grams for notes
+        conn = sqlite3.connect(db_path)
+        cursor = conn.cursor()
+        cursor.execute("SELECT COUNT(*) FROM ngram_significance")
+        sig_count = cursor.fetchone()[0]
+        conn.close()
+
+        update_active_run_id(
+            analysis_type="ngrams",
+            run_id=run_id,
+            script_name="phase12_ngram_analysis",
+            notes=f"N-gram analysis complete. {sig_count:,} significant n-grams (p < 0.05) stored.",
+            db_path=db_path
+        )
 
     except Exception as e:
         print(f"\n[ERROR] Error: {e}")

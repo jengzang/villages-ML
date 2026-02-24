@@ -4,6 +4,10 @@ Populate semantic_indices table.
 This script calculates semantic intensity indices for regions based on village name composition.
 It uses the SemanticIndexCalculator to compute normalized semantic scores.
 
+IMPORTANT (2026-02-25):
+- Automatically calculates village_count for each region
+- Auto-updates active_run_ids table after completion
+
 Usage:
     python scripts/core/populate_semantic_indices.py --output-run-id semantic_indices_001
 """
@@ -24,6 +28,10 @@ sys.path.insert(0, str(project_root))
 from src.semantic.lexicon_loader import SemanticLexicon
 from src.semantic.semantic_index import SemanticIndexCalculator
 from src.data.db_writer import write_semantic_indices
+
+# Import run_id manager for auto-update (NEW: 2026-02-25)
+sys.path.insert(0, str(project_root / 'scripts'))
+from utils.update_run_id import update_active_run_id
 
 logging.basicConfig(
     level=logging.INFO,
@@ -164,6 +172,21 @@ def main():
         elapsed = time.time() - start_time
         logger.info(f"\n=== Completed in {elapsed:.2f}s ===")
         logger.info(f"Wrote {len(combined_indices)} semantic indices records")
+
+        # Auto-update active_run_ids (NEW: 2026-02-25)
+        logger.info(f"\n=== Step 6: Updating active_run_ids ===")
+
+        # Count unique regions for notes
+        unique_regions = combined_indices[['region_level', 'region_name']].drop_duplicates()
+        region_count = len(unique_regions)
+
+        update_active_run_id(
+            analysis_type="semantic_indices",
+            run_id=args.output_run_id,
+            script_name="populate_semantic_indices",
+            notes=f"Semantic indices calculated for {region_count} regions across {len(args.region_levels)} levels.",
+            db_path=args.db_path
+        )
 
         return 0
 
