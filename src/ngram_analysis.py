@@ -126,20 +126,21 @@ class NgramExtractor:
             'middle': middle_counter
         }
 
-    def extract_regional_ngrams(self, n: int = 2, level: str = '市级') -> Dict[str, Dict[str, Counter]]:
+    def extract_regional_ngrams(self, n: int = 2, level: str = '市级') -> Dict[Tuple, Dict[str, Counter]]:
         """
-        Extract n-grams by region.
+        Extract n-grams by region with hierarchical grouping.
 
         Args:
             n: N-gram size
             level: Regional level ('市级', '县区级', '乡镇')
 
         Returns:
-            Dictionary mapping region -> position -> Counter
+            Dictionary mapping (city, county, township) tuple -> position -> Counter
+            The tuple contains hierarchical information to separate duplicate place names.
         """
         cursor = self.conn.cursor()
 
-        # Map level to column index to avoid encoding issues
+        # Map level to column indices
         level_to_index = {
             '市级': 0,
             '县区级': 1,
@@ -148,7 +149,7 @@ class NgramExtractor:
 
         col_index = level_to_index.get(level, 0)
 
-        # Query using column index
+        # Query all columns we need for hierarchical grouping
         cursor.execute("SELECT * FROM 广东省自然村")
 
         regional_data = defaultdict(lambda: {
@@ -159,18 +160,34 @@ class NgramExtractor:
         })
 
         for row in cursor:
-            region = row[col_index]  # Get region by index
-            village_name = row[4]     # 自然村 is at index 4
+            city = row[0]        # 市级
+            county = row[1]      # 区县级
+            township = row[2]    # 乡镇级
+            village_name = row[4]  # 自然村
 
-            if not region or not village_name:
+            if not village_name:
                 continue
+
+            # Create hierarchical key based on level
+            if level == '市级':
+                if not city:
+                    continue
+                hierarchical_key = (city, None, None)
+            elif level == '县区级':
+                if not city or not county:
+                    continue
+                hierarchical_key = (city, county, None)
+            else:  # 乡镇
+                if not city or not county or not township:
+                    continue
+                hierarchical_key = (city, county, township)
 
             positional = self.extract_positional_ngrams(village_name, n)
 
-            regional_data[region]['all'].update(positional['all'])
-            regional_data[region]['prefix'].update(positional['prefix'])
-            regional_data[region]['suffix'].update(positional['suffix'])
-            regional_data[region]['middle'].update(positional['middle'])
+            regional_data[hierarchical_key]['all'].update(positional['all'])
+            regional_data[hierarchical_key]['prefix'].update(positional['prefix'])
+            regional_data[hierarchical_key]['suffix'].update(positional['suffix'])
+            regional_data[hierarchical_key]['middle'].update(positional['middle'])
 
         return dict(regional_data)
 

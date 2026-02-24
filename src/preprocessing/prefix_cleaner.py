@@ -331,7 +331,7 @@ def batch_clean_prefixes(
     """Batch clean prefixes for all villages.
 
     Args:
-        villages_df: DataFrame with columns: 自然村, 行政村
+        villages_df: DataFrame with columns: 自然村, 村委会
         min_length: Minimum Chinese characters required after removal
         confidence_threshold: Minimum confidence to auto-remove
 
@@ -355,7 +355,7 @@ def batch_clean_prefixes(
 
         result = remove_administrative_prefix(
             natural_village=row['自然村'],
-            administrative_village=row.get('行政村', ''),
+            administrative_village=row.get('村委会', row.get('行政村', '')),
             min_length=min_length,
             confidence_threshold=confidence_threshold
         )

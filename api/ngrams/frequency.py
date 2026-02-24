@@ -68,48 +68,75 @@ def get_ngram_frequency(
 @router.get("/regional")
 def get_regional_ngram_frequency(
     n: int = Query(..., ge=2, le=4, description="N-gram大小"),
-    run_id: Optional[str] = Query(None, description="N-gram分析运行ID（留空使用活跃版本）"),
     region_level: str = Query(..., description="区域级别", pattern="^(city|county|township)$"),
-    region_name: Optional[str] = Query(None, description="区域名称（不指定返回所有区域）"),
+    region_name: Optional[str] = Query(None, description="区域名称（可选，用于向后兼容）"),
+    city: Optional[str] = Query(None, description="市级（可选）"),
+    county: Optional[str] = Query(None, description="区县级（可选）"),
+    township: Optional[str] = Query(None, description="乡镇级（可选）"),
     top_k: int = Query(50, ge=1, le=500, description="每个区域返回前K个n-grams"),
     db: sqlite3.Connection = Depends(get_db)
 ):
     """
-    获取区域N-gram频率
-    Get regional n-gram frequencies
+    获取区域N-gram频率（支持层级查询）
+    Get regional n-gram frequencies with hierarchical filtering
+
+    支持两种查询方式：
+    1. 层级查询：使用 city/county/township 参数精确指定位置
+    2. 名称查询：使用 region_name 参数（可能返回多个重复地名的数据）
 
     Args:
         n: N-gram大小
-        run_id: N-gram分析运行ID
         region_level: 区域级别 (city/county/township)
-        region_name: 区域名称（可选）
+        region_name: 区域名称（可选，向后兼容）
+        city: 市级名称（可选）
+        county: 区县级名称（可选）
+        township: 乡镇级名称（可选）
         top_k: 每个区域返回前K个n-grams
 
     Returns:
         List[dict]: 区域N-gram频率列表
-    """
-    # 如果未指定run_id，使用活跃版本
-    if run_id is None:
-        run_id = run_id_manager.get_active_run_id("ngrams")
 
+    Examples:
+        # 精确查询特定位置
+        ?n=2&region_level=township&city=清远市&county=清新区&township=太平镇&top_k=50
+
+        # 查询所有同名地点
+        ?n=2&region_level=township&region_name=太平镇&top_k=50
+    """
     query = """
         SELECT
-            region_name,
+            city,
+            county,
+            township,
+            region as region_name,
             ngram,
             frequency,
-            rank_within_region as rank
+            percentage
         FROM regional_ngram_frequency
-        WHERE run_id = ? AND n = ? AND region_level = ?
+        WHERE n = ? AND level = ?
     """
-    params = [run_id, n, region_level]
+    params = [n, region_level]
 
-    # 现场过滤：区域名称
+    # 层级过滤（优先使用）
+    if city is not None:
+        query += " AND city = ?"
+        params.append(city)
+
+    if county is not None:
+        query += " AND county = ?"
+        params.append(county)
+
+    if township is not None:
+        query += " AND township = ?"
+        params.append(township)
+
+    # 名称过滤（向后兼容）
     if region_name is not None:
-        query += " AND region_name = ?"
+        query += " AND region = ?"
         params.append(region_name)
 
-    # 现场排序和限制（每个区域前K个）
-    query += " AND rank_within_region <= ? ORDER BY region_name, rank_within_region"
+    # 现场排序和限制
+    query += " ORDER BY city, county, township, frequency DESC LIMIT ?"
     params.append(top_k)
 
     results = execute_query(db, query, tuple(params))
@@ -183,38 +210,82 @@ def get_structural_patterns(
 @router.get("/tendency")
 def get_ngram_tendency(
     ngram: Optional[str] = Query(None, description="N-gram"),
-    region_level: str = Query("county", description="区域级别"),
-    min_tendency: Optional[float] = Query(None, description="最小倾向值"),
+    region_level: str = Query("county", description="区域级别", pattern="^(city|county|township)$"),
+    region_name: Optional[str] = Query(None, description="区域名称（可选，用于向后兼容）"),
+    city: Optional[str] = Query(None, description="市级（可选）"),
+    county: Optional[str] = Query(None, description="区县级（可选）"),
+    township: Optional[str] = Query(None, description="乡镇级（可选）"),
+    min_lift: Optional[float] = Query(None, description="最小lift值"),
     limit: int = Query(100, ge=1, le=1000, description="返回记录数"),
     db: sqlite3.Connection = Depends(get_db)
 ):
     """
-    获取N-gram倾向性
-    Get n-gram tendency scores
+    获取N-gram倾向性（支持层级查询）
+    Get n-gram tendency scores with hierarchical filtering
+
+    支持两种查询方式：
+    1. 层级查询：使用 city/county/township 参数精确指定位置
+    2. 名称查询：使用 region_name 参数（可能返回多个重复地名的数据）
+
+    Args:
+        ngram: N-gram（可选）
+        region_level: 区域级别
+        region_name: 区域名称（可选，向后兼容）
+        city: 市级名称（可选）
+        county: 区县级名称（可选）
+        township: 乡镇级名称（可选）
+        min_lift: 最小lift值（可选）
+        limit: 返回记录数
+
+    Returns:
+        List[dict]: N-gram倾向性列表
     """
     query = """
         SELECT
-            region_level,
-            region_name,
+            level as region_level,
+            city,
+            county,
+            township,
+            region as region_name,
             ngram,
             n,
-            tendency_score,
-            frequency,
-            expected_frequency
+            lift,
+            log_odds,
+            z_score
         FROM ngram_tendency
-        WHERE region_level = ?
+        WHERE level = ?
     """
     params = [region_level]
 
+    # 层级过滤（优先使用）
+    if city is not None:
+        query += " AND city = ?"
+        params.append(city)
+
+    if county is not None:
+        query += " AND county = ?"
+        params.append(county)
+
+    if township is not None:
+        query += " AND township = ?"
+        params.append(township)
+
+    # 名称过滤（向后兼容）
+    if region_name is not None:
+        query += " AND region = ?"
+        params.append(region_name)
+
+    # N-gram 过滤
     if ngram is not None:
         query += " AND ngram = ?"
         params.append(ngram)
 
-    if min_tendency is not None:
-        query += " AND tendency_score >= ?"
-        params.append(min_tendency)
+    # Lift 过滤
+    if min_lift is not None:
+        query += " AND lift >= ?"
+        params.append(min_lift)
 
-    query += " ORDER BY tendency_score DESC LIMIT ?"
+    query += " ORDER BY lift DESC LIMIT ?"
     params.append(limit)
 
     results = execute_query(db, query, tuple(params))
@@ -231,39 +302,83 @@ def get_ngram_tendency(
 @router.get("/significance")
 def get_ngram_significance(
     ngram: Optional[str] = Query(None, description="N-gram"),
-    region_level: str = Query("county", description="区域级别"),
+    region_level: str = Query("county", description="区域级别", pattern="^(city|county|township)$"),
+    region_name: Optional[str] = Query(None, description="区域名称（可选，用于向后兼容）"),
+    city: Optional[str] = Query(None, description="市级（可选）"),
+    county: Optional[str] = Query(None, description="区县级（可选）"),
+    township: Optional[str] = Query(None, description="乡镇级（可选）"),
     is_significant: Optional[bool] = Query(None, description="仅显示显著结果"),
     limit: int = Query(100, ge=1, le=1000, description="返回记录数"),
     db: sqlite3.Connection = Depends(get_db)
 ):
     """
-    获取N-gram显著性
-    Get n-gram significance test results
+    获取N-gram显著性（支持层级查询）
+    Get n-gram significance test results with hierarchical filtering
+
+    支持两种查询方式：
+    1. 层级查询：使用 city/county/township 参数精确指定位置
+    2. 名称查询：使用 region_name 参数（可能返回多个重复地名的数据）
+
+    Args:
+        ngram: N-gram（可选）
+        region_level: 区域级别
+        region_name: 区域名称（可选，向后兼容）
+        city: 市级名称（可选）
+        county: 区县级名称（可选）
+        township: 乡镇级名称（可选）
+        is_significant: 仅显示显著结果（可选）
+        limit: 返回记录数
+
+    Returns:
+        List[dict]: N-gram显著性列表
     """
     query = """
         SELECT
-            region_level,
-            region_name,
+            level as region_level,
+            city,
+            county,
+            township,
+            region as region_name,
             ngram,
             n,
-            z_score,
+            chi2,
             p_value,
-            is_significant,
-            lift
+            cramers_v,
+            is_significant
         FROM ngram_significance
-        WHERE region_level = ?
+        WHERE level = ?
     """
     params = [region_level]
 
+    # 层级过滤（优先使用）
+    if city is not None:
+        query += " AND city = ?"
+        params.append(city)
+
+    if county is not None:
+        query += " AND county = ?"
+        params.append(county)
+
+    if township is not None:
+        query += " AND township = ?"
+        params.append(township)
+
+    # 名称过滤（向后兼容）
+    if region_name is not None:
+        query += " AND region = ?"
+        params.append(region_name)
+
+    # N-gram 过滤
     if ngram is not None:
         query += " AND ngram = ?"
         params.append(ngram)
 
+    # 显著性过滤
     if is_significant is not None:
         query += " AND is_significant = ?"
         params.append(1 if is_significant else 0)
 
-    query += " ORDER BY ABS(z_score) DESC LIMIT ?"
+    query += " ORDER BY chi2 DESC LIMIT ?"
     params.append(limit)
 
     results = execute_query(db, query, tuple(params))

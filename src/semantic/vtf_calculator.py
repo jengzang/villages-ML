@@ -76,17 +76,19 @@ class VTFCalculator:
     def calculate_regional_vtf(self, char_freq_df: pd.DataFrame,
                                level: str) -> pd.DataFrame:
         """
-        Calculate regional VTF for each semantic category.
+        Calculate regional VTF for each semantic category with hierarchical grouping.
 
         Args:
             char_freq_df: DataFrame from char_frequency_regional table
                          Must have columns: region_level, region_name, character,
                                           village_count, total_villages
+                         Optional: city, county, township (for hierarchical grouping)
             level: Region level to filter ('city', 'county', 'township')
 
         Returns:
             DataFrame with columns:
               - region_level
+              - city, county, township (if available in input)
               - region_name
               - category
               - vtf_count
@@ -100,14 +102,52 @@ class VTFCalculator:
         if level_df.empty:
             return pd.DataFrame()
 
-        # Get unique regions
-        regions = level_df['region_name'].unique()
+        # Check if hierarchical columns exist
+        has_hierarchical = all(col in level_df.columns for col in ['city', 'county', 'township'])
+
+        if has_hierarchical:
+            # Use hierarchical grouping to separate duplicate place names
+            if level == 'city':
+                group_cols = ['city']
+            elif level == 'county':
+                group_cols = ['city', 'county']
+            else:  # township
+                group_cols = ['city', 'county', 'township']
+
+            # Get unique regions by hierarchical key
+            region_groups = level_df.groupby(group_cols)
+        else:
+            # Fall back to region_name for backward compatibility
+            group_cols = ['region_name']
+            region_groups = level_df.groupby('region_name')
 
         results = []
 
-        for region in regions:
-            # Get data for this region
-            region_df = level_df[level_df['region_name'] == region]
+        for group_key, region_df in region_groups:
+            # Extract hierarchical values
+            if has_hierarchical:
+                if isinstance(group_key, tuple):
+                    # Explicit unpacking based on level
+                    if level == 'city':
+                        city = group_key
+                        county = None
+                        township = None
+                    elif level == 'county':
+                        city, county = group_key
+                        township = None
+                    else:  # township
+                        city, county, township = group_key
+                else:
+                    city = group_key
+                    county = None
+                    township = None
+            else:
+                city = None
+                county = None
+                township = None
+
+            # Get region name for display
+            region_name = region_df['region_name'].iloc[0]
             total_villages = region_df['total_villages'].iloc[0]
 
             # Calculate VTF for each category
@@ -124,32 +164,50 @@ class VTFCalculator:
                 # Calculate frequency
                 frequency = vtf_count / total_villages if total_villages > 0 else 0.0
 
-                results.append({
+                result = {
                     'region_level': level,
-                    'region_name': region,
+                    'region_name': region_name,
                     'category': category,
                     'vtf_count': int(vtf_count),
                     'total_villages': int(total_villages),
                     'frequency': float(frequency)
-                })
+                }
+
+                # Add hierarchical columns if available
+                if has_hierarchical:
+                    result['city'] = city
+                    result['county'] = county
+                    result['township'] = township
+
+                results.append(result)
 
         # Create DataFrame
         result_df = pd.DataFrame(results)
 
-        # Add rank within each region
-        result_df['rank_within_region'] = result_df.groupby('region_name')['vtf_count'].rank(
-            ascending=False, method='dense'
-        ).astype(int)
+        # Add rank within each region using hierarchical grouping
+        if has_hierarchical:
+            result_df['rank_within_region'] = result_df.groupby(group_cols)['vtf_count'].rank(
+                ascending=False, method='dense'
+            ).astype(int)
+        else:
+            result_df['rank_within_region'] = result_df.groupby('region_name')['vtf_count'].rank(
+                ascending=False, method='dense'
+            ).astype(int)
 
-        # Sort by region_name and rank
-        result_df = result_df.sort_values(['region_name', 'rank_within_region']).reset_index(drop=True)
+        # Sort by hierarchical key (or region_name) and rank
+        if has_hierarchical:
+            sort_cols = group_cols + ['rank_within_region']
+        else:
+            sort_cols = ['region_name', 'rank_within_region']
+
+        result_df = result_df.sort_values(sort_cols).reset_index(drop=True)
 
         return result_df
 
     def calculate_vtf_tendency(self, regional_vtf: pd.DataFrame,
                                global_vtf: pd.DataFrame) -> pd.DataFrame:
         """
-        Calculate tendency metrics for semantic categories.
+        Calculate tendency metrics for semantic categories with hierarchical support.
 
         Args:
             regional_vtf: DataFrame from calculate_regional_vtf
@@ -158,6 +216,7 @@ class VTFCalculator:
         Returns:
             DataFrame with columns:
               - region_level
+              - city, county, township (if available in input)
               - region_name
               - category
               - frequency (regional)
@@ -172,6 +231,9 @@ class VTFCalculator:
         """
         # Create global frequency lookup
         global_freq_map = dict(zip(global_vtf['category'], global_vtf['frequency']))
+
+        # Check if hierarchical columns exist
+        has_hierarchical = all(col in regional_vtf.columns for col in ['city', 'county', 'township'])
 
         results = []
 
@@ -201,7 +263,7 @@ class VTFCalculator:
             # Support flag (categories with reasonable counts)
             support_flag = 1 if vtf_count >= 10 else 0
 
-            results.append({
+            result = {
                 'region_level': region_level,
                 'region_name': region_name,
                 'category': category,
@@ -214,13 +276,37 @@ class VTFCalculator:
                 'vtf_count': int(vtf_count),
                 'total_villages': int(total_villages),
                 'support_flag': int(support_flag)
-            })
+            }
+
+            # Add hierarchical columns if available
+            if has_hierarchical:
+                result['city'] = row['city']
+                result['county'] = row['county']
+                result['township'] = row['township']
+
+            results.append(result)
 
         result_df = pd.DataFrame(results)
 
-        # Sort by region_name and log_odds descending
-        result_df = result_df.sort_values(['region_name', 'log_odds'],
-                                          ascending=[True, False]).reset_index(drop=True)
+        # Sort by hierarchical key (or region_name) and log_odds descending
+        if has_hierarchical:
+            # Determine sort columns based on region_level
+            if 'region_level' in result_df.columns and len(result_df) > 0:
+                region_level = result_df['region_level'].iloc[0]
+                if region_level == 'city':
+                    sort_cols = ['city', 'log_odds']
+                elif region_level == 'county':
+                    sort_cols = ['city', 'county', 'log_odds']
+                else:  # township
+                    sort_cols = ['city', 'county', 'township', 'log_odds']
+            else:
+                sort_cols = ['city', 'county', 'township', 'log_odds']
+
+            result_df = result_df.sort_values(sort_cols,
+                                              ascending=[True] * (len(sort_cols) - 1) + [False]).reset_index(drop=True)
+        else:
+            result_df = result_df.sort_values(['region_name', 'log_odds'],
+                                              ascending=[True, False]).reset_index(drop=True)
 
         return result_df
 

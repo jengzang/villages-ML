@@ -25,22 +25,28 @@ NGRAM_SCHEMA = {
 
     'regional_ngram_frequency': """
         CREATE TABLE IF NOT EXISTS regional_ngram_frequency (
-            region TEXT NOT NULL,
             level TEXT NOT NULL,
+            city TEXT,
+            county TEXT,
+            township TEXT,
+            region TEXT NOT NULL,
             ngram TEXT NOT NULL,
             n INTEGER NOT NULL,
             position TEXT NOT NULL,
             frequency INTEGER NOT NULL,
             total_count INTEGER NOT NULL,
             percentage REAL NOT NULL,
-            PRIMARY KEY (region, level, ngram, n, position)
+            PRIMARY KEY (level, city, county, township, ngram, n, position)
         )
     """,
 
     'ngram_tendency': """
         CREATE TABLE IF NOT EXISTS ngram_tendency (
-            region TEXT NOT NULL,
             level TEXT NOT NULL,
+            city TEXT,
+            county TEXT,
+            township TEXT,
+            region TEXT NOT NULL,
             ngram TEXT NOT NULL,
             n INTEGER NOT NULL,
             position TEXT NOT NULL,
@@ -51,14 +57,17 @@ NGRAM_SCHEMA = {
             regional_total INTEGER NOT NULL,
             global_count INTEGER NOT NULL,
             global_total INTEGER NOT NULL,
-            PRIMARY KEY (region, level, ngram, n, position)
+            PRIMARY KEY (level, city, county, township, ngram, n, position)
         )
     """,
 
     'ngram_significance': """
         CREATE TABLE IF NOT EXISTS ngram_significance (
-            region TEXT NOT NULL,
             level TEXT NOT NULL,
+            city TEXT,
+            county TEXT,
+            township TEXT,
+            region TEXT NOT NULL,
             ngram TEXT NOT NULL,
             n INTEGER NOT NULL,
             position TEXT NOT NULL,
@@ -66,7 +75,7 @@ NGRAM_SCHEMA = {
             p_value REAL NOT NULL,
             cramers_v REAL NOT NULL,
             is_significant INTEGER NOT NULL,
-            PRIMARY KEY (region, level, ngram, n, position)
+            PRIMARY KEY (level, city, county, township, ngram, n, position)
         )
     """,
 
@@ -85,8 +94,9 @@ NGRAM_SCHEMA = {
 
     'village_ngrams': """
         CREATE TABLE IF NOT EXISTS village_ngrams (
-            村委会 TEXT NOT NULL,
-            自然村 TEXT NOT NULL,
+            village_id TEXT NOT NULL,
+            村委会 TEXT,
+            自然村 TEXT,
             n INTEGER NOT NULL,
             bigrams TEXT,
             trigrams TEXT,
@@ -94,7 +104,7 @@ NGRAM_SCHEMA = {
             suffix_bigram TEXT,
             prefix_trigram TEXT,
             suffix_trigram TEXT,
-            PRIMARY KEY (村委会, 自然村, n)
+            PRIMARY KEY (village_id, n)
         )
     """
 }
@@ -103,13 +113,26 @@ NGRAM_SCHEMA = {
 NGRAM_INDEXES = [
     "CREATE INDEX IF NOT EXISTS idx_ngram_freq_ngram ON ngram_frequency(ngram)",
     "CREATE INDEX IF NOT EXISTS idx_ngram_freq_n ON ngram_frequency(n)",
+    "CREATE INDEX IF NOT EXISTS idx_regional_ngram_level ON regional_ngram_frequency(level)",
+    "CREATE INDEX IF NOT EXISTS idx_regional_ngram_city ON regional_ngram_frequency(city)",
+    "CREATE INDEX IF NOT EXISTS idx_regional_ngram_county ON regional_ngram_frequency(county)",
+    "CREATE INDEX IF NOT EXISTS idx_regional_ngram_township ON regional_ngram_frequency(township)",
     "CREATE INDEX IF NOT EXISTS idx_regional_ngram_region ON regional_ngram_frequency(region)",
     "CREATE INDEX IF NOT EXISTS idx_regional_ngram_ngram ON regional_ngram_frequency(ngram)",
+    "CREATE INDEX IF NOT EXISTS idx_ngram_tendency_level ON ngram_tendency(level)",
+    "CREATE INDEX IF NOT EXISTS idx_ngram_tendency_city ON ngram_tendency(city)",
+    "CREATE INDEX IF NOT EXISTS idx_ngram_tendency_county ON ngram_tendency(county)",
+    "CREATE INDEX IF NOT EXISTS idx_ngram_tendency_township ON ngram_tendency(township)",
     "CREATE INDEX IF NOT EXISTS idx_ngram_tendency_region ON ngram_tendency(region)",
     "CREATE INDEX IF NOT EXISTS idx_ngram_tendency_lift ON ngram_tendency(lift DESC)",
     "CREATE INDEX IF NOT EXISTS idx_ngram_tendency_zscore ON ngram_tendency(z_score DESC)",
+    "CREATE INDEX IF NOT EXISTS idx_ngram_sig_level ON ngram_significance(level)",
+    "CREATE INDEX IF NOT EXISTS idx_ngram_sig_city ON ngram_significance(city)",
+    "CREATE INDEX IF NOT EXISTS idx_ngram_sig_county ON ngram_significance(county)",
+    "CREATE INDEX IF NOT EXISTS idx_ngram_sig_township ON ngram_significance(township)",
     "CREATE INDEX IF NOT EXISTS idx_ngram_sig_pvalue ON ngram_significance(p_value)",
     "CREATE INDEX IF NOT EXISTS idx_structural_patterns_type ON structural_patterns(pattern_type)",
+    "CREATE INDEX IF NOT EXISTS idx_village_ngrams_id ON village_ngrams(village_id)",
 ]
 
 

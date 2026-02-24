@@ -18,11 +18,12 @@ import json
 from pathlib import Path
 from datetime import datetime
 
-# Add src to path
-sys.path.insert(0, str(Path(__file__).parent.parent / 'src'))
+# Add project root to path
+project_root = Path(__file__).parent.parent.parent
+sys.path.insert(0, str(project_root))
 
-from semantic_composition import SemanticCompositionAnalyzer
-from semantic_composition_schema import create_semantic_composition_tables
+from src.semantic_composition import SemanticCompositionAnalyzer
+from src.semantic_composition_schema import create_semantic_composition_tables
 
 
 def step1_create_tables(db_path: str):
@@ -216,16 +217,28 @@ def step6_extract_village_structures(db_path: str):
     with SemanticCompositionAnalyzer(db_path) as analyzer:
         char_labels = analyzer.get_character_labels()
 
-        # Use SELECT * and access by index to avoid encoding issues
-        cursor.execute("SELECT * FROM 广东省自然村")
+        # Query from preprocessed table to get village_id
+        # Fetch all rows first to avoid cursor issues
+        cursor.execute("""
+            SELECT village_id, 村委会, 自然村_去前缀
+            FROM 广东省自然村_预处理
+            WHERE 有效 = 1
+        """)
+
+        # Fetch all rows into memory
+        all_villages = cursor.fetchall()
+        print(f"\nLoaded {len(all_villages):,} villages from database")
 
         count = 0
         skipped = 0
-        for row in cursor:
-            village_committee = row[3]  # 村委会 is at index 3
-            village_name = row[4]        # 自然村 is at index 4
+        insert_cursor = conn.cursor()  # Separate cursor for inserts
 
-            if not village_name:
+        for row in all_villages:
+            village_id = row[0]
+            village_committee = row[1]
+            village_name = row[2]
+
+            if not village_name or not village_id:
                 continue
 
             sequence = analyzer.extract_semantic_sequence(village_name, char_labels)
@@ -251,13 +264,13 @@ def step6_extract_village_structures(db_path: str):
             has_head = 1 if any(cat in ['water', 'mountain', 'landform', 'vegetation'] for cat in sequence) else 0
             has_settlement = 1 if 'settlement' in sequence else 0
 
-            cursor.execute("""
+            insert_cursor.execute("""
                 INSERT OR REPLACE INTO village_semantic_structure
-                (村委会, 自然村, semantic_sequence, sequence_length,
+                (village_id, 村委会, 自然村, semantic_sequence, sequence_length,
                  has_modifier, has_head, has_settlement)
-                VALUES (?, ?, ?, ?, ?, ?, ?)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
             """, (
-                village_committee, village_name, sequence_str, sequence_length,
+                village_id, village_committee, village_name, sequence_str, sequence_length,
                 has_modifier, has_head, has_settlement
             ))
 

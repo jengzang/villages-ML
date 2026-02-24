@@ -59,7 +59,7 @@ class CoordinateLoader:
             市级 as city,
             区县级 as county,
             乡镇级 as town,
-            行政村 as village_committee,
+            村委会 as village_committee,
             自然村 as village_name_original,
             自然村_去前缀 as village_name,
             拼音 as pinyin,

@@ -23,11 +23,10 @@ def create_analysis_tables(conn: sqlite3.Connection) -> None:
     """
     Create analysis result tables if they don't exist.
 
-    Creates 4 tables:
+    Creates optimized tables without run_id:
     - analysis_runs: Run metadata
     - char_frequency_global: Global character frequency
-    - char_frequency_regional: Regional character frequency
-    - regional_tendency: Regional tendency analysis
+    - char_regional_analysis: Merged regional frequency + tendency with hierarchical columns
 
     Args:
         conn: SQLite database connection
@@ -48,41 +47,24 @@ def create_analysis_tables(conn: sqlite3.Connection) -> None:
         )
     """)
 
-    # Table 2: char_frequency_global
+    # Table 2: char_frequency_global (no run_id)
     cursor.execute("""
         CREATE TABLE IF NOT EXISTS char_frequency_global (
-            run_id TEXT NOT NULL,
-            char TEXT NOT NULL,
+            char TEXT PRIMARY KEY,
             village_count INTEGER NOT NULL,
             total_villages INTEGER NOT NULL,
             frequency REAL NOT NULL,
-            rank INTEGER NOT NULL,
-            PRIMARY KEY (run_id, char),
-            FOREIGN KEY (run_id) REFERENCES analysis_runs(run_id)
+            rank INTEGER NOT NULL
         )
     """)
 
-    # Table 3: char_frequency_regional
+    # Table 3: char_regional_analysis (merged frequency + tendency, with hierarchical columns)
     cursor.execute("""
-        CREATE TABLE IF NOT EXISTS char_frequency_regional (
-            run_id TEXT NOT NULL,
+        CREATE TABLE IF NOT EXISTS char_regional_analysis (
             region_level TEXT NOT NULL,
-            region_name TEXT NOT NULL,
-            char TEXT NOT NULL,
-            village_count INTEGER NOT NULL,
-            total_villages INTEGER NOT NULL,
-            frequency REAL NOT NULL,
-            rank_within_region INTEGER NOT NULL,
-            PRIMARY KEY (run_id, region_level, region_name, char),
-            FOREIGN KEY (run_id) REFERENCES analysis_runs(run_id)
-        )
-    """)
-
-    # Table 4: regional_tendency
-    cursor.execute("""
-        CREATE TABLE IF NOT EXISTS regional_tendency (
-            run_id TEXT NOT NULL,
-            region_level TEXT NOT NULL,
+            city TEXT,
+            county TEXT,
+            township TEXT,
             region_name TEXT NOT NULL,
             char TEXT NOT NULL,
             village_count INTEGER NOT NULL,
@@ -98,31 +80,22 @@ def create_analysis_tables(conn: sqlite3.Connection) -> None:
             support_flag INTEGER NOT NULL,
             rank_overrepresented INTEGER,
             rank_underrepresented INTEGER,
-            PRIMARY KEY (run_id, region_level, region_name, char),
-            FOREIGN KEY (run_id) REFERENCES analysis_runs(run_id)
+            PRIMARY KEY (region_level, city, county, township, char)
         )
     """)
 
-    # Table 5: tendency_significance
-    cursor.execute("""
-        CREATE TABLE IF NOT EXISTS tendency_significance (
-            run_id TEXT NOT NULL,
-            region_level TEXT NOT NULL,
-            region_name TEXT NOT NULL,
-            char TEXT NOT NULL,
-            chi_square_statistic REAL NOT NULL,
-            p_value REAL NOT NULL,
-            is_significant INTEGER NOT NULL,
-            significance_level TEXT NOT NULL,
-            effect_size REAL NOT NULL,
-            effect_size_interpretation TEXT NOT NULL,
-            ci_lower REAL,
-            ci_upper REAL,
-            created_at REAL NOT NULL,
-            PRIMARY KEY (run_id, region_level, region_name, char),
-            FOREIGN KEY (run_id) REFERENCES analysis_runs(run_id)
-        )
-    """)
+    conn.commit()
+    logger.info("Analysis tables created successfully")
+
+
+def create_semantic_tables(conn: sqlite3.Connection) -> None:
+    """
+    Create semantic analysis tables.
+
+    Args:
+        conn: SQLite database connection
+    """
+    cursor = conn.cursor()
 
     # Table 6: semantic_vtf_global
     cursor.execute("""
@@ -197,7 +170,7 @@ def create_analysis_tables(conn: sqlite3.Connection) -> None:
 
 def create_indexes(conn: sqlite3.Connection) -> None:
     """
-    Create indexes for query optimization.
+    Create indexes for query optimization (optimized schema without run_id).
 
     Args:
         conn: SQLite database connection
@@ -208,31 +181,22 @@ def create_indexes(conn: sqlite3.Connection) -> None:
     cursor.execute("CREATE INDEX IF NOT EXISTS idx_runs_created ON analysis_runs(created_at)")
     cursor.execute("CREATE INDEX IF NOT EXISTS idx_runs_status ON analysis_runs(status)")
 
-    # Indexes for char_frequency_global
-    cursor.execute("CREATE INDEX IF NOT EXISTS idx_global_char ON char_frequency_global(run_id, char)")
-    cursor.execute("CREATE INDEX IF NOT EXISTS idx_global_rank ON char_frequency_global(run_id, rank)")
-    cursor.execute("CREATE INDEX IF NOT EXISTS idx_global_freq ON char_frequency_global(run_id, frequency DESC)")
+    # Indexes for char_frequency_global (no run_id)
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_global_rank ON char_frequency_global(rank)")
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_global_freq ON char_frequency_global(frequency DESC)")
 
-    # Indexes for char_frequency_regional
-    cursor.execute("CREATE INDEX IF NOT EXISTS idx_regional_level ON char_frequency_regional(run_id, region_level)")
-    cursor.execute("CREATE INDEX IF NOT EXISTS idx_regional_name ON char_frequency_regional(run_id, region_name)")
-    cursor.execute("CREATE INDEX IF NOT EXISTS idx_regional_char ON char_frequency_regional(run_id, char)")
-    cursor.execute("CREATE INDEX IF NOT EXISTS idx_regional_freq ON char_frequency_regional(run_id, region_level, frequency DESC)")
+    # Indexes for char_regional_analysis (hierarchical columns)
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_regional_level ON char_regional_analysis(region_level)")
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_regional_city ON char_regional_analysis(city)")
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_regional_county ON char_regional_analysis(city, county)")
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_regional_township ON char_regional_analysis(city, county, township)")
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_regional_char ON char_regional_analysis(char)")
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_regional_lift ON char_regional_analysis(lift DESC)")
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_regional_rank_over ON char_regional_analysis(rank_overrepresented)")
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_regional_rank_under ON char_regional_analysis(rank_underrepresented)")
 
-    # Indexes for regional_tendency
-    cursor.execute("CREATE INDEX IF NOT EXISTS idx_tendency_level ON regional_tendency(run_id, region_level)")
-    cursor.execute("CREATE INDEX IF NOT EXISTS idx_tendency_char ON regional_tendency(run_id, char)")
-    cursor.execute("CREATE INDEX IF NOT EXISTS idx_tendency_lift ON regional_tendency(run_id, region_level, lift DESC)")
-    cursor.execute("CREATE INDEX IF NOT EXISTS idx_tendency_logodds ON regional_tendency(run_id, region_level, log_odds DESC)")
-    cursor.execute("CREATE INDEX IF NOT EXISTS idx_tendency_zscore ON regional_tendency(run_id, region_level, z_score DESC)")
-    cursor.execute("CREATE INDEX IF NOT EXISTS idx_tendency_support ON regional_tendency(run_id, support_flag)")
-
-    # Indexes for tendency_significance
-    cursor.execute("CREATE INDEX IF NOT EXISTS idx_significance_level ON tendency_significance(run_id, region_level)")
-    cursor.execute("CREATE INDEX IF NOT EXISTS idx_significance_char ON tendency_significance(run_id, char)")
-    cursor.execute("CREATE INDEX IF NOT EXISTS idx_significance_pvalue ON tendency_significance(run_id, p_value)")
-    cursor.execute("CREATE INDEX IF NOT EXISTS idx_significance_flag ON tendency_significance(run_id, is_significant)")
-    cursor.execute("CREATE INDEX IF NOT EXISTS idx_significance_effect ON tendency_significance(run_id, effect_size DESC)")
+    conn.commit()
+    logger.info("Indexes created successfully")
 
     conn.commit()
     logger.info("Indexes created successfully")
@@ -280,25 +244,21 @@ def save_global_frequency(conn: sqlite3.Connection, run_id: str, df: pd.DataFram
     """
     cursor = conn.cursor()
 
-    # Prepare data for insertion
-    df_copy = df.copy()
-    df_copy['run_id'] = run_id
-
-    # Select and reorder columns
-    columns = ['run_id', 'char', 'village_count', 'total_villages', 'frequency', 'rank']
-    data = df_copy[columns].values.tolist()
+    # Select and reorder columns (no run_id)
+    columns = ['char', 'village_count', 'total_villages', 'frequency', 'rank']
+    data = df[columns].values.tolist()
 
     # Batch insert
     for i in range(0, len(data), batch_size):
         batch = data[i:i + batch_size]
         cursor.executemany("""
             INSERT OR REPLACE INTO char_frequency_global
-            (run_id, char, village_count, total_villages, frequency, rank)
-            VALUES (?, ?, ?, ?, ?, ?)
+            (char, village_count, total_villages, frequency, rank)
+            VALUES (?, ?, ?, ?, ?)
         """, batch)
 
     conn.commit()
-    logger.info(f"Saved {len(data)} global frequency records for run_id={run_id}")
+    logger.info(f"Saved {len(data)} global frequency records")
 
 
 def save_regional_frequency(conn: sqlite3.Connection, run_id: str, df: pd.DataFrame, batch_size: int = 10000) -> None:
@@ -529,13 +489,23 @@ def persist_results_to_db(db_path: str, run_id: str, results_dir: Path,
         logger.info("Saving global frequency data...")
         save_global_frequency(conn, run_id, global_freq_df, batch_size)
 
-        logger.info("Saving regional frequency data...")
-        save_regional_frequency(conn, run_id, regional_freq_df, batch_size)
+        # Step 5: Merge regional frequency and tendency data
+        logger.info("Merging regional frequency and tendency data...")
+        # Merge on hierarchical key + char
+        merge_cols = ['region_level', 'city', 'county', 'township', 'char']
+        merged_df = regional_freq_df.merge(
+            tendency_df,
+            on=merge_cols,
+            how='left',
+            suffixes=('', '_tendency')
+        )
+        logger.info(f"Merged {len(merged_df)} regional analysis records")
 
-        logger.info("Saving regional tendency data...")
-        save_regional_tendency(conn, run_id, tendency_df, batch_size)
+        # Step 6: Write to char_regional_analysis table
+        logger.info("Saving regional analysis data...")
+        write_char_regional_analysis(conn, merged_df, batch_size)
 
-        # Step 5: Create indexes
+        # Step 7: Create indexes
         logger.info("Creating indexes...")
         create_indexes(conn)
 
@@ -554,54 +524,36 @@ def create_morphology_tables(conn: sqlite3.Connection) -> None:
     """
     Create morphology analysis result tables if they don't exist.
 
-    Creates 3 tables:
+    Creates 2 tables (optimized schema without run_id):
     - pattern_frequency_global: Global pattern frequency
-    - pattern_frequency_regional: Regional pattern frequency
-    - pattern_tendency: Regional pattern tendency analysis
+    - pattern_regional_analysis: Regional pattern frequency + tendency (merged)
 
     Args:
         conn: SQLite database connection
     """
     cursor = conn.cursor()
 
-    # Table 1: pattern_frequency_global
+    # Table 1: pattern_frequency_global (no run_id)
     cursor.execute("""
         CREATE TABLE IF NOT EXISTS pattern_frequency_global (
-            run_id TEXT NOT NULL,
             pattern_type TEXT NOT NULL,
             pattern TEXT NOT NULL,
             village_count INTEGER NOT NULL,
             total_villages INTEGER NOT NULL,
             frequency REAL NOT NULL,
             rank INTEGER NOT NULL,
-            PRIMARY KEY (run_id, pattern_type, pattern),
-            FOREIGN KEY (run_id) REFERENCES analysis_runs(run_id)
+            PRIMARY KEY (pattern_type, pattern)
         )
     """)
 
-    # Table 2: pattern_frequency_regional
+    # Table 2: pattern_regional_analysis (merged frequency + tendency, with hierarchical columns)
     cursor.execute("""
-        CREATE TABLE IF NOT EXISTS pattern_frequency_regional (
-            run_id TEXT NOT NULL,
+        CREATE TABLE IF NOT EXISTS pattern_regional_analysis (
             pattern_type TEXT NOT NULL,
             region_level TEXT NOT NULL,
-            region_name TEXT NOT NULL,
-            pattern TEXT NOT NULL,
-            village_count INTEGER NOT NULL,
-            total_villages INTEGER NOT NULL,
-            frequency REAL NOT NULL,
-            rank_within_region INTEGER NOT NULL,
-            PRIMARY KEY (run_id, pattern_type, region_level, region_name, pattern),
-            FOREIGN KEY (run_id) REFERENCES analysis_runs(run_id)
-        )
-    """)
-
-    # Table 3: pattern_tendency
-    cursor.execute("""
-        CREATE TABLE IF NOT EXISTS pattern_tendency (
-            run_id TEXT NOT NULL,
-            pattern_type TEXT NOT NULL,
-            region_level TEXT NOT NULL,
+            city TEXT,
+            county TEXT,
+            township TEXT,
             region_name TEXT NOT NULL,
             pattern TEXT NOT NULL,
             village_count INTEGER NOT NULL,
@@ -617,8 +569,7 @@ def create_morphology_tables(conn: sqlite3.Connection) -> None:
             support_flag INTEGER NOT NULL,
             rank_overrepresented INTEGER,
             rank_underrepresented INTEGER,
-            PRIMARY KEY (run_id, pattern_type, region_level, region_name, pattern),
-            FOREIGN KEY (run_id) REFERENCES analysis_runs(run_id)
+            PRIMARY KEY (pattern_type, region_level, city, county, township, pattern)
         )
     """)
 
@@ -628,7 +579,7 @@ def create_morphology_tables(conn: sqlite3.Connection) -> None:
 
 def create_morphology_indexes(conn: sqlite3.Connection) -> None:
     """
-    Create indexes for morphology tables.
+    Create indexes for morphology tables (optimized schema without run_id).
 
     Args:
         conn: SQLite database connection
@@ -636,38 +587,35 @@ def create_morphology_indexes(conn: sqlite3.Connection) -> None:
     cursor = conn.cursor()
 
     # Indexes for pattern_frequency_global
-    cursor.execute("CREATE INDEX IF NOT EXISTS idx_pattern_global_type ON pattern_frequency_global(run_id, pattern_type)")
-    cursor.execute("CREATE INDEX IF NOT EXISTS idx_pattern_global_pattern ON pattern_frequency_global(run_id, pattern)")
-    cursor.execute("CREATE INDEX IF NOT EXISTS idx_pattern_global_rank ON pattern_frequency_global(run_id, pattern_type, rank)")
-    cursor.execute("CREATE INDEX IF NOT EXISTS idx_pattern_global_freq ON pattern_frequency_global(run_id, pattern_type, frequency DESC)")
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_pattern_global_type ON pattern_frequency_global(pattern_type)")
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_pattern_global_pattern ON pattern_frequency_global(pattern)")
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_pattern_global_rank ON pattern_frequency_global(pattern_type, rank)")
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_pattern_global_freq ON pattern_frequency_global(pattern_type, frequency DESC)")
 
-    # Indexes for pattern_frequency_regional
-    cursor.execute("CREATE INDEX IF NOT EXISTS idx_pattern_regional_type ON pattern_frequency_regional(run_id, pattern_type)")
-    cursor.execute("CREATE INDEX IF NOT EXISTS idx_pattern_regional_level ON pattern_frequency_regional(run_id, region_level)")
-    cursor.execute("CREATE INDEX IF NOT EXISTS idx_pattern_regional_name ON pattern_frequency_regional(run_id, region_name)")
-    cursor.execute("CREATE INDEX IF NOT EXISTS idx_pattern_regional_pattern ON pattern_frequency_regional(run_id, pattern)")
-    cursor.execute("CREATE INDEX IF NOT EXISTS idx_pattern_regional_freq ON pattern_frequency_regional(run_id, pattern_type, region_level, frequency DESC)")
-
-    # Indexes for pattern_tendency
-    cursor.execute("CREATE INDEX IF NOT EXISTS idx_pattern_tendency_type ON pattern_tendency(run_id, pattern_type)")
-    cursor.execute("CREATE INDEX IF NOT EXISTS idx_pattern_tendency_level ON pattern_tendency(run_id, region_level)")
-    cursor.execute("CREATE INDEX IF NOT EXISTS idx_pattern_tendency_pattern ON pattern_tendency(run_id, pattern)")
-    cursor.execute("CREATE INDEX IF NOT EXISTS idx_pattern_tendency_lift ON pattern_tendency(run_id, pattern_type, region_level, lift DESC)")
-    cursor.execute("CREATE INDEX IF NOT EXISTS idx_pattern_tendency_logodds ON pattern_tendency(run_id, pattern_type, region_level, log_odds DESC)")
-    cursor.execute("CREATE INDEX IF NOT EXISTS idx_pattern_tendency_zscore ON pattern_tendency(run_id, pattern_type, region_level, z_score DESC)")
-    cursor.execute("CREATE INDEX IF NOT EXISTS idx_pattern_tendency_support ON pattern_tendency(run_id, support_flag)")
+    # Indexes for pattern_regional_analysis (merged table)
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_pattern_regional_type ON pattern_regional_analysis(pattern_type)")
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_pattern_regional_level ON pattern_regional_analysis(region_level)")
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_pattern_regional_city ON pattern_regional_analysis(city)")
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_pattern_regional_county ON pattern_regional_analysis(county)")
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_pattern_regional_township ON pattern_regional_analysis(township)")
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_pattern_regional_name ON pattern_regional_analysis(region_name)")
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_pattern_regional_pattern ON pattern_regional_analysis(pattern)")
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_pattern_regional_freq ON pattern_regional_analysis(pattern_type, region_level, frequency DESC)")
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_pattern_regional_lift ON pattern_regional_analysis(pattern_type, region_level, lift DESC)")
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_pattern_regional_logodds ON pattern_regional_analysis(pattern_type, region_level, log_odds DESC)")
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_pattern_regional_zscore ON pattern_regional_analysis(pattern_type, region_level, z_score DESC)")
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_pattern_regional_support ON pattern_regional_analysis(support_flag)")
 
     conn.commit()
     logger.info("Morphology indexes created successfully")
 
 
-def save_pattern_frequency_global(conn: sqlite3.Connection, run_id: str, pattern_type: str, df: pd.DataFrame, batch_size: int = 10000) -> None:
+def save_pattern_frequency_global(conn: sqlite3.Connection, pattern_type: str, df: pd.DataFrame, batch_size: int = 10000) -> None:
     """
-    Save global pattern frequency data.
+    Save global pattern frequency data (optimized schema without run_id).
 
     Args:
         conn: SQLite database connection
-        run_id: Run identifier
         pattern_type: Pattern type (e.g., 'suffix_1', 'prefix_2')
         df: DataFrame with columns: pattern, village_count, total_villages, frequency, rank
         batch_size: Number of rows to insert per batch
@@ -676,11 +624,10 @@ def save_pattern_frequency_global(conn: sqlite3.Connection, run_id: str, pattern
 
     # Prepare data for insertion
     df_copy = df.copy()
-    df_copy['run_id'] = run_id
     df_copy['pattern_type'] = pattern_type
 
     # Select and reorder columns
-    columns = ['run_id', 'pattern_type', 'pattern', 'village_count', 'total_villages', 'frequency', 'rank']
+    columns = ['pattern_type', 'pattern', 'village_count', 'total_villages', 'frequency', 'rank']
     data = df_copy[columns].values.tolist()
 
     # Batch insert
@@ -688,8 +635,8 @@ def save_pattern_frequency_global(conn: sqlite3.Connection, run_id: str, pattern
         batch = data[i:i + batch_size]
         cursor.executemany("""
             INSERT OR REPLACE INTO pattern_frequency_global
-            (run_id, pattern_type, pattern, village_count, total_villages, frequency, rank)
-            VALUES (?, ?, ?, ?, ?, ?, ?)
+            (pattern_type, pattern, village_count, total_villages, frequency, rank)
+            VALUES (?, ?, ?, ?, ?, ?)
         """, batch)
 
     conn.commit()
@@ -780,7 +727,6 @@ def save_pattern_tendency(conn: sqlite3.Connection, run_id: str, df: pd.DataFram
 
 def persist_morphology_results_to_db(
     db_path: str,
-    run_id: str,
     results_dir: Path,
     suffix_lengths: list,
     prefix_lengths: list,
@@ -788,11 +734,10 @@ def persist_morphology_results_to_db(
     batch_size: int = 10000
 ) -> None:
     """
-    Main function to persist morphology analysis results to database.
+    Main function to persist morphology analysis results to database (optimized schema without run_id).
 
     Args:
         db_path: Path to SQLite database
-        run_id: Run identifier
         results_dir: Directory containing CSV result files
         suffix_lengths: List of suffix n-gram lengths
         prefix_lengths: List of prefix n-gram lengths
@@ -804,7 +749,7 @@ def persist_morphology_results_to_db(
     if region_levels is None:
         region_levels = ['city', 'county', 'township']
 
-    logger.info(f"Starting morphology database persistence for run_id={run_id}")
+    logger.info(f"Starting morphology database persistence")
     start_time = time.time()
 
     # Build list of pattern types
@@ -837,34 +782,88 @@ def persist_morphology_results_to_db(
             global_freq_df = pd.read_csv(global_freq_file)
             logger.info(f"Loaded {len(global_freq_df)} global frequency records")
 
-            # Save global frequency
-            save_pattern_frequency_global(conn, run_id, pattern_type, global_freq_df, batch_size)
+            # Save global frequency (without run_id)
+            save_pattern_frequency_global(conn, pattern_type, global_freq_df, batch_size)
 
-            # Load and combine regional frequency files
+            # Load and merge regional frequency + tendency data
             regional_freq_dfs = []
+            tendency_dfs = []
+
             for level in region_levels:
+                # Load frequency
                 regional_freq_file = results_dir / f"{pattern_type}_frequency_{level}.csv"
                 if regional_freq_file.exists():
                     df = pd.read_csv(regional_freq_file)
                     regional_freq_dfs.append(df)
                     logger.info(f"Loaded {len(df)} {level}-level frequency records")
 
-            if regional_freq_dfs:
-                regional_freq_df = pd.concat(regional_freq_dfs, ignore_index=True)
-                save_pattern_frequency_regional(conn, run_id, pattern_type, regional_freq_df, batch_size)
-
-            # Load and combine tendency files
-            tendency_dfs = []
-            for level in region_levels:
+                # Load tendency
                 tendency_file = results_dir / f"{pattern_type}_tendency_{level}.csv"
                 if tendency_file.exists():
                     df = pd.read_csv(tendency_file)
                     tendency_dfs.append(df)
                     logger.info(f"Loaded {len(df)} {level}-level tendency records")
 
-            if tendency_dfs:
+            # Merge frequency and tendency data
+            if regional_freq_dfs and tendency_dfs:
+                regional_freq_df = pd.concat(regional_freq_dfs, ignore_index=True)
                 tendency_df = pd.concat(tendency_dfs, ignore_index=True)
-                save_pattern_tendency(conn, run_id, tendency_df, batch_size)
+
+                # Merge on common keys
+                merge_keys = ['region_level', 'city', 'county', 'township', 'region_name', 'pattern']
+                merged_df = pd.merge(
+                    regional_freq_df,
+                    tendency_df,
+                    on=merge_keys,
+                    how='inner',
+                    suffixes=('_freq', '_tend')
+                )
+
+                # Select final columns for pattern_regional_analysis
+                merged_df['pattern_type'] = pattern_type
+
+                # Handle column names with suffixes from merge
+                # Tendency columns have all the data we need (includes frequency data)
+                final_df = pd.DataFrame({
+                    'pattern_type': merged_df['pattern_type'],
+                    'region_level': merged_df['region_level'],
+                    'city': merged_df['city'],
+                    'county': merged_df['county'],
+                    'township': merged_df['township'],
+                    'region_name': merged_df['region_name'],
+                    'pattern': merged_df['pattern'],
+                    'village_count': merged_df['village_count_tend'],
+                    'total_villages': merged_df['total_villages_tend'],
+                    'frequency': merged_df['frequency_tend'],
+                    'rank_within_region': merged_df['rank_within_region_tend'],
+                    'global_village_count': merged_df['global_village_count'],
+                    'global_frequency': merged_df['global_frequency'],
+                    'lift': merged_df['lift'],
+                    'log_lift': merged_df['log_lift'],
+                    'log_odds': merged_df['log_odds'],
+                    'z_score': merged_df['z_score'],
+                    'support_flag': merged_df['support_flag'],
+                    'rank_overrepresented': merged_df['rank_overrepresented'],
+                    'rank_underrepresented': merged_df['rank_underrepresented']
+                })
+
+                # Write to pattern_regional_analysis
+                cursor = conn.cursor()
+                data = final_df.values.tolist()
+
+                for i in range(0, len(data), batch_size):
+                    batch = data[i:i + batch_size]
+                    cursor.executemany("""
+                        INSERT OR REPLACE INTO pattern_regional_analysis
+                        (pattern_type, region_level, city, county, township, region_name, pattern,
+                         village_count, total_villages, frequency, rank_within_region,
+                         global_village_count, global_frequency, lift, log_lift, log_odds,
+                         z_score, support_flag, rank_overrepresented, rank_underrepresented)
+                        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    """, batch)
+
+                conn.commit()
+                logger.info(f"Saved {len(data)} merged regional analysis records for {pattern_type}")
 
         # Step 3: Create indexes
         logger.info("\nCreating morphology indexes...")
@@ -1281,9 +1280,11 @@ def create_feature_materialization_tables(conn: sqlite3.Connection) -> None:
 
     Creates 4 tables:
     - village_features: Materialized village-level features
-    - city_aggregates: City-level aggregates
-    - county_aggregates: County-level aggregates
-    - town_aggregates: Town-level aggregates
+    - city_aggregates: City-level aggregates (kept for structure, computed dynamically)
+    - county_aggregates: County-level aggregates (kept for structure, computed dynamically)
+    - town_aggregates: Town-level aggregates (kept for structure, computed dynamically)
+
+    Note: Aggregate tables are kept empty and computed dynamically at runtime.
 
     Args:
         conn: SQLite database connection
@@ -1293,7 +1294,7 @@ def create_feature_materialization_tables(conn: sqlite3.Connection) -> None:
     # Table 1: village_features
     cursor.execute("""
         CREATE TABLE IF NOT EXISTS village_features (
-            run_id TEXT NOT NULL,
+            village_id TEXT PRIMARY KEY,
             city TEXT,
             county TEXT,
             town TEXT,
@@ -1319,12 +1320,11 @@ def create_feature_materialization_tables(conn: sqlite3.Connection) -> None:
             kmeans_cluster_id INTEGER,
             dbscan_cluster_id INTEGER,
             gmm_cluster_id INTEGER,
-            has_valid_chars INTEGER NOT NULL DEFAULT 1,
-            created_at REAL NOT NULL
+            has_valid_chars INTEGER NOT NULL DEFAULT 1
         )
     """)
 
-    # Table 2: city_aggregates
+    # Table 2: city_aggregates (structure kept, not populated)
     cursor.execute("""
         CREATE TABLE IF NOT EXISTS city_aggregates (
             run_id TEXT NOT NULL,
@@ -1357,7 +1357,7 @@ def create_feature_materialization_tables(conn: sqlite3.Connection) -> None:
         )
     """)
 
-    # Table 3: county_aggregates
+    # Table 3: county_aggregates (structure kept, not populated)
     cursor.execute("""
         CREATE TABLE IF NOT EXISTS county_aggregates (
             run_id TEXT NOT NULL,
@@ -1391,7 +1391,7 @@ def create_feature_materialization_tables(conn: sqlite3.Connection) -> None:
         )
     """)
 
-    # Table 4: town_aggregates
+    # Table 4: town_aggregates (structure kept, not populated)
     cursor.execute("""
         CREATE TABLE IF NOT EXISTS town_aggregates (
             run_id TEXT NOT NULL,
@@ -1440,7 +1440,6 @@ def create_feature_materialization_indexes(conn: sqlite3.Connection) -> None:
     cursor = conn.cursor()
 
     # Indexes for village_features
-    cursor.execute("CREATE INDEX IF NOT EXISTS idx_village_features_run_id ON village_features(run_id)")
     cursor.execute("CREATE INDEX IF NOT EXISTS idx_village_features_city ON village_features(city)")
     cursor.execute("CREATE INDEX IF NOT EXISTS idx_village_features_county ON village_features(county)")
     cursor.execute("CREATE INDEX IF NOT EXISTS idx_village_features_town ON village_features(town)")
@@ -1453,7 +1452,7 @@ def create_feature_materialization_indexes(conn: sqlite3.Connection) -> None:
     cursor.execute("CREATE INDEX IF NOT EXISTS idx_village_features_dbscan_cluster ON village_features(dbscan_cluster_id)")
     cursor.execute("CREATE INDEX IF NOT EXISTS idx_village_features_gmm_cluster ON village_features(gmm_cluster_id)")
 
-    # Indexes for aggregates
+    # Indexes for aggregates (kept for structure compatibility)
     cursor.execute("CREATE INDEX IF NOT EXISTS idx_city_aggregates_run_id ON city_aggregates(run_id)")
     cursor.execute("CREATE INDEX IF NOT EXISTS idx_county_aggregates_run_id ON county_aggregates(run_id)")
     cursor.execute("CREATE INDEX IF NOT EXISTS idx_town_aggregates_run_id ON town_aggregates(run_id)")
@@ -1480,8 +1479,7 @@ def create_spatial_analysis_tables(conn: sqlite3.Connection) -> None:
     # Table 1: village_spatial_features
     cursor.execute("""
         CREATE TABLE IF NOT EXISTS village_spatial_features (
-            run_id TEXT NOT NULL,
-            village_id TEXT NOT NULL,
+            village_id TEXT PRIMARY KEY,
             village_name TEXT NOT NULL,
             city TEXT,
             county TEXT,
@@ -1497,9 +1495,7 @@ def create_spatial_analysis_tables(conn: sqlite3.Connection) -> None:
             isolation_score REAL,
             is_isolated INTEGER,
             spatial_cluster_id INTEGER,
-            cluster_size INTEGER,
-            created_at REAL NOT NULL,
-            PRIMARY KEY (run_id, village_id)
+            cluster_size INTEGER
         )
     """)
 
@@ -1674,27 +1670,22 @@ def write_spatial_features(conn: sqlite3.Connection, run_id: str, features_df: p
 
     Args:
         conn: SQLite database connection
-        run_id: Unique run identifier
+        run_id: Unique run identifier (kept for backward compatibility, not used)
         features_df: DataFrame with spatial features
     """
-    import time
-
     logger.info(f"Writing {len(features_df)} village spatial features to database")
 
-    # Prepare data
+    # Prepare data (no run_id or created_at)
     features_df = features_df.copy()
-    features_df['run_id'] = run_id
-    features_df['created_at'] = time.time()
 
     # Select columns in correct order
     columns = [
-        'run_id', 'village_id', 'village_name', 'city', 'county', 'town',
+        'village_id', 'village_name', 'city', 'county', 'town',
         'longitude', 'latitude',
         'nn_distance_1', 'nn_distance_5', 'nn_distance_10',
         'local_density_1km', 'local_density_5km', 'local_density_10km',
         'isolation_score', 'is_isolated',
-        'spatial_cluster_id', 'cluster_size',
-        'created_at'
+        'spatial_cluster_id', 'cluster_size'
     ]
 
     # Write to database
@@ -1858,5 +1849,178 @@ def write_spatial_tendency_integration(conn: sqlite3.Connection, run_id: str, in
     integration_df[columns].to_sql('spatial_tendency_integration', conn, if_exists='append', index=False)
 
     logger.info("Spatial-tendency integration written successfully")
+
+
+def write_char_regional_analysis(conn: sqlite3.Connection, df: pd.DataFrame, batch_size: int = 10000) -> None:
+    """
+    Write character regional analysis data to optimized table.
+
+    This function writes to the merged char_regional_analysis table which combines
+    frequency and tendency data with hierarchical columns (city, county, township).
+
+    Args:
+        conn: SQLite database connection
+        df: DataFrame with columns:
+            - region_level, city, county, township, region_name, char
+            - village_count, total_villages, frequency, rank_within_region
+            - global_village_count, global_frequency
+            - lift, log_lift, log_odds, z_score, support_flag
+            - rank_overrepresented, rank_underrepresented
+        batch_size: Number of rows to insert per batch
+    """
+    cursor = conn.cursor()
+
+    logger.info(f"Writing {len(df)} rows to char_regional_analysis table")
+
+    # Prepare data for insertion
+    df_copy = df.copy()
+
+    # Handle NaN values for optional columns
+    for col in ['z_score', 'rank_overrepresented', 'rank_underrepresented', 'city', 'county', 'township']:
+        if col in df_copy.columns:
+            df_copy[col] = df_copy[col].where(pd.notna(df_copy[col]), None)
+
+    # Select and reorder columns to match table schema
+    columns = [
+        'region_level', 'city', 'county', 'township', 'region_name', 'char',
+        'village_count', 'total_villages', 'frequency', 'rank_within_region',
+        'global_village_count', 'global_frequency',
+        'lift', 'log_lift', 'log_odds', 'z_score', 'support_flag',
+        'rank_overrepresented', 'rank_underrepresented'
+    ]
+
+    # Ensure all columns exist
+    for col in columns:
+        if col not in df_copy.columns:
+            logger.warning(f"Column {col} not found in DataFrame, adding as None")
+            df_copy[col] = None
+
+    data = df_copy[columns].values.tolist()
+
+    # Batch insert
+    for i in range(0, len(data), batch_size):
+        batch = data[i:i + batch_size]
+        cursor.executemany("""
+            INSERT OR REPLACE INTO char_regional_analysis
+            (region_level, city, county, township, region_name, char,
+             village_count, total_villages, frequency, rank_within_region,
+             global_village_count, global_frequency,
+             lift, log_lift, log_odds, z_score, support_flag,
+             rank_overrepresented, rank_underrepresented)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        """, batch)
+
+    conn.commit()
+    logger.info(f"Successfully wrote {len(data)} rows to char_regional_analysis")
+
+
+def write_pattern_regional_analysis(conn: sqlite3.Connection, df: pd.DataFrame, batch_size: int = 10000) -> None:
+    """
+    Write pattern regional analysis data to optimized table.
+
+    Args:
+        conn: SQLite database connection
+        df: DataFrame with pattern analysis data including hierarchical columns
+        batch_size: Number of rows to insert per batch
+    """
+    cursor = conn.cursor()
+
+    logger.info(f"Writing {len(df)} rows to pattern_regional_analysis table")
+
+    # Prepare data for insertion
+    df_copy = df.copy()
+
+    # Handle NaN values for optional columns
+    for col in ['z_score', 'rank_overrepresented', 'rank_underrepresented', 'city', 'county', 'township']:
+        if col in df_copy.columns:
+            df_copy[col] = df_copy[col].where(pd.notna(df_copy[col]), None)
+
+    # Select and reorder columns
+    columns = [
+        'pattern_type', 'region_level', 'city', 'county', 'township', 'region_name', 'pattern',
+        'village_count', 'total_villages', 'frequency', 'rank_within_region',
+        'global_village_count', 'global_frequency',
+        'lift', 'log_lift', 'log_odds', 'z_score', 'support_flag',
+        'rank_overrepresented', 'rank_underrepresented'
+    ]
+
+    # Ensure all columns exist
+    for col in columns:
+        if col not in df_copy.columns:
+            logger.warning(f"Column {col} not found in DataFrame, adding as None")
+            df_copy[col] = None
+
+    data = df_copy[columns].values.tolist()
+
+    # Batch insert
+    for i in range(0, len(data), batch_size):
+        batch = data[i:i + batch_size]
+        cursor.executemany("""
+            INSERT OR REPLACE INTO pattern_regional_analysis
+            (pattern_type, region_level, city, county, township, region_name, pattern,
+             village_count, total_villages, frequency, rank_within_region,
+             global_village_count, global_frequency,
+             lift, log_lift, log_odds, z_score, support_flag,
+             rank_overrepresented, rank_underrepresented)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        """, batch)
+
+    conn.commit()
+    logger.info(f"Successfully wrote {len(data)} rows to pattern_regional_analysis")
+
+
+def write_semantic_regional_analysis(conn: sqlite3.Connection, df: pd.DataFrame, batch_size: int = 10000) -> None:
+    """
+    Write semantic regional analysis data to optimized table.
+
+    Args:
+        conn: SQLite database connection
+        df: DataFrame with semantic analysis data including hierarchical columns
+        batch_size: Number of rows to insert per batch
+    """
+    cursor = conn.cursor()
+
+    logger.info(f"Writing {len(df)} rows to semantic_regional_analysis table")
+
+    # Prepare data for insertion
+    df_copy = df.copy()
+
+    # Handle NaN values for optional columns
+    for col in ['z_score', 'rank_overrepresented', 'rank_underrepresented', 'city', 'county', 'township']:
+        if col in df_copy.columns:
+            df_copy[col] = df_copy[col].where(pd.notna(df_copy[col]), None)
+
+    # Select and reorder columns
+    columns = [
+        'region_level', 'city', 'county', 'township', 'region_name', 'category',
+        'vtf_count', 'total_villages', 'frequency', 'rank_within_region',
+        'global_vtf_count', 'global_frequency',
+        'lift', 'log_lift', 'log_odds', 'z_score', 'support_flag',
+        'rank_overrepresented', 'rank_underrepresented'
+    ]
+
+    # Ensure all columns exist
+    for col in columns:
+        if col not in df_copy.columns:
+            logger.warning(f"Column {col} not found in DataFrame, adding as None")
+            df_copy[col] = None
+
+    data = df_copy[columns].values.tolist()
+
+    # Batch insert
+    for i in range(0, len(data), batch_size):
+        batch = data[i:i + batch_size]
+        cursor.executemany("""
+            INSERT OR REPLACE INTO semantic_regional_analysis
+            (region_level, city, county, township, region_name, category,
+             vtf_count, total_villages, frequency, rank_within_region,
+             global_vtf_count, global_frequency,
+             lift, log_lift, log_odds, z_score, support_flag,
+             rank_overrepresented, rank_underrepresented)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        """, batch)
+
+    conn.commit()
+    logger.info(f"Successfully wrote {len(data)} rows to semantic_regional_analysis")
 
 

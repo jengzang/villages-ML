@@ -74,7 +74,7 @@ def compute_char_frequency_by_region(
     region_level: str
 ) -> pd.DataFrame:
     """
-    Compute character frequencies by region.
+    Compute character frequencies by region with hierarchical grouping.
 
     Args:
         villages_df: DataFrame with columns [市级, 区县级, 乡镇级, char_set_json, is_valid]
@@ -83,7 +83,10 @@ def compute_char_frequency_by_region(
     Returns:
         DataFrame with columns:
         - region_level: Level name
-        - region_name: Region name
+        - city: City name (市级)
+        - county: County name (区县级)
+        - township: Township name (乡镇级)
+        - region_name: Region name (for display/backward compatibility)
         - char: Character
         - village_count: Villages in region containing char
         - total_villages: Total valid villages in region
@@ -104,15 +107,40 @@ def compute_char_frequency_by_region(
     # Filter to valid villages
     valid_df = villages_df[villages_df['is_valid']].copy()
 
-    logger.info(f"Computing {region_level}-level frequencies")
+    logger.info(f"Computing {region_level}-level frequencies with hierarchical grouping")
 
     results = []
 
-    # Group by region
-    for region_name, group in valid_df.groupby(region_col):
-        if pd.isna(region_name):
+    # Group by hierarchical key to separate duplicate place names
+    # For city level: group by 市级
+    # For county level: group by (市级, 区县级)
+    # For township level: group by (市级, 区县级, 乡镇级)
+    if region_level == 'city':
+        group_cols = ['市级']
+    elif region_level == 'county':
+        group_cols = ['市级', '区县级']
+    else:  # township
+        group_cols = ['市级', '区县级', '乡镇级']
+
+    # Group by hierarchical key
+    for group_key, group in valid_df.groupby(group_cols):
+        # Handle single vs multiple group columns
+        if region_level == 'city':
+            city = group_key
+            county = None
+            township = None
+        elif region_level == 'county':
+            city, county = group_key
+            township = None
+        else:  # township
+            city, county, township = group_key
+
+        # Skip if any key is NaN
+        if pd.isna(city) or (region_level in ['county', 'township'] and pd.isna(county)) or (region_level == 'township' and pd.isna(township)):
             continue
 
+        # Get region name for display
+        region_name = group[region_col].iloc[0]
         total_villages = len(group)
 
         # Count characters in this region
@@ -126,6 +154,9 @@ def compute_char_frequency_by_region(
         for char, count in char_counts.items():
             results.append({
                 'region_level': region_level,
+                'city': city,
+                'county': county,
+                'township': township,
                 'region_name': region_name,
                 'char': char,
                 'village_count': count,
@@ -135,15 +166,26 @@ def compute_char_frequency_by_region(
 
     df = pd.DataFrame(results)
 
-    # Add rank within each region
-    df['rank_within_region'] = df.groupby('region_name')['frequency'].rank(
+    # Add rank within each hierarchical region (not just by region_name)
+    # Group by hierarchical key for ranking
+    if region_level == 'city':
+        rank_group_cols = ['city']
+    elif region_level == 'county':
+        rank_group_cols = ['city', 'county']
+    else:  # township
+        rank_group_cols = ['city', 'county', 'township']
+
+    df['rank_within_region'] = df.groupby(rank_group_cols)['frequency'].rank(
         ascending=False, method='dense'
     ).astype(int)
 
-    # Sort by region and frequency
-    df = df.sort_values(['region_name', 'frequency'], ascending=[True, False])
+    # Sort by hierarchical key and frequency
+    sort_cols = rank_group_cols + ['frequency']
+    df = df.sort_values(sort_cols, ascending=[True] * len(rank_group_cols) + [False])
 
-    logger.info(f"Computed frequencies for {df['region_name'].nunique()} {region_level} regions")
+    # Count unique regions (by hierarchical key, not just region_name)
+    unique_regions = df.groupby(rank_group_cols).ngroups
+    logger.info(f"Computed frequencies for {unique_regions} {region_level} regions (hierarchically separated)")
 
     return df
 

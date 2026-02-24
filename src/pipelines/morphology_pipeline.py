@@ -78,7 +78,6 @@ class MorphologyPipeline:
             from ..data.db_writer import persist_morphology_results_to_db
             persist_morphology_results_to_db(
                 db_path=self.config.db_path,
-                run_id=self.config.run_id,
                 results_dir=self.output_dir,
                 suffix_lengths=self.suffix_lengths,
                 prefix_lengths=self.prefix_lengths,
@@ -194,10 +193,6 @@ class MorphologyPipeline:
                 min_regional_support=self.config.tendency.min_regional_support,
                 compute_z=self.config.tendency.compute_z_score
             )
-
-            # Add run_id and pattern_type
-            tendency_df.insert(0, 'run_id', self.config.run_id)
-            tendency_df.insert(1, 'pattern_type', pattern_col)
 
             # Save tendency
             output_path = self.output_dir / f"{pattern_col}_tendency_{level}.csv"

@@ -50,7 +50,10 @@
       "Bash(find .:*)",
       "Bash(http_proxy=\"\" https_proxy=\"\" curl:*)",
       "Bash(./start_api.sh:*)",
-      "Bash(pkill:*)"
+      "Bash(pkill:*)",
+      "Bash(cd:*)",
+      "Bash(PYTHONPATH=/c/Users/joengzaang/PycharmProjects/villages-ML python:*)",
+      "Bash(iconv:*)"
     ]
   }
 }

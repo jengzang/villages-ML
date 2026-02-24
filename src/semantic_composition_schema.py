@@ -58,14 +58,14 @@ SEMANTIC_COMPOSITION_SCHEMA = {
 
     'village_semantic_structure': """
         CREATE TABLE IF NOT EXISTS village_semantic_structure (
-            村委会 TEXT NOT NULL,
-            自然村 TEXT NOT NULL,
+            village_id TEXT PRIMARY KEY,
+            村委会 TEXT,
+            自然村 TEXT,
             semantic_sequence TEXT NOT NULL,
             sequence_length INTEGER NOT NULL,
             has_modifier INTEGER NOT NULL,
             has_head INTEGER NOT NULL,
-            has_settlement INTEGER NOT NULL,
-            PRIMARY KEY (村委会, 自然村)
+            has_settlement INTEGER NOT NULL
         )
     """,
 
@@ -90,6 +90,7 @@ SEMANTIC_COMPOSITION_INDEXES = [
     "CREATE INDEX IF NOT EXISTS idx_semantic_patterns_freq ON semantic_composition_patterns(frequency DESC)",
     "CREATE INDEX IF NOT EXISTS idx_semantic_conflicts_type ON semantic_conflicts(conflict_type)",
     "CREATE INDEX IF NOT EXISTS idx_semantic_pmi_score ON semantic_pmi(pmi DESC)",
+    "CREATE INDEX IF NOT EXISTS idx_village_semantic_id ON village_semantic_structure(village_id)",
 ]
 
 

@@ -45,7 +45,7 @@ def populate_village_ngrams(db_path: str = 'data/villages.db', batch_size: int =
 
     # Load villages in batches
     cursor.execute("""
-        SELECT 行政村, 自然村_去前缀
+        SELECT village_id, 村委会, 自然村_去前缀
         FROM 广东省自然村_预处理
         WHERE 有效 = 1
     """)
@@ -60,10 +60,10 @@ def populate_village_ngrams(db_path: str = 'data/villages.db', batch_size: int =
 
     with tqdm(total=len(villages), desc="Extracting n-grams") as pbar:
         for row in villages:
-            village_committee, village_name = row
+            village_id, village_committee, village_name = row
 
             # Skip if either field is NULL
-            if not village_name or not village_committee:
+            if not village_name or not village_committee or not village_id:
                 pbar.update(1)
                 continue
 
@@ -84,6 +84,7 @@ def populate_village_ngrams(db_path: str = 'data/villages.db', batch_size: int =
             trigrams_json = json.dumps(trigrams_all, ensure_ascii=False) if trigrams_all else None
 
             batch.append((
+                village_id,
                 village_committee,
                 village_name,
                 2,  # n for bigrams
@@ -102,8 +103,8 @@ def populate_village_ngrams(db_path: str = 'data/villages.db', batch_size: int =
             if len(batch) >= batch_size:
                 insert_cursor.executemany("""
                     INSERT OR REPLACE INTO village_ngrams
-                    (村委会, 自然村, n, bigrams, trigrams, prefix_bigram, suffix_bigram, prefix_trigram, suffix_trigram)
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    (village_id, 村委会, 自然村, n, bigrams, trigrams, prefix_bigram, suffix_bigram, prefix_trigram, suffix_trigram)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """, batch)
                 conn.commit()
                 batch = []
@@ -112,8 +113,8 @@ def populate_village_ngrams(db_path: str = 'data/villages.db', batch_size: int =
     if batch:
         insert_cursor.executemany("""
             INSERT OR REPLACE INTO village_ngrams
-            (村委会, 自然村, n, bigrams, trigrams, prefix_bigram, suffix_bigram, prefix_trigram, suffix_trigram)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+            (village_id, 村委会, 自然村, n, bigrams, trigrams, prefix_bigram, suffix_bigram, prefix_trigram, suffix_trigram)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """, batch)
         conn.commit()
 

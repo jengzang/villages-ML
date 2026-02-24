@@ -166,7 +166,7 @@ def write_village_features(conn: sqlite3.Connection, run_id: str, df: pd.DataFra
 
     Args:
         conn: SQLite database connection
-        run_id: Run identifier
+        run_id: Run identifier (kept for backward compatibility, not used)
         df: DataFrame with village features
         batch_size: Batch size for insertion
     """
@@ -175,22 +175,47 @@ def write_village_features(conn: sqlite3.Connection, run_id: str, df: pd.DataFra
 
     logger.info(f"Writing {len(df)} village features to database")
 
-    cursor = conn.cursor()
-    created_at = time.time()
+    # Get village_id mapping from preprocessed table
+    logger.info("Loading village_id mapping from preprocessed table...")
+    id_mapping_query = """
+    SELECT
+        市级, 区县级, 乡镇级, 村委会, 自然村_去前缀,
+        village_id
+    FROM 广东省自然村_预处理
+    WHERE village_id IS NOT NULL
+    """
+    id_mapping = pd.read_sql(id_mapping_query, conn)
 
-    # Prepare data for insertion
+    # Merge village_id into features dataframe
+    # Match on: city, county, town, village_committee, village_name
+    df = df.merge(
+        id_mapping,
+        left_on=['city', 'county', 'town', 'village_committee', 'village_name'],
+        right_on=['市级', '区县级', '乡镇级', '村委会', '自然村_去前缀'],
+        how='left'
+    )
+
+    # Drop the Chinese column names from merge
+    df = df.drop(columns=['市级', '区县级', '乡镇级', '村委会', '自然村_去前缀'], errors='ignore')
+
+    # Check coverage
+    null_count = df['village_id'].isna().sum()
+    if null_count > 0:
+        logger.warning(f"{null_count} villages could not be mapped to village_id")
+
+    logger.info(f"Successfully mapped village_id for {len(df) - null_count} villages")
+
+    cursor = conn.cursor()
+
+    # Prepare data for insertion (now includes village_id, no run_id/created_at)
     columns = [
-        'run_id', 'city', 'county', 'town', 'village_committee', 'village_name', 'pinyin',
+        'village_id', 'city', 'county', 'town', 'village_committee', 'village_name', 'pinyin',
         'name_length', 'suffix_1', 'suffix_2', 'suffix_3', 'prefix_1', 'prefix_2', 'prefix_3',
         'sem_mountain', 'sem_water', 'sem_settlement', 'sem_direction', 'sem_clan',
         'sem_symbolic', 'sem_agriculture', 'sem_vegetation', 'sem_infrastructure',
         'kmeans_cluster_id', 'dbscan_cluster_id', 'gmm_cluster_id',
-        'has_valid_chars', 'created_at'
+        'has_valid_chars'
     ]
-
-    # Add run_id and created_at
-    df['run_id'] = run_id
-    df['created_at'] = created_at
 
     # Insert in batches
     total_batches = (len(df) + batch_size - 1) // batch_size

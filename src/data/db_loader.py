@@ -53,7 +53,7 @@ def validate_database_schema(conn: sqlite3.Connection, use_preprocessed: bool = 
 
     # Required columns depend on table type
     if use_preprocessed:
-        required_columns = {'市级', '区县级', '乡镇级', '自然村_去前缀', '有效'}
+        required_columns = {'市级', '区县级', '乡镇级', '自然村_去前缀'}
     else:
         required_columns = {'市级', '区县级', '乡镇级', '自然村'}
 
@@ -81,7 +81,7 @@ def get_total_village_count(conn: sqlite3.Connection, use_preprocessed: bool = T
     cursor = conn.cursor()
 
     if use_preprocessed:
-        cursor.execute("SELECT COUNT(*) FROM 广东省自然村_预处理 WHERE 有效 = 1")
+        cursor.execute("SELECT COUNT(*) FROM 广东省自然村_预处理")
     else:
         cursor.execute("SELECT COUNT(*) FROM 广东省自然村")
 
@@ -117,7 +117,7 @@ def load_villages(
     if use_preprocessed:
         table_name = '广东省自然村_预处理'
         village_col = '自然村_去前缀'
-        base_conditions = ['有效 = 1']  # Only load valid villages
+        base_conditions = []  # No filtering needed for preprocessed table
     else:
         table_name = '广东省自然村'
         village_col = '自然村'

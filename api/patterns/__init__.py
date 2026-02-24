@@ -67,47 +67,82 @@ def get_global_pattern_frequency(
 
 @router.get("/frequency/regional")
 def get_regional_pattern_frequency(
-    region_level: str = Query(..., description="区域级别"),
-    region_name: Optional[str] = Query(None, description="区域名称"),
+    region_level: str = Query(..., description="区域级别", pattern="^(city|county|township)$"),
+    region_name: Optional[str] = Query(None, description="区域名称（可选，用于向后兼容）"),
+    city: Optional[str] = Query(None, description="市级（可选）"),
+    county: Optional[str] = Query(None, description="区县级（可选）"),
+    township: Optional[str] = Query(None, description="乡镇级（可选）"),
     pattern_type: Optional[str] = Query(None, description="模式类型"),
     top_k: int = Query(50, ge=1, le=500, description="返回Top K"),
     db: sqlite3.Connection = Depends(get_db)
 ):
     """
-    获取区域模式频率
-    Get regional pattern frequencies
+    获取区域模式频率（支持层级查询）
+    Get regional pattern frequencies with hierarchical filtering
+
+    支持两种查询方式：
+    1. 层级查询：使用 city/county/township 参数精确指定位置
+    2. 名称查询：使用 region_name 参数（可能返回多个重复地名的数据）
 
     Args:
-        region_level: 区域级别（city/county/town）
-        region_name: 区域名称（可选）
+        region_level: 区域级别（city/county/township）
+        region_name: 区域名称（可选，向后兼容）
+        city: 市级名称（可选）
+        county: 区县级名称（可选）
+        township: 乡镇级名称（可选）
         pattern_type: 模式类型（可选）
         top_k: 返回Top K
 
     Returns:
         List[dict]: 区域模式频率列表
+
+    Examples:
+        # 精确查询特定位置
+        ?region_level=township&city=清远市&county=清新区&township=太平镇&top_k=50
+
+        # 查询所有同名地点
+        ?region_level=township&region_name=太平镇&top_k=50
     """
     query = """
         SELECT
             region_level,
+            city,
+            county,
+            township,
             region_name,
             pattern,
             pattern_type,
             frequency,
             rank_within_region as rank_in_region
-        FROM pattern_frequency_regional
+        FROM pattern_regional_analysis
         WHERE region_level = ?
     """
     params = [region_level]
 
+    # 层级过滤（优先使用）
+    if city is not None:
+        query += " AND city = ?"
+        params.append(city)
+
+    if county is not None:
+        query += " AND county = ?"
+        params.append(county)
+
+    if township is not None:
+        query += " AND township = ?"
+        params.append(township)
+
+    # 名称过滤（向后兼容）
     if region_name is not None:
         query += " AND region_name = ?"
         params.append(region_name)
 
+    # 模式类型过滤
     if pattern_type is not None:
         query += " AND pattern_type = ?"
         params.append(pattern_type)
 
-    query += " ORDER BY frequency DESC LIMIT ?"
+    query += " ORDER BY city, county, township, frequency DESC LIMIT ?"
     params.append(top_k)
 
     results = execute_query(db, query, tuple(params))
@@ -123,53 +158,94 @@ def get_regional_pattern_frequency(
 
 @router.get("/tendency")
 def get_pattern_tendency(
-    run_id: Optional[str] = Query(None, description="分析运行ID（留空使用活跃版本）"),
+    region_level: str = Query(..., description="区域级别", pattern="^(city|county|township)$"),
+    region_name: Optional[str] = Query(None, description="区域名称（可选，用于向后兼容）"),
+    city: Optional[str] = Query(None, description="市级（可选）"),
+    county: Optional[str] = Query(None, description="区县级（可选）"),
+    township: Optional[str] = Query(None, description="乡镇级（可选）"),
     pattern: Optional[str] = Query(None, description="模式"),
-    region_level: str = Query("county", description="区域级别"),
+    pattern_type: Optional[str] = Query(None, description="模式类型"),
     min_tendency: Optional[float] = Query(None, description="最小倾向值"),
     limit: int = Query(100, ge=1, le=1000, description="返回记录数"),
     db: sqlite3.Connection = Depends(get_db)
 ):
     """
-    获取模式倾向性
-    Get pattern tendency scores
+    获取模式倾向性（支持层级查询）
+    Get pattern tendency scores with hierarchical filtering
+
+    支持两种查询方式：
+    1. 层级查询：使用 city/county/township 参数精确指定位置
+    2. 名称查询：使用 region_name 参数（可能返回多个重复地名的数据）
 
     Args:
+        region_level: 区域级别（city/county/township）
+        region_name: 区域名称（可选，向后兼容）
+        city: 市级名称（可选）
+        county: 区县级名称（可选）
+        township: 乡镇级名称（可选）
         pattern: 模式（可选）
-        region_level: 区域级别
+        pattern_type: 模式类型（可选）
         min_tendency: 最小倾向值
         limit: 返回记录数
 
     Returns:
         List[dict]: 模式倾向性列表
-    """
-    # 如果未指定run_id，使用活跃版本
-    if run_id is None:
-        run_id = run_id_manager.get_active_run_id("patterns")
 
+    Examples:
+        # 精确查询特定位置的高倾向模式
+        ?region_level=township&city=清远市&county=清新区&township=太平镇&min_tendency=2.0
+
+        # 查询所有同名地点的倾向性
+        ?region_level=township&region_name=太平镇&min_tendency=1.5
+    """
     query = """
         SELECT
             region_level,
+            city,
+            county,
+            township,
             region_name,
             pattern,
             pattern_type,
             lift as tendency_score,
             frequency,
             global_frequency
-        FROM pattern_tendency
-        WHERE run_id = ? AND region_level = ?
+        FROM pattern_regional_analysis
+        WHERE region_level = ?
     """
-    params = [run_id, region_level]
+    params = [region_level]
+
+    # 层级过滤（优先使用）
+    if city is not None:
+        query += " AND city = ?"
+        params.append(city)
+
+    if county is not None:
+        query += " AND county = ?"
+        params.append(county)
+
+    if township is not None:
+        query += " AND township = ?"
+        params.append(township)
+
+    # 名称过滤（向后兼容）
+    if region_name is not None:
+        query += " AND region_name = ?"
+        params.append(region_name)
 
     if pattern is not None:
         query += " AND pattern = ?"
         params.append(pattern)
 
+    if pattern_type is not None:
+        query += " AND pattern_type = ?"
+        params.append(pattern_type)
+
     if min_tendency is not None:
-        query += " AND tendency_score >= ?"
+        query += " AND lift >= ?"
         params.append(min_tendency)
 
-    query += " ORDER BY tendency_score DESC LIMIT ?"
+    query += " ORDER BY lift DESC LIMIT ?"
     params.append(limit)
 
     results = execute_query(db, query, tuple(params))
@@ -177,7 +253,7 @@ def get_pattern_tendency(
     if not results:
         raise HTTPException(
             status_code=404,
-            detail="No pattern tendency data found"
+            detail=f"No pattern tendency data found for region_level: {region_level}"
         )
 
     return results

@@ -292,24 +292,47 @@ def compute_regional_tendency(
     df = filter_by_support(df, min_global_support, min_regional_support)
 
     # Add ranks (within each region) based on normalization method
+    # Use hierarchical grouping if columns exist, otherwise fall back to region_name
+    if 'city' in df.columns and 'county' in df.columns and 'township' in df.columns:
+        # Determine grouping columns based on region_level
+        if 'region_level' in df.columns:
+            # Get unique region level (should be consistent within df)
+            region_level = df['region_level'].iloc[0] if len(df) > 0 else 'township'
+
+            if region_level == 'city':
+                rank_group_cols = ['city']
+            elif region_level == 'county':
+                rank_group_cols = ['city', 'county']
+            else:  # township
+                rank_group_cols = ['city', 'county', 'township']
+        else:
+            # Default to full hierarchical grouping
+            rank_group_cols = ['city', 'county', 'township']
+
+        logger.info(f"Using hierarchical grouping for ranking: {rank_group_cols}")
+    else:
+        # Fall back to region_name for backward compatibility
+        rank_group_cols = ['region_name']
+        logger.info("Using region_name for ranking (backward compatibility)")
+
     if normalization_method == 'zscore':
         # Use z-scores for ranking
         logger.info("Using z-score normalization for ranking")
-        df['rank_overrepresented'] = df.groupby('region_name')['z_score'].rank(
+        df['rank_overrepresented'] = df.groupby(rank_group_cols)['z_score'].rank(
             ascending=False, method='dense'
         ).astype(int)
 
-        df['rank_underrepresented'] = df.groupby('region_name')['z_score'].rank(
+        df['rank_underrepresented'] = df.groupby(rank_group_cols)['z_score'].rank(
             ascending=True, method='dense'
         ).astype(int)
     else:
         # Use lift (percentage) for ranking (default)
         logger.info("Using percentage (lift) normalization for ranking")
-        df['rank_overrepresented'] = df.groupby('region_name')['lift'].rank(
+        df['rank_overrepresented'] = df.groupby(rank_group_cols)['lift'].rank(
             ascending=False, method='dense'
         ).astype(int)
 
-        df['rank_underrepresented'] = df.groupby('region_name')['lift'].rank(
+        df['rank_underrepresented'] = df.groupby(rank_group_cols)['lift'].rank(
             ascending=True, method='dense'
         ).astype(int)
 

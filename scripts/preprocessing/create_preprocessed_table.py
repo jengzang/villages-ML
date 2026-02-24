@@ -16,16 +16,17 @@ from pathlib import Path
 import pandas as pd
 import sys
 
-# Add src to path
-sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
+# Add project root to path
+project_root = Path(__file__).parent.parent.parent
+sys.path.insert(0, str(project_root))
 
-from preprocessing.text_cleaner import normalize_village_name
-from preprocessing.prefix_cleaner import batch_clean_prefixes
-from preprocessing.numbered_village_normalizer import (
+from src.preprocessing.text_cleaner import normalize_village_name
+from src.preprocessing.prefix_cleaner import batch_clean_prefixes
+from src.preprocessing.numbered_village_normalizer import (
     normalize_numbered_village,
     detect_trailing_numeral
 )
-from preprocessing.char_extractor import extract_char_set
+from src.preprocessing.char_extractor import extract_char_set
 
 logging.basicConfig(
     level=logging.INFO,
@@ -35,49 +36,27 @@ logger = logging.getLogger(__name__)
 
 
 def create_preprocessed_table(conn: sqlite3.Connection):
-    """Create the preprocessed table schema."""
+    """Create the preprocessed table schema (optimized with only 12 essential columns)."""
     cursor = conn.cursor()
 
     # Drop if exists
     cursor.execute("DROP TABLE IF EXISTS 广东省自然村_预处理")
 
-    # Create table
+    # Create table with only essential columns (space-optimized)
     cursor.execute("""
     CREATE TABLE 广东省自然村_预处理 (
-        -- Original fields
         市级 TEXT,
         区县级 TEXT,
         乡镇级 TEXT,
-        行政村 TEXT,
-        自然村 TEXT,
-        拼音 TEXT,
-        语言分布 TEXT,
-        longitude TEXT,
-        latitude TEXT,
-        备注 TEXT,
-        更新时间 REAL,
-        数据来源 TEXT,
-
-        -- Preprocessing fields
-        自然村_基础清洗 TEXT,
+        村委会 TEXT,
+        自然村_规范名 TEXT,
         自然村_去前缀 TEXT,
-        自然村_规范化 TEXT,
+        longitude REAL,
+        latitude REAL,
+        语言分布 TEXT,
         字符集 TEXT,
         字符数量 INTEGER,
-
-        -- Cleaning metadata
-        有括号 INTEGER,
-        有噪音 INTEGER,
-        有前缀 INTEGER,
-        去除的前缀 TEXT,
-        前缀匹配来源 TEXT,
-        前缀置信度 REAL,
-        有编号后缀 INTEGER,
-        编号后缀 TEXT,
-
-        -- Validity
-        有效 INTEGER,
-        无效原因 TEXT
+        village_id TEXT
     )
     """)
 
@@ -85,17 +64,16 @@ def create_preprocessed_table(conn: sqlite3.Connection):
     cursor.execute("CREATE INDEX idx_prep_city ON 广东省自然村_预处理(市级)")
     cursor.execute("CREATE INDEX idx_prep_county ON 广东省自然村_预处理(区县级)")
     cursor.execute("CREATE INDEX idx_prep_township ON 广东省自然村_预处理(乡镇级)")
-    cursor.execute("CREATE INDEX idx_prep_admin ON 广东省自然村_预处理(行政村)")
-    cursor.execute("CREATE INDEX idx_prep_prefix ON 广东省自然村_预处理(有前缀)")
-    cursor.execute("CREATE INDEX idx_prep_valid ON 广东省自然村_预处理(有效)")
+    cursor.execute("CREATE INDEX idx_prep_admin ON 广东省自然村_预处理(村委会)")
+    cursor.execute("CREATE INDEX idx_prep_village_id ON 广东省自然村_预处理(village_id)")
 
     conn.commit()
-    logger.info("Created preprocessed table schema")
+    logger.info("Created optimized preprocessed table schema (12 columns)")
 
 
 def main():
     """Main preprocessing pipeline."""
-    db_path = Path(__file__).parent.parent / "data" / "villages.db"
+    db_path = Path(__file__).parent.parent.parent / "data" / "villages.db"
 
     if not db_path.exists():
         logger.error(f"Database not found: {db_path}")
@@ -115,8 +93,13 @@ def main():
     logger.info(f"Loaded {len(df)} villages")
 
     # Rename columns to avoid encoding issues
-    df.columns = ['市级', '区县级', '乡镇级', '行政村', '自然村', '拼音', '语言分布',
+    df.columns = ['市级', '区县级', '乡镇级', '村委会', '自然村', '拼音', '语言分布',
                   'longitude', 'latitude', '备注', '更新时间', '数据来源']
+
+    # Convert longitude and latitude to numeric (REAL type)
+    logger.info("Converting longitude and latitude to numeric...")
+    df['longitude'] = pd.to_numeric(df['longitude'], errors='coerce')
+    df['latitude'] = pd.to_numeric(df['latitude'], errors='coerce')
 
     # Step 1: Basic text cleaning
     logger.info("Step 1: Basic text cleaning...")
@@ -142,10 +125,10 @@ def main():
     valid_df = df_clean[df_clean['有效'] == 1].copy()
 
     # Prepare input dataframe with required columns
-    # batch_clean_prefixes expects columns: 自然村, 行政村
+    # batch_clean_prefixes expects columns: 自然村, 村委会
     input_df = pd.DataFrame({
         '自然村': valid_df['自然村_基础清洗'].values,
-        '行政村': valid_df['行政村'].values
+        '村委会': valid_df['村委会'].values
     })
 
     df_prefix_results = batch_clean_prefixes(
@@ -215,25 +198,44 @@ def main():
 
     df_final = pd.concat([df_final, pd.DataFrame(char_sets)], axis=1)
 
+    # Select only the 12 essential columns for the optimized table
+    logger.info("Selecting essential columns for optimized table...")
+    df_optimized = df_final[[
+        '市级', '区县级', '乡镇级', '村委会',
+        '自然村_规范化', '自然村_去前缀',
+        'longitude', 'latitude', '语言分布',
+        '字符集', '字符数量'
+    ]].copy()
+
+    # Rename 自然村_规范化 to 自然村_规范名
+    df_optimized = df_optimized.rename(columns={'自然村_规范化': '自然村_规范名'})
+
+    # Add village_id column (will be populated after writing to database)
+    df_optimized['village_id'] = None
+
     # Write to database
-    logger.info("Writing to database...")
-    df_final.to_sql("广东省自然村_预处理", conn, if_exists="replace", index=False)
+    logger.info("Writing optimized table to database...")
+    df_optimized.to_sql("广东省自然村_预处理", conn, if_exists="replace", index=False)
+
+    # Populate village_id using ROWID
+    logger.info("Populating village_id...")
+    cursor = conn.cursor()
+    cursor.execute("""
+        UPDATE 广东省自然村_预处理
+        SET village_id = 'v_' || ROWID
+    """)
+    conn.commit()
+    logger.info("village_id populated successfully")
 
     # Verify
-    cursor = conn.cursor()
     cursor.execute("SELECT COUNT(*) FROM 广东省自然村_预处理")
     count = cursor.fetchone()[0]
     logger.info(f"Verification: {count} rows written")
 
-    # Statistics
-    cursor.execute("SELECT SUM(有前缀) FROM 广东省自然村_预处理 WHERE 有效=1")
-    prefix_count = cursor.fetchone()[0] or 0
-
-    cursor.execute("SELECT COUNT(*) FROM 广东省自然村_预处理 WHERE 有效=1")
-    valid_count = cursor.fetchone()[0]
-
-    cursor.execute("SELECT SUM(有编号后缀) FROM 广东省自然村_预处理 WHERE 有效=1")
-    numbered_count = cursor.fetchone()[0] or 0
+    # Statistics (using df_final which has all the metadata)
+    valid_count = df_final['有效'].sum()
+    prefix_count = df_final[df_final['有效'] == 1]['有前缀'].sum()
+    numbered_count = df_final[df_final['有效'] == 1]['有编号后缀'].sum()
 
     logger.info(f"\nPreprocessing Statistics:")
     logger.info(f"  Total villages: {count}")

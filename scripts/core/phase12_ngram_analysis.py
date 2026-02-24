@@ -18,11 +18,12 @@ from pathlib import Path
 import json
 from datetime import datetime
 
-# Add src to path
-sys.path.insert(0, str(Path(__file__).parent.parent / 'src'))
+# Add project root to path
+project_root = Path(__file__).parent.parent.parent
+sys.path.insert(0, str(project_root))
 
-from ngram_analysis import NgramExtractor, NgramAnalyzer, StructuralPatternDetector
-from ngram_schema import create_ngram_tables
+from src.ngram_analysis import NgramExtractor, NgramAnalyzer, StructuralPatternDetector
+from src.ngram_schema import create_ngram_tables
 
 
 def step1_create_tables(db_path: str):
@@ -92,61 +93,91 @@ def step2_extract_global_ngrams(db_path: str):
 
 
 def step3_extract_regional_ngrams(db_path: str):
-    """Step 3: Extract regional n-gram frequencies."""
+    """Step 3: Extract regional n-gram frequencies with hierarchical grouping."""
     print("\n" + "="*60)
-    print("Step 3: Extracting Regional N-grams")
+    print("Step 3: Extracting Regional N-grams (Hierarchical)")
     print("="*60)
 
     conn = sqlite3.connect(db_path)
     cursor = conn.cursor()
+
+    # Map Chinese level names to English for database
+    level_map = {
+        '市级': 'city',
+        '县区级': 'county',
+        '乡镇': 'township'
+    }
 
     levels = ['市级', '县区级', '乡镇']
 
     with NgramExtractor(db_path) as extractor:
         for level in levels:
             print(f"\nProcessing level: {level}")
+            level_en = level_map[level]
 
             # Bigrams
             print(f"  Extracting bigrams for {level}...")
             bigram_data = extractor.extract_regional_ngrams(n=2, level=level)
 
-            for region, position_data in bigram_data.items():
+            for hierarchical_key, position_data in bigram_data.items():
+                # Extract hierarchical components
+                city, county, township = hierarchical_key
+
+                # Get region name for display (the actual region at this level)
+                if level == '市级':
+                    region_name = city
+                elif level == '县区级':
+                    region_name = county
+                else:  # 乡镇
+                    region_name = township
+
                 for position, counter in position_data.items():
                     total = sum(counter.values())
                     for ngram, freq in counter.items():
                         percentage = (freq / total * 100) if total > 0 else 0
                         cursor.execute("""
                             INSERT OR REPLACE INTO regional_ngram_frequency
-                            (region, level, ngram, n, position, frequency, total_count, percentage)
-                            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-                        """, (region, level, ngram, 2, position, freq, total, percentage))
+                            (level, city, county, township, region, ngram, n, position, frequency, total_count, percentage)
+                            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                        """, (level_en, city, county, township, region_name, ngram, 2, position, freq, total, percentage))
 
             # Trigrams
             print(f"  Extracting trigrams for {level}...")
             trigram_data = extractor.extract_regional_ngrams(n=3, level=level)
 
-            for region, position_data in trigram_data.items():
+            for hierarchical_key, position_data in trigram_data.items():
+                # Extract hierarchical components
+                city, county, township = hierarchical_key
+
+                # Get region name for display
+                if level == '市级':
+                    region_name = city
+                elif level == '县区级':
+                    region_name = county
+                else:  # 乡镇
+                    region_name = township
+
                 for position, counter in position_data.items():
                     total = sum(counter.values())
                     for ngram, freq in counter.items():
                         percentage = (freq / total * 100) if total > 0 else 0
                         cursor.execute("""
                             INSERT OR REPLACE INTO regional_ngram_frequency
-                            (region, level, ngram, n, position, frequency, total_count, percentage)
-                            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-                        """, (region, level, ngram, 3, position, freq, total, percentage))
+                            (level, city, county, township, region, ngram, n, position, frequency, total_count, percentage)
+                            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                        """, (level_en, city, county, township, region_name, ngram, 3, position, freq, total, percentage))
 
             conn.commit()
             print(f"  [OK] Completed {level}")
 
-    print("\n[OK] Regional n-gram extraction complete")
+    print("\n[OK] Regional n-gram extraction complete (with hierarchical separation)")
     conn.close()
 
 
 def step4_calculate_tendency(db_path: str):
-    """Step 4: Calculate tendency scores."""
+    """Step 4: Calculate tendency scores with hierarchical grouping."""
     print("\n" + "="*60)
-    print("Step 4: Calculating Tendency Scores")
+    print("Step 4: Calculating Tendency Scores (Hierarchical)")
     print("="*60)
 
     conn = sqlite3.connect(db_path)
@@ -155,22 +186,30 @@ def step4_calculate_tendency(db_path: str):
     analyzer = NgramAnalyzer(db_path)
     analyzer.__enter__()
 
+    # Map Chinese level names to English
+    level_map = {
+        '市级': 'city',
+        '县区级': 'county',
+        '乡镇': 'township'
+    }
+
     levels = ['市级', '县区级', '乡镇']
 
     for level in levels:
         print(f"\nProcessing level: {level}")
+        level_en = level_map[level]
 
-        # Get all regional n-grams
+        # Get all regional n-grams with hierarchical keys
         cursor.execute("""
-            SELECT DISTINCT region, ngram, n, position
+            SELECT DISTINCT level, city, county, township, region, ngram, n, position
             FROM regional_ngram_frequency
             WHERE level = ?
-        """, (level,))
+        """, (level_en,))
 
         rows = cursor.fetchall()
         total_rows = len(rows)
 
-        for idx, (region, ngram, n, position) in enumerate(rows, 1):
+        for idx, (level_db, city, county, township, region, ngram, n, position) in enumerate(rows, 1):
             if idx % 1000 == 0:
                 print(f"  Progress: {idx}/{total_rows}")
 
@@ -178,8 +217,9 @@ def step4_calculate_tendency(db_path: str):
             cursor.execute("""
                 SELECT frequency, total_count
                 FROM regional_ngram_frequency
-                WHERE region = ? AND level = ? AND ngram = ? AND n = ? AND position = ?
-            """, (region, level, ngram, n, position))
+                WHERE level = ? AND city IS ? AND county IS ? AND township IS ?
+                  AND ngram = ? AND n = ? AND position = ?
+            """, (level_en, city, county, township, ngram, n, position))
 
             regional_result = cursor.fetchone()
             if not regional_result:
@@ -206,14 +246,14 @@ def step4_calculate_tendency(db_path: str):
                 global_count, global_total
             )
 
-            # Store results
+            # Store results with hierarchical columns
             cursor.execute("""
                 INSERT OR REPLACE INTO ngram_tendency
-                (region, level, ngram, n, position, lift, log_odds, z_score,
+                (level, city, county, township, region, ngram, n, position, lift, log_odds, z_score,
                  regional_count, regional_total, global_count, global_total)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """, (
-                region, level, ngram, n, position,
+                level_en, city, county, township, region, ngram, n, position,
                 tendency['lift'], tendency['log_odds'], tendency['z_score'],
                 regional_count, regional_total, global_count, global_total
             ))
@@ -223,13 +263,13 @@ def step4_calculate_tendency(db_path: str):
 
     analyzer.__exit__(None, None, None)
     conn.close()
-    print("\n[OK] Tendency calculation complete")
+    print("\n[OK] Tendency calculation complete (with hierarchical separation)")
 
 
 def step5_calculate_significance(db_path: str):
-    """Step 5: Calculate statistical significance."""
+    """Step 5: Calculate statistical significance with hierarchical grouping."""
     print("\n" + "="*60)
-    print("Step 5: Calculating Statistical Significance")
+    print("Step 5: Calculating Statistical Significance (Hierarchical)")
     print("="*60)
 
     conn = sqlite3.connect(db_path)
@@ -238,19 +278,27 @@ def step5_calculate_significance(db_path: str):
     analyzer = NgramAnalyzer(db_path)
     analyzer.__enter__()
 
+    # Map Chinese level names to English
+    level_map = {
+        '市级': 'city',
+        '县区级': 'county',
+        '乡镇': 'township'
+    }
+
     levels = ['市级', '县区级', '乡镇']
     alpha = 0.05  # Significance level
 
     for level in levels:
         print(f"\nProcessing level: {level}")
+        level_en = level_map[level]
 
-        # Get all tendency records
+        # Get all tendency records with hierarchical columns
         cursor.execute("""
-            SELECT region, ngram, n, position,
+            SELECT level, city, county, township, region, ngram, n, position,
                    regional_count, regional_total, global_count, global_total
             FROM ngram_tendency
             WHERE level = ?
-        """, (level,))
+        """, (level_en,))
 
         rows = cursor.fetchall()
         total_rows = len(rows)
@@ -259,7 +307,7 @@ def step5_calculate_significance(db_path: str):
             if idx % 1000 == 0:
                 print(f"  Progress: {idx}/{total_rows}")
 
-            region, ngram, n, position, regional_count, regional_total, global_count, global_total = row
+            level_db, city, county, township, region, ngram, n, position, regional_count, regional_total, global_count, global_total = row
 
             # Calculate significance
             sig = analyzer.calculate_significance(
@@ -269,13 +317,13 @@ def step5_calculate_significance(db_path: str):
 
             is_significant = 1 if sig['p_value'] < alpha else 0
 
-            # Store results
+            # Store results with hierarchical columns
             cursor.execute("""
                 INSERT OR REPLACE INTO ngram_significance
-                (region, level, ngram, n, position, chi2, p_value, cramers_v, is_significant)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                (level, city, county, township, region, ngram, n, position, chi2, p_value, cramers_v, is_significant)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """, (
-                region, level, ngram, n, position,
+                level_en, city, county, township, region, ngram, n, position,
                 sig['chi2'], sig['p_value'], sig['cramers_v'], is_significant
             ))
 
@@ -284,7 +332,7 @@ def step5_calculate_significance(db_path: str):
 
     analyzer.__exit__(None, None, None)
     conn.close()
-    print("\n[OK] Significance testing complete")
+    print("\n[OK] Significance testing complete (with hierarchical separation)")
 
 
 def step6_detect_patterns(db_path: str):

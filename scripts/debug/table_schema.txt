@@ -1,0 +1,94 @@
+Main table: 广东省自然村
+======================================================================
+Index  Name                 Type       NotNull  Default    PK  
+----------------------------------------------------------------------
+0      市级                   TEXT       0        None       0   
+1      区县级                  TEXT       0        None       0   
+2      乡镇级                  TEXT       0        None       0   
+3      行政村                  TEXT       0        None       0   
+4      自然村                  TEXT       0        None       0   
+5      拼音                   TEXT       0        None       0   
+6      方言分布                 TEXT       0        None       0   
+7      longitude            TEXT       0        None       0   
+8      latitude             TEXT       0        None       0   
+9      备注                   TEXT       0        None       0   
+10     暂时不用                 REAL       0        None       0   
+11     搜索用                  TEXT       0        None       0   
+
+Total columns: 12
+
+
+Sample row:
+----------------------------------------------------------------------
+市级: 潮州市
+区县级: 潮安区
+乡镇级: 庵埠镇
+行政村: 庵埠镇镇政府(国有)
+自然村: 连彬街
+拼音: liánbīnjiē
+方言分布: None
+longitude: 116.6845008
+latitude: 23.4452861
+备注: None
+暂时不用: None
+搜索用: 潮安庵埠庵埠镇镇政府(国有)连彬街
+
+
+======================================================================
+city_aggregates table schema:
+======================================================================
+0      run_id                         TEXT      
+1      city                           TEXT      
+2      total_villages                 INTEGER   
+3      avg_name_length                REAL      
+4      sem_mountain_count             INTEGER   
+5      sem_water_count                INTEGER   
+6      sem_settlement_count           INTEGER   
+7      sem_direction_count            INTEGER   
+8      sem_clan_count                 INTEGER   
+9      sem_symbolic_count             INTEGER   
+10     sem_agriculture_count          INTEGER   
+11     sem_vegetation_count           INTEGER   
+12     sem_infrastructure_count       INTEGER   
+13     sem_mountain_pct               REAL      
+14     sem_water_pct                  REAL      
+15     sem_settlement_pct             REAL      
+16     sem_direction_pct              REAL      
+17     sem_clan_pct                   REAL      
+18     sem_symbolic_pct               REAL      
+19     sem_agriculture_pct            REAL      
+20     sem_vegetation_pct             REAL      
+21     sem_infrastructure_pct         REAL      
+22     top_suffixes_json              TEXT      
+23     top_prefixes_json              TEXT      
+24     cluster_distribution_json      TEXT      
+25     created_at                     REAL      
+
+Sample city_aggregates row:
+----------------------------------------------------------------------
+run_id: feature_001
+city: 东莞市
+total_villages: 2863
+avg_name_length: 2.852602165560601
+sem_mountain_count: 566
+sem_water_count: 599
+sem_settlement_count: 1531
+sem_direction_count: 703
+sem_clan_count: 320
+sem_symbolic_count: 214
+sem_agriculture_count: 219
+sem_vegetation_count: 180
+sem_infrastructure_count: 79
+sem_mountain_pct: 19.76947258120852
+sem_water_pct: 20.92210967516591
+sem_settlement_pct: 53.475375480265456
+sem_direction_pct: 24.55466294097101
+sem_clan_pct: 11.177086971707999
+sem_symbolic_pct: 7.474676912329723
+sem_agriculture_pct: 7.649318896262662
+sem_vegetation_pct: 6.287111421585749
+sem_infrastructure_pct: 2.759343346140412
+top_suffixes_json: [{"suffix": "新围", "count": 100}, {"suffix": "新村", "count": 71}, {"suffix": "屋村", "count": 44}, {"suffix": "头村", "count": 38}, {"suffix": "围仔", "count": 33}, {"suffix": "旧围", "count": 28}, {"suffix": "塘村", "count": 20}, {"suffix": "山村", "count": 19}, {"suffix": "围村", "count": 19}, {"suffix": "涌村", "count": 18}]
+top_prefixes_json: [{"prefix": "新围", "count": 48}, {"prefix": "陈屋", "count": 21}, {"prefix": "新村", "count": 19}, {"prefix": "田心", "count": 14}, {"prefix": "刘屋", "count": 13}, {"prefix": "旧围", "count": 13}, {"prefix": "杨屋", "count": 12}, {"prefix": "黄屋", "count": 11}, {"prefix": "大塘", "count": 11}, {"prefix": "大围", "count": 10}]
+cluster_distribution_json: {"kmeans": {}, "dbscan": {}, "gmm": {}}
+created_at: 1771180766.2212174
