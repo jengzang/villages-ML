@@ -129,8 +129,9 @@ def compute_pattern_frequency_by_region(
     # Group by hierarchical key
     for group_key, group in valid_df.groupby(group_cols):
         # Handle single vs multiple group columns
+        # IMPORTANT: groupby always returns tuple, even for single column
         if region_level == 'city':
-            city = group_key
+            city = group_key[0] if isinstance(group_key, tuple) else group_key
             county = None
             township = None
         elif region_level == 'county':

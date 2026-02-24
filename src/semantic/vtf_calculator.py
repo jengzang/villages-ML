@@ -129,7 +129,7 @@ class VTFCalculator:
                 if isinstance(group_key, tuple):
                     # Explicit unpacking based on level
                     if level == 'city':
-                        city = group_key
+                        city = group_key[0]  # Extract first element from tuple
                         county = None
                         township = None
                     elif level == 'county':
