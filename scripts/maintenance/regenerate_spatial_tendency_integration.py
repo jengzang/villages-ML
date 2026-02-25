@@ -83,11 +83,14 @@ def calculate_mann_whitney_u(cluster_values, global_values):
 def regenerate_spatial_tendency_integration():
     """重新生成 spatial_tendency_integration 表"""
 
+    # 可配置的空间聚类 run_id
+    SPATIAL_RUN_ID = 'spatial_eps_20'  # 使用粗粒度聚类（253个聚类，平均1121个村庄）
+
     print("=" * 80)
     print("重新生成 spatial_tendency_integration 表")
     print("=" * 80)
     print(f"字符数量: {len(SELECTED_CHARACTERS)}")
-    print(f"空间聚类: spatial_hdbscan_v1")
+    print(f"空间聚类: {SPATIAL_RUN_ID}")
     print(f"显著性检验: Mann-Whitney U test + FDR correction")
     print()
 
@@ -159,9 +162,9 @@ def regenerate_spatial_tendency_integration():
         SELECT cluster_id, cluster_size, centroid_lon, centroid_lat,
                avg_distance_km, dominant_city, dominant_county
         FROM spatial_clusters
-        WHERE run_id = 'spatial_hdbscan_v1'
+        WHERE run_id = ?
         ORDER BY cluster_id
-    ''')
+    ''', (SPATIAL_RUN_ID,))
 
     clusters = {}
     for row in cursor.fetchall():
@@ -204,8 +207,10 @@ def regenerate_spatial_tendency_integration():
         print(f"  处理字符 {char_idx}/{len(SELECTED_CHARACTERS)}: {char}")
 
         # 获取包含该字符的所有村庄
+        # 注意：village_spatial_features 使用 village_id (如 "v_1")
+        # 而不是 ROWID，所以需要转换
         cursor.execute('''
-            SELECT ROWID
+            SELECT 'v_' || ROWID as village_id
             FROM 广东省自然村_预处理
             WHERE 字符集 LIKE ?
         ''', (f'%"{char}"%',))
@@ -286,9 +291,9 @@ def regenerate_spatial_tendency_integration():
     # Step 7: 插入数据
     print("\nStep 7: 插入数据到数据库...")
 
-    run_id = 'integration_v2_001'
+    run_id = f'integration_{SPATIAL_RUN_ID}_001'
     tendency_run_id = 'freq_final_001'
-    spatial_run_id = 'spatial_hdbscan_v1'
+    spatial_run_id = SPATIAL_RUN_ID
     created_at = time.time()
 
     for record in records:
