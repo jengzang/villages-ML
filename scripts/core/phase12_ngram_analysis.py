@@ -205,6 +205,49 @@ def step3_extract_regional_ngrams(db_path: str):
     conn.close()
 
 
+def step3_5_calculate_regional_totals_raw(db_path: str):
+    """Step 3.5: Calculate and store regional total raw counts (before filtering)."""
+    print("\n" + "="*60)
+    print("Step 3.5: Calculating Regional Total Raw Counts")
+    print("="*60)
+
+    conn = sqlite3.connect(db_path)
+    cursor = conn.cursor()
+
+    # Create temporary table to store raw totals
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS temp_regional_totals_raw (
+            level TEXT NOT NULL,
+            city TEXT,
+            county TEXT,
+            township TEXT,
+            n INTEGER NOT NULL,
+            position TEXT NOT NULL,
+            total_raw INTEGER NOT NULL,
+            PRIMARY KEY (level, city, county, township, n, position)
+        )
+    """)
+
+    # Clear old data
+    cursor.execute("DELETE FROM temp_regional_totals_raw")
+
+    # Calculate raw totals for each region-position combination
+    cursor.execute("""
+        INSERT INTO temp_regional_totals_raw
+        SELECT level, city, county, township, n, position, COUNT(*) as total_raw
+        FROM regional_ngram_frequency
+        GROUP BY level, city, county, township, n, position
+    """)
+
+    rows_inserted = cursor.rowcount
+    print(f"  Calculated raw totals for {rows_inserted:,} region-position combinations")
+
+    conn.commit()
+    conn.close()
+
+    print("[OK] Regional total raw counts calculated")
+
+
 def step4_calculate_tendency(db_path: str):
     """Step 4: Calculate tendency scores with hierarchical grouping."""
     print("\n" + "="*60)
@@ -258,6 +301,17 @@ def step4_calculate_tendency(db_path: str):
 
             regional_count, regional_total = regional_result
 
+            # Get regional_total_raw from temp table
+            cursor.execute("""
+                SELECT total_raw
+                FROM temp_regional_totals_raw
+                WHERE level = ? AND city IS ? AND county IS ? AND township IS ?
+                  AND n = ? AND position = ?
+            """, (level_en, city, county, township, n, position))
+
+            raw_result = cursor.fetchone()
+            regional_total_raw = raw_result[0] if raw_result else regional_total
+
             # Get global counts
             cursor.execute("""
                 SELECT frequency, total_count
@@ -277,16 +331,16 @@ def step4_calculate_tendency(db_path: str):
                 global_count, global_total
             )
 
-            # Store results with hierarchical columns
+            # Store results with hierarchical columns (including regional_total_raw)
             cursor.execute("""
                 INSERT OR REPLACE INTO ngram_tendency
                 (level, city, county, township, region, ngram, n, position, lift, log_odds, z_score,
-                 regional_count, regional_total, global_count, global_total)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                 regional_count, regional_total, regional_total_raw, global_count, global_total)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """, (
                 level_en, city, county, township, region, ngram, n, position,
                 tendency['lift'], tendency['log_odds'], tendency['z_score'],
-                regional_count, regional_total, global_count, global_total
+                regional_count, regional_total, regional_total_raw, global_count, global_total
             ))
 
         conn.commit()
@@ -360,13 +414,24 @@ def step5_calculate_significance(db_path: str):
 
             # ONLY store significant results (p < 0.05)
             if is_significant:
+                # Get total_before_filter from temp table
+                cursor.execute("""
+                    SELECT total_raw
+                    FROM temp_regional_totals_raw
+                    WHERE level = ? AND city IS ? AND county IS ? AND township IS ?
+                      AND n = ? AND position = ?
+                """, (level_db, city, county, township, n, position))
+
+                raw_result = cursor.fetchone()
+                total_before_filter = raw_result[0] if raw_result else regional_total
+
                 cursor.execute("""
                     INSERT OR REPLACE INTO ngram_significance
-                    (level, city, county, township, region, ngram, n, position, chi2, p_value, cramers_v, is_significant)
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    (level, city, county, township, region, ngram, n, position, chi2, p_value, cramers_v, is_significant, total_before_filter)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """, (
-                    level_en, city, county, township, region, ngram, n, position,
-                    sig['chi2'], sig['p_value'], sig['cramers_v'], 1
+                    level_db, city, county, township, region, ngram, n, position,
+                    sig['chi2'], sig['p_value'], sig['cramers_v'], 1, total_before_filter
                 ))
                 significant_count += 1
 
@@ -707,6 +772,7 @@ def main():
         step1_create_tables(db_path)
         step2_extract_global_ngrams(db_path)
         step3_extract_regional_ngrams(db_path)
+        step3_5_calculate_regional_totals_raw(db_path)  # NEW: Calculate raw totals
         step4_calculate_tendency(db_path)
         step5_calculate_significance(db_path)
         step6_cleanup_insignificant_data(db_path)  # NEW: Clean up non-significant data

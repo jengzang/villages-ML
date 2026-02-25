@@ -55,6 +55,7 @@ NGRAM_SCHEMA = {
             z_score REAL NOT NULL,
             regional_count INTEGER NOT NULL,
             regional_total INTEGER NOT NULL,
+            regional_total_raw INTEGER,
             global_count INTEGER NOT NULL,
             global_total INTEGER NOT NULL,
             PRIMARY KEY (level, city, county, township, ngram, n, position)
@@ -75,6 +76,7 @@ NGRAM_SCHEMA = {
             p_value REAL NOT NULL,
             cramers_v REAL NOT NULL,
             is_significant INTEGER NOT NULL,
+            total_before_filter INTEGER,
             PRIMARY KEY (level, city, county, township, ngram, n, position)
         )
     """,
