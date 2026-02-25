@@ -142,9 +142,10 @@ def run_spatial_analysis_pipeline(
         logger.info("="*80)
         hotspot_detector = HotspotDetector(bandwidth_km=5.0, threshold_percentile=90)
 
-        # Detect density hotspots (use all data for maximum accuracy)
+        # Detect density hotspots (use sampling for performance)
+        # Sample 10K points for KDE evaluation - sufficient for accurate hotspot detection
         density_hotspots_df = hotspot_detector.detect_density_hotspots(
-            coords, coords_df, sample_size=None  # None = use all data
+            coords, coords_df, sample_size=10000
         )
 
         # Detect naming hotspots (if semantic features available)

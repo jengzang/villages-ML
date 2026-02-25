@@ -1,0 +1,1183 @@
+{
+  "final_recommendations": [
+    "村",
+    "屋",
+    "围",
+    "岗",
+    "里",
+    "寨",
+    "南",
+    "坡",
+    "塘",
+    "下",
+    "坑",
+    "山",
+    "头",
+    "上",
+    "垌",
+    "园",
+    "楼",
+    "湖",
+    "仔",
+    "西",
+    "新",
+    "大",
+    "子",
+    "田",
+    "岭",
+    "龙",
+    "水",
+    "东",
+    "尾",
+    "黄",
+    "竹",
+    "安",
+    "边",
+    "旺",
+    "前",
+    "一",
+    "美",
+    "二",
+    "队",
+    "北",
+    "顶",
+    "埇",
+    "埔"
+  ],
+  "tier1": [
+    "村",
+    "屋",
+    "围",
+    "岗",
+    "里",
+    "寨",
+    "南",
+    "坡",
+    "塘",
+    "下",
+    "坑",
+    "山",
+    "头",
+    "上",
+    "垌"
+  ],
+  "tier2": [
+    "园",
+    "楼",
+    "湖",
+    "仔",
+    "西",
+    "新",
+    "大",
+    "子",
+    "田",
+    "岭",
+    "龙",
+    "水",
+    "东",
+    "尾",
+    "黄"
+  ],
+  "tier3": [
+    "竹",
+    "安",
+    "边",
+    "旺",
+    "前",
+    "一",
+    "美",
+    "二",
+    "队",
+    "北",
+    "顶",
+    "埇",
+    "埔"
+  ],
+  "all_chars_with_scores": {
+    "村": {
+      "village_count": 34664,
+      "frequency": 0.1217288702223595,
+      "rank": 1,
+      "category": "high_frequency",
+      "score": 20,
+      "reasons": [
+        "TOP10高频(排名1)",
+        "中等区域倾向(lift=6.1)",
+        "语义类别:settlement"
+      ],
+      "max_lift": 6.110869249426648,
+      "num_regions": 81,
+      "semantic_category": "settlement"
+    },
+    "屋": {
+      "village_count": 21484,
+      "frequency": 0.0754449298366366,
+      "rank": 2,
+      "category": "high_frequency",
+      "score": 20,
+      "reasons": [
+        "TOP10高频(排名2)",
+        "中等区域倾向(lift=6.0)",
+        "语义类别:settlement"
+      ],
+      "max_lift": 5.993430095601985,
+      "num_regions": 45,
+      "semantic_category": "settlement"
+    },
+    "围": {
+      "village_count": 7034,
+      "frequency": 0.0247011560450056,
+      "rank": 14,
+      "category": "high_frequency",
+      "score": 18,
+      "reasons": [
+        "TOP30高频(排名14)",
+        "强区域倾向(lift=13.5)",
+        "语义类别:settlement"
+      ],
+      "max_lift": 13.538889795233455,
+      "num_regions": 25,
+      "semantic_category": "settlement"
+    },
+    "岗": {
+      "village_count": 6135,
+      "frequency": 0.0215441558623983,
+      "rank": 19,
+      "category": "high_frequency",
+      "score": 15,
+      "reasons": [
+        "TOP30高频(排名19)",
+        "中等区域倾向(lift=6.0)",
+        "语义类别:mountain"
+      ],
+      "max_lift": 5.995243581804291,
+      "num_regions": 14,
+      "semantic_category": "mountain"
+    },
+    "里": {
+      "village_count": 5710,
+      "frequency": 0.0200516919273503,
+      "rank": 22,
+      "category": "high_frequency",
+      "score": 15,
+      "reasons": [
+        "TOP30高频(排名22)",
+        "强区域倾向(lift=34.6)"
+      ],
+      "max_lift": 34.623887023547915,
+      "num_regions": 16
+    },
+    "寨": {
+      "village_count": 5477,
+      "frequency": 0.0192334705229593,
+      "rank": 26,
+      "category": "high_frequency",
+      "score": 15,
+      "reasons": [
+        "TOP30高频(排名26)",
+        "中等区域倾向(lift=8.5)",
+        "语义类别:settlement"
+      ],
+      "max_lift": 8.464926657985233,
+      "num_regions": 17,
+      "semantic_category": "settlement"
+    },
+    "南": {
+      "village_count": 4847,
+      "frequency": 0.0170211122192411,
+      "rank": 29,
+      "category": "high_frequency",
+      "score": 15,
+      "reasons": [
+        "TOP30高频(排名29)",
+        "中等区域倾向(lift=8.0)",
+        "语义类别:direction"
+      ],
+      "max_lift": 7.979437910583152,
+      "num_regions": 14,
+      "semantic_category": "direction"
+    },
+    "坡": {
+      "village_count": 4780,
+      "frequency": 0.0167858296694806,
+      "rank": 30,
+      "category": "high_frequency",
+      "score": 15,
+      "reasons": [
+        "TOP30高频(排名30)",
+        "中等区域倾向(lift=7.1)",
+        "语义类别:mountain"
+      ],
+      "max_lift": 7.107736973128486,
+      "num_regions": 14,
+      "semantic_category": "mountain"
+    },
+    "塘": {
+      "village_count": 21093,
+      "frequency": 0.0740718630163925,
+      "rank": 3,
+      "category": "high_frequency",
+      "score": 13,
+      "reasons": [
+        "TOP10高频(排名3)",
+        "语义类别:water"
+      ],
+      "semantic_category": "water"
+    },
+    "下": {
+      "village_count": 19313,
+      "frequency": 0.0678210728884269,
+      "rank": 4,
+      "category": "high_frequency",
+      "score": 13,
+      "reasons": [
+        "TOP10高频(排名4)",
+        "语义类别:direction"
+      ],
+      "semantic_category": "direction"
+    },
+    "坑": {
+      "village_count": 18409,
+      "frequency": 0.0646465143065836,
+      "rank": 5,
+      "category": "high_frequency",
+      "score": 13,
+      "reasons": [
+        "TOP10高频(排名5)",
+        "语义类别:mountain"
+      ],
+      "semantic_category": "mountain"
+    },
+    "山": {
+      "village_count": 11675,
+      "frequency": 0.0409988622157295,
+      "rank": 8,
+      "category": "high_frequency",
+      "score": 13,
+      "reasons": [
+        "TOP10高频(排名8)",
+        "语义类别:mountain"
+      ],
+      "semantic_category": "mountain"
+    },
+    "头": {
+      "village_count": 11065,
+      "frequency": 0.0388567375089547,
+      "rank": 9,
+      "category": "high_frequency",
+      "score": 13,
+      "reasons": [
+        "TOP10高频(排名9)",
+        "语义类别:settlement"
+      ],
+      "semantic_category": "settlement"
+    },
+    "上": {
+      "village_count": 11056,
+      "frequency": 0.0388251323903302,
+      "rank": 10,
+      "category": "high_frequency",
+      "score": 13,
+      "reasons": [
+        "TOP10高频(排名10)",
+        "语义类别:direction"
+      ],
+      "semantic_category": "direction"
+    },
+    "垌": {
+      "village_count": 4061,
+      "frequency": 0.0142609318593642,
+      "rank": 34,
+      "category": "high_frequency",
+      "score": 13,
+      "reasons": [
+        "TOP50高频(排名34)",
+        "中等区域倾向(lift=6.5)",
+        "语义类别:agriculture"
+      ],
+      "max_lift": 6.485946213782573,
+      "num_regions": 14,
+      "semantic_category": "agriculture"
+    },
+    "园": {
+      "village_count": 4029,
+      "frequency": 0.0141485581042547,
+      "rank": 36,
+      "category": "high_frequency",
+      "score": 13,
+      "reasons": [
+        "TOP50高频(排名36)",
+        "中等区域倾向(lift=6.5)",
+        "语义类别:agriculture"
+      ],
+      "max_lift": 6.535616228632558,
+      "num_regions": 7,
+      "semantic_category": "agriculture"
+    },
+    "楼": {
+      "village_count": 3976,
+      "frequency": 0.0139624390723546,
+      "rank": 37,
+      "category": "high_frequency",
+      "score": 13,
+      "reasons": [
+        "TOP50高频(排名37)",
+        "中等区域倾向(lift=7.7)",
+        "语义类别:settlement"
+      ],
+      "max_lift": 7.681423757481929,
+      "num_regions": 16,
+      "semantic_category": "settlement"
+    },
+    "湖": {
+      "village_count": 3389,
+      "frequency": 0.0119010830020648,
+      "rank": 41,
+      "category": "high_frequency",
+      "score": 13,
+      "reasons": [
+        "TOP50高频(排名41)",
+        "中等区域倾向(lift=5.1)",
+        "语义类别:water"
+      ],
+      "max_lift": 5.055220740463528,
+      "num_regions": 10,
+      "semantic_category": "water"
+    },
+    "仔": {
+      "village_count": 6019,
+      "frequency": 0.0211368010001264,
+      "rank": 20,
+      "category": "high_frequency",
+      "score": 12,
+      "reasons": [
+        "TOP30高频(排名20)",
+        "中等区域倾向(lift=5.8)"
+      ],
+      "max_lift": 5.7946621229156765,
+      "num_regions": 19
+    },
+    "西": {
+      "village_count": 4030,
+      "frequency": 0.0141520697841019,
+      "rank": 35,
+      "category": "high_frequency",
+      "score": 11,
+      "reasons": [
+        "TOP50高频(排名35)",
+        "弱区域倾向(lift=5.0)",
+        "语义类别:direction"
+      ],
+      "max_lift": 4.968965867840586,
+      "num_regions": 13,
+      "semantic_category": "direction"
+    },
+    "新": {
+      "village_count": 15019,
+      "frequency": 0.0527419196246716,
+      "rank": 6,
+      "category": "high_frequency",
+      "score": 10,
+      "reasons": [
+        "TOP10高频(排名6)"
+      ]
+    },
+    "大": {
+      "village_count": 14070,
+      "frequency": 0.0494093354497057,
+      "rank": 7,
+      "category": "high_frequency",
+      "score": 10,
+      "reasons": [
+        "TOP10高频(排名7)"
+      ]
+    },
+    "子": {
+      "village_count": 6447,
+      "frequency": 0.0226397999747159,
+      "rank": 15,
+      "category": "high_frequency",
+      "score": 10,
+      "reasons": [
+        "TOP30高频(排名15)",
+        "弱区域倾向(lift=4.6)"
+      ],
+      "max_lift": 4.552523245958811,
+      "num_regions": 14
+    },
+    "老": {
+      "village_count": 4463,
+      "frequency": 0.0156726271579272,
+      "rank": 32,
+      "category": "high_frequency",
+      "score": 10,
+      "reasons": [
+        "TOP50高频(排名32)",
+        "中等区域倾向(lift=8.2)"
+      ],
+      "max_lift": 8.226165181853364,
+      "num_regions": 17
+    },
+    "庄": {
+      "village_count": 744,
+      "frequency": 0,
+      "rank": 999,
+      "category": "regional_tendency",
+      "score": 10,
+      "reasons": [
+        "强区域倾向(lift=135.3)"
+      ],
+      "max_lift": 135.32514956880166,
+      "num_regions": 5
+    },
+    "区": {
+      "village_count": 1018,
+      "frequency": 0,
+      "rank": 999,
+      "category": "regional_tendency",
+      "score": 10,
+      "reasons": [
+        "强区域倾向(lift=113.9)"
+      ],
+      "max_lift": 113.85365156582549,
+      "num_regions": 5
+    },
+    "片": {
+      "village_count": 779,
+      "frequency": 0,
+      "rank": 999,
+      "category": "regional_tendency",
+      "score": 10,
+      "reasons": [
+        "强区域倾向(lift=85.2)"
+      ],
+      "max_lift": 85.21672161231047,
+      "num_regions": 9
+    },
+    "厝": {
+      "village_count": 518,
+      "frequency": 0,
+      "rank": 999,
+      "category": "regional_tendency",
+      "score": 10,
+      "reasons": [
+        "强区域倾向(lift=28.2)"
+      ],
+      "max_lift": 28.233849208888465,
+      "num_regions": 11
+    },
+    "崀": {
+      "village_count": 639,
+      "frequency": 0,
+      "rank": 999,
+      "category": "regional_tendency",
+      "score": 10,
+      "reasons": [
+        "强区域倾向(lift=25.1)"
+      ],
+      "max_lift": 25.09512968419054,
+      "num_regions": 5
+    },
+    "榃": {
+      "village_count": 226,
+      "frequency": 0,
+      "rank": 999,
+      "category": "regional_tendency",
+      "score": 10,
+      "reasons": [
+        "强区域倾向(lift=25.0)"
+      ],
+      "max_lift": 25.00545423216605,
+      "num_regions": 3
+    },
+    "垇": {
+      "village_count": 204,
+      "frequency": 0,
+      "rank": 999,
+      "category": "regional_tendency",
+      "score": 10,
+      "reasons": [
+        "强区域倾向(lift=20.2)"
+      ],
+      "max_lift": 20.241867491476228,
+      "num_regions": 3
+    },
+    "家": {
+      "village_count": 523,
+      "frequency": 0,
+      "rank": 999,
+      "category": "regional_tendency",
+      "score": 10,
+      "reasons": [
+        "强区域倾向(lift=18.6)"
+      ],
+      "max_lift": 18.57336566410304,
+      "num_regions": 5
+    },
+    "化": {
+      "village_count": 400,
+      "frequency": 0,
+      "rank": 999,
+      "category": "regional_tendency",
+      "score": 10,
+      "reasons": [
+        "强区域倾向(lift=12.9)"
+      ],
+      "max_lift": 12.881100041173896,
+      "num_regions": 3
+    },
+    "沟": {
+      "village_count": 128,
+      "frequency": 0,
+      "rank": 999,
+      "category": "regional_tendency",
+      "score": 10,
+      "reasons": [
+        "强区域倾向(lift=12.4)"
+      ],
+      "max_lift": 12.3721525794425,
+      "num_regions": 3
+    },
+    "后": {
+      "village_count": 389,
+      "frequency": 0,
+      "rank": 999,
+      "category": "regional_tendency",
+      "score": 10,
+      "reasons": [
+        "强区域倾向(lift=12.3)"
+      ],
+      "max_lift": 12.320175608378742,
+      "num_regions": 7
+    },
+    "路": {
+      "village_count": 357,
+      "frequency": 0,
+      "rank": 999,
+      "category": "regional_tendency",
+      "score": 10,
+      "reasons": [
+        "强区域倾向(lift=11.9)"
+      ],
+      "max_lift": 11.93896180124852,
+      "num_regions": 6
+    },
+    "社": {
+      "village_count": 300,
+      "frequency": 0,
+      "rank": 999,
+      "category": "regional_tendency",
+      "score": 10,
+      "reasons": [
+        "强区域倾向(lift=11.9)"
+      ],
+      "max_lift": 11.87389612251447,
+      "num_regions": 4
+    },
+    "冲": {
+      "village_count": 497,
+      "frequency": 0,
+      "rank": 999,
+      "category": "regional_tendency",
+      "score": 10,
+      "reasons": [
+        "强区域倾向(lift=11.6)"
+      ],
+      "max_lift": 11.629751579201075,
+      "num_regions": 13
+    },
+    "土": {
+      "village_count": 882,
+      "frequency": 0,
+      "rank": 999,
+      "category": "regional_tendency",
+      "score": 10,
+      "reasons": [
+        "强区域倾向(lift=10.2)"
+      ],
+      "max_lift": 10.199839595094412,
+      "num_regions": 3
+    },
+    "第": {
+      "village_count": 320,
+      "frequency": 0,
+      "rank": 999,
+      "category": "regional_tendency",
+      "score": 10,
+      "reasons": [
+        "强区域倾向(lift=10.1)"
+      ],
+      "max_lift": 10.086234640291712,
+      "num_regions": 5
+    },
+    "田": {
+      "village_count": 9823,
+      "frequency": 0.0344952311387675,
+      "rank": 11,
+      "category": "high_frequency",
+      "score": 8,
+      "reasons": [
+        "TOP30高频(排名11)",
+        "语义类别:agriculture"
+      ],
+      "semantic_category": "agriculture"
+    },
+    "岭": {
+      "village_count": 9406,
+      "frequency": 0.0330308606424969,
+      "rank": 13,
+      "category": "high_frequency",
+      "score": 8,
+      "reasons": [
+        "TOP30高频(排名13)",
+        "语义类别:mountain"
+      ],
+      "semantic_category": "mountain"
+    },
+    "龙": {
+      "village_count": 6402,
+      "frequency": 0.0224817743815931,
+      "rank": 16,
+      "category": "high_frequency",
+      "score": 8,
+      "reasons": [
+        "TOP30高频(排名16)",
+        "语义类别:symbolic"
+      ],
+      "semantic_category": "symbolic"
+    },
+    "水": {
+      "village_count": 6388,
+      "frequency": 0.0224326108637327,
+      "rank": 17,
+      "category": "high_frequency",
+      "score": 8,
+      "reasons": [
+        "TOP30高频(排名17)",
+        "语义类别:water"
+      ],
+      "semantic_category": "water"
+    },
+    "东": {
+      "village_count": 5797,
+      "frequency": 0.0203572080740543,
+      "rank": 21,
+      "category": "high_frequency",
+      "score": 8,
+      "reasons": [
+        "TOP30高频(排名21)",
+        "语义类别:direction"
+      ],
+      "semantic_category": "direction"
+    },
+    "尾": {
+      "village_count": 5666,
+      "frequency": 0.0198971780140748,
+      "rank": 23,
+      "category": "high_frequency",
+      "score": 8,
+      "reasons": [
+        "TOP30高频(排名23)",
+        "语义类别:settlement"
+      ],
+      "semantic_category": "settlement"
+    },
+    "黄": {
+      "village_count": 5620,
+      "frequency": 0.0197356407411049,
+      "rank": 24,
+      "category": "high_frequency",
+      "score": 8,
+      "reasons": [
+        "TOP30高频(排名24)",
+        "语义类别:clan"
+      ],
+      "semantic_category": "clan"
+    },
+    "竹": {
+      "village_count": 4871,
+      "frequency": 0.0171053925355733,
+      "rank": 28,
+      "category": "high_frequency",
+      "score": 8,
+      "reasons": [
+        "TOP30高频(排名28)",
+        "语义类别:vegetation"
+      ],
+      "semantic_category": "vegetation"
+    },
+    "安": {
+      "village_count": 1030,
+      "frequency": 0,
+      "rank": 999,
+      "category": "regional_tendency",
+      "score": 7,
+      "reasons": [
+        "中等区域倾向(lift=9.6)"
+      ],
+      "max_lift": 9.638440857119091,
+      "num_regions": 5
+    },
+    "边": {
+      "village_count": 324,
+      "frequency": 0,
+      "rank": 999,
+      "category": "regional_tendency",
+      "score": 7,
+      "reasons": [
+        "中等区域倾向(lift=9.4)"
+      ],
+      "max_lift": 9.430629594199086,
+      "num_regions": 6
+    },
+    "旺": {
+      "village_count": 450,
+      "frequency": 0,
+      "rank": 999,
+      "category": "regional_tendency",
+      "score": 7,
+      "reasons": [
+        "中等区域倾向(lift=8.8)"
+      ],
+      "max_lift": 8.791828383988562,
+      "num_regions": 4
+    },
+    "前": {
+      "village_count": 189,
+      "frequency": 0,
+      "rank": 999,
+      "category": "regional_tendency",
+      "score": 7,
+      "reasons": [
+        "中等区域倾向(lift=8.6)"
+      ],
+      "max_lift": 8.587161053748915,
+      "num_regions": 3
+    },
+    "一": {
+      "village_count": 610,
+      "frequency": 0,
+      "rank": 999,
+      "category": "regional_tendency",
+      "score": 7,
+      "reasons": [
+        "中等区域倾向(lift=8.5)"
+      ],
+      "max_lift": 8.510316228913686,
+      "num_regions": 4
+    },
+    "美": {
+      "village_count": 184,
+      "frequency": 0,
+      "rank": 999,
+      "category": "regional_tendency",
+      "score": 7,
+      "reasons": [
+        "中等区域倾向(lift=8.1)"
+      ],
+      "max_lift": 8.09640459259035,
+      "num_regions": 3
+    },
+    "二": {
+      "village_count": 640,
+      "frequency": 0,
+      "rank": 999,
+      "category": "regional_tendency",
+      "score": 7,
+      "reasons": [
+        "中等区域倾向(lift=8.0)"
+      ],
+      "max_lift": 7.956055598849018,
+      "num_regions": 4
+    },
+    "队": {
+      "village_count": 248,
+      "frequency": 0,
+      "rank": 999,
+      "category": "regional_tendency",
+      "score": 7,
+      "reasons": [
+        "中等区域倾向(lift=7.6)"
+      ],
+      "max_lift": 7.61084686821743,
+      "num_regions": 3
+    },
+    "北": {
+      "village_count": 478,
+      "frequency": 0,
+      "rank": 999,
+      "category": "regional_tendency",
+      "score": 7,
+      "reasons": [
+        "中等区域倾向(lift=7.2)"
+      ],
+      "max_lift": 7.167119702003423,
+      "num_regions": 8
+    },
+    "顶": {
+      "village_count": 192,
+      "frequency": 0,
+      "rank": 999,
+      "category": "regional_tendency",
+      "score": 7,
+      "reasons": [
+        "中等区域倾向(lift=7.1)"
+      ],
+      "max_lift": 7.115892765474989,
+      "num_regions": 3
+    },
+    "埇": {
+      "village_count": 1113,
+      "frequency": 0,
+      "rank": 999,
+      "category": "regional_tendency",
+      "score": 7,
+      "reasons": [
+        "中等区域倾向(lift=6.9)"
+      ],
+      "max_lift": 6.925140991685575,
+      "num_regions": 13
+    },
+    "埔": {
+      "village_count": 357,
+      "frequency": 0,
+      "rank": 999,
+      "category": "regional_tendency",
+      "score": 7,
+      "reasons": [
+        "中等区域倾向(lift=6.9)"
+      ],
+      "max_lift": 6.8535865608327935,
+      "num_regions": 8
+    },
+    "寮": {
+      "village_count": 240,
+      "frequency": 0,
+      "rank": 999,
+      "category": "regional_tendency",
+      "score": 7,
+      "reasons": [
+        "中等区域倾向(lift=6.8)"
+      ],
+      "max_lift": 6.818207979284021,
+      "num_regions": 4
+    },
+    "兴": {
+      "village_count": 412,
+      "frequency": 0,
+      "rank": 999,
+      "category": "regional_tendency",
+      "score": 7,
+      "reasons": [
+        "中等区域倾向(lift=6.7)"
+      ],
+      "max_lift": 6.74042392032607,
+      "num_regions": 4
+    },
+    "那": {
+      "village_count": 266,
+      "frequency": 0,
+      "rank": 999,
+      "category": "regional_tendency",
+      "score": 7,
+      "reasons": [
+        "中等区域倾向(lift=6.3)"
+      ],
+      "max_lift": 6.33389681298407,
+      "num_regions": 4
+    },
+    "和": {
+      "village_count": 446,
+      "frequency": 0,
+      "rank": 999,
+      "category": "regional_tendency",
+      "score": 7,
+      "reasons": [
+        "中等区域倾向(lift=5.4)"
+      ],
+      "max_lift": 5.415363539012591,
+      "num_regions": 4
+    },
+    "洞": {
+      "village_count": 717,
+      "frequency": 0,
+      "rank": 999,
+      "category": "regional_tendency",
+      "score": 7,
+      "reasons": [
+        "中等区域倾向(lift=5.1)"
+      ],
+      "max_lift": 5.090433690022027,
+      "num_regions": 10
+    },
+    "沙": {
+      "village_count": 3943,
+      "frequency": 0.0138465536373979,
+      "rank": 38,
+      "category": "high_frequency",
+      "score": 6,
+      "reasons": [
+        "TOP50高频(排名38)",
+        "语义类别:water"
+      ],
+      "semantic_category": "water"
+    },
+    "中": {
+      "village_count": 3542,
+      "frequency": 0.0124383700186821,
+      "rank": 40,
+      "category": "high_frequency",
+      "score": 6,
+      "reasons": [
+        "TOP50高频(排名40)",
+        "语义类别:direction"
+      ],
+      "semantic_category": "direction"
+    },
+    "河": {
+      "village_count": 3091,
+      "frequency": 0.0108546024076077,
+      "rank": 48,
+      "category": "high_frequency",
+      "score": 6,
+      "reasons": [
+        "TOP50高频(排名48)",
+        "语义类别:water"
+      ],
+      "semantic_category": "water"
+    },
+    "江": {
+      "village_count": 2953,
+      "frequency": 0.010369990588698,
+      "rank": 49,
+      "category": "high_frequency",
+      "score": 6,
+      "reasons": [
+        "TOP50高频(排名49)",
+        "语义类别:water"
+      ],
+      "semantic_category": "water"
+    },
+    "马": {
+      "village_count": 2817,
+      "frequency": 0.0098924021294826,
+      "rank": 50,
+      "category": "high_frequency",
+      "score": 6,
+      "reasons": [
+        "TOP50高频(排名50)",
+        "语义类别:symbolic"
+      ],
+      "semantic_category": "symbolic"
+    },
+    "石": {
+      "village_count": 9764,
+      "frequency": 0.0342880420277844,
+      "rank": 12,
+      "category": "high_frequency",
+      "score": 5,
+      "reasons": [
+        "TOP30高频(排名12)"
+      ]
+    },
+    "坪": {
+      "village_count": 6249,
+      "frequency": 0.0219444873649759,
+      "rank": 18,
+      "category": "high_frequency",
+      "score": 5,
+      "reasons": [
+        "TOP30高频(排名18)"
+      ]
+    },
+    "背": {
+      "village_count": 5480,
+      "frequency": 0.0192440055625008,
+      "rank": 25,
+      "category": "high_frequency",
+      "score": 5,
+      "reasons": [
+        "TOP30高频(排名25)"
+      ]
+    },
+    "口": {
+      "village_count": 5310,
+      "frequency": 0.0186470199884816,
+      "rank": 27,
+      "category": "high_frequency",
+      "score": 5,
+      "reasons": [
+        "TOP30高频(排名27)"
+      ]
+    },
+    "根": {
+      "village_count": 737,
+      "frequency": 0,
+      "rank": 999,
+      "category": "regional_tendency",
+      "score": 5,
+      "reasons": [
+        "弱区域倾向(lift=4.8)"
+      ],
+      "max_lift": 4.795327258508155,
+      "num_regions": 8
+    },
+    "角": {
+      "village_count": 4594,
+      "frequency": 0.0161326572179067,
+      "rank": 31,
+      "category": "high_frequency",
+      "score": 3,
+      "reasons": [
+        "TOP50高频(排名31)"
+      ]
+    },
+    "高": {
+      "village_count": 4107,
+      "frequency": 0.0144224691323341,
+      "rank": 33,
+      "category": "high_frequency",
+      "score": 3,
+      "reasons": [
+        "TOP50高频(排名33)"
+      ]
+    },
+    "三": {
+      "village_count": 3913,
+      "frequency": 0.0137412032419828,
+      "rank": 39,
+      "category": "high_frequency",
+      "score": 3,
+      "reasons": [
+        "TOP50高频(排名39)"
+      ]
+    },
+    "白": {
+      "village_count": 3336,
+      "frequency": 0.0117149639701647,
+      "rank": 42,
+      "category": "high_frequency",
+      "score": 3,
+      "reasons": [
+        "TOP50高频(排名42)"
+      ]
+    },
+    "心": {
+      "village_count": 3320,
+      "frequency": 0.01165877709261,
+      "rank": 43,
+      "category": "high_frequency",
+      "score": 3,
+      "reasons": [
+        "TOP50高频(排名43)"
+      ]
+    },
+    "树": {
+      "village_count": 3306,
+      "frequency": 0.0116096135747496,
+      "rank": 44,
+      "category": "high_frequency",
+      "score": 3,
+      "reasons": [
+        "TOP50高频(排名44)"
+      ]
+    },
+    "地": {
+      "village_count": 3205,
+      "frequency": 0.0112549339101852,
+      "rank": 45,
+      "category": "high_frequency",
+      "score": 3,
+      "reasons": [
+        "TOP50高频(排名45)"
+      ]
+    },
+    "窝": {
+      "village_count": 3190,
+      "frequency": 0.0112022587124777,
+      "rank": 46,
+      "category": "high_frequency",
+      "score": 3,
+      "reasons": [
+        "TOP50高频(排名46)"
+      ]
+    },
+    "排": {
+      "village_count": 3184,
+      "frequency": 0.0111811886333946,
+      "rank": 47,
+      "category": "high_frequency",
+      "score": 3,
+      "reasons": [
+        "TOP50高频(排名47)"
+      ]
+    }
+  },
+  "recommendations_by_category": {
+    "核心高频字符（必选）": [
+      "村",
+      "屋",
+      "围",
+      "岗",
+      "里",
+      "寨",
+      "南",
+      "坡"
+    ],
+    "地形地貌字符": [
+      "岗",
+      "坡",
+      "坑",
+      "山",
+      "岭"
+    ],
+    "水系字符": [
+      "塘",
+      "湖",
+      "水",
+      "沙",
+      "河",
+      "江"
+    ],
+    "方位字符": [
+      "南",
+      "下",
+      "上",
+      "西",
+      "东",
+      "中"
+    ],
+    "聚落字符": [
+      "村",
+      "屋",
+      "围",
+      "寨",
+      "头",
+      "楼",
+      "尾"
+    ],
+    "植物字符": [
+      "竹"
+    ],
+    "宗族字符": [
+      "黄"
+    ],
+    "区域特征字符": [
+      "围",
+      "里",
+      "庄",
+      "区",
+      "片",
+      "厝",
+      "崀",
+      "榃",
+      "垇",
+      "家",
+      "化",
+      "沟",
+      "后",
+      "路",
+      "社"
+    ]
+  }
+}

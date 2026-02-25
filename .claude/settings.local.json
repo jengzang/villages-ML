@@ -53,7 +53,9 @@
       "Bash(pkill:*)",
       "Bash(cd:*)",
       "Bash(PYTHONPATH=/c/Users/joengzaang/PycharmProjects/villages-ML python:*)",
-      "Bash(iconv:*)"
+      "Bash(iconv:*)",
+      "Bash(dir:*)",
+      "Bash(powershell.exe:*)"
     ]
   }
 }
