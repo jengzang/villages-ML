@@ -84,7 +84,7 @@ def regenerate_spatial_tendency_integration():
     """重新生成 spatial_tendency_integration 表"""
 
     # 可配置的空间聚类 run_id
-    SPATIAL_RUN_ID = 'spatial_eps_20'  # 使用粗粒度聚类（253个聚类，平均1121个村庄）
+    SPATIAL_RUN_ID = 'spatial_hdbscan_v1'  # 使用 HDBSCAN 聚类（7213个聚类，平均27.7个村庄）
 
     print("=" * 80)
     print("重新生成 spatial_tendency_integration 表")
@@ -183,10 +183,10 @@ def regenerate_spatial_tendency_integration():
     # Step 4: 获取每个聚类中的村庄
     print("\nStep 4: 加载聚类-村庄映射...")
     cursor.execute('''
-        SELECT spatial_cluster_id, village_id
-        FROM village_spatial_features
-        WHERE spatial_cluster_id >= 0
-    ''')
+        SELECT cluster_id, village_id
+        FROM village_cluster_assignments
+        WHERE run_id = ?
+    ''', (SPATIAL_RUN_ID,))
 
     cluster_villages = {}
     for cluster_id, village_id in cursor.fetchall():
