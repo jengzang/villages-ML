@@ -178,11 +178,39 @@ def write_results_to_db(
     cluster_profiles.to_sql('spatial_clusters', conn, if_exists='append', index=False)
     logger.info(f"  写入 {len(cluster_profiles)} 个聚类画像")
 
-    # 2. 写入村庄聚类分配（简化版，不包含概率）
-    # 注意：village_spatial_features 表结构可能不支持 run_id 和 cluster_probability
-    # 我们只记录聚类画像，村庄级别的分配可以通过 HDBSCAN 重新计算
-    logger.info(f"  聚类分配已完成（存储在聚类画像中）")
+    # 2. 写入村庄聚类分配到 village_cluster_assignments 表
+    logger.info(f"  写入村庄聚类分配...")
 
+    # 准备数据
+    village_assignments = []
+    created_at = time.time()
+
+    for idx, (village_id, cluster_id, prob) in enumerate(zip(coords_df['village_id'], labels, probabilities)):
+        if cluster_id >= 0:  # 只存储非噪声点
+            # 获取聚类大小
+            cluster_size = cluster_profiles[cluster_profiles['cluster_id'] == cluster_id]['cluster_size'].values
+            cluster_size = int(cluster_size[0]) if len(cluster_size) > 0 else None
+
+            village_assignments.append({
+                'run_id': run_id,
+                'village_id': village_id,
+                'cluster_id': int(cluster_id),
+                'cluster_size': cluster_size,
+                'cluster_probability': float(prob),
+                'created_at': created_at
+            })
+
+    # 删除旧数据（如果存在）
+    cursor = conn.cursor()
+    cursor.execute('DELETE FROM village_cluster_assignments WHERE run_id = ?', (run_id,))
+
+    # 写入新数据
+    if village_assignments:
+        assignments_df = pd.DataFrame(village_assignments)
+        assignments_df.to_sql('village_cluster_assignments', conn, if_exists='append', index=False)
+        logger.info(f"  写入 {len(village_assignments)} 条村庄聚类分配")
+
+    conn.commit()
     conn.close()
 
 
