@@ -4,6 +4,11 @@
 
 從 char_regional_analysis 表讀取數據，計算語義 VTF，
 寫入 semantic_regional_analysis 表。
+
+LEXICON VERSION: v1 (9 main categories)
+- Uses basic 9 semantic categories
+- Path: data/semantic_lexicon_v1.json
+- Generates: semantic_regional_analysis table
 """
 
 import sqlite3
@@ -46,17 +51,24 @@ def main():
     logger.info("\n[Step 2/4] Loading character frequency data...")
     conn = sqlite3.connect(db_path)
 
+    # Get actual global total villages
+    cursor = conn.cursor()
+    global_total_villages = cursor.execute(
+        "SELECT COUNT(*) FROM 广东省自然村_预处理"
+    ).fetchone()[0]
+    logger.info(f"Global total villages: {global_total_villages:,}")
+
     # Load global character frequency
     global_char_df = pd.read_sql_query("""
         SELECT
             char as character,
-            SUM(village_count) as village_count,
-            MAX(total_villages) as total_villages,
-            AVG(frequency) as frequency
+            SUM(village_count) as village_count
         FROM char_regional_analysis
         WHERE region_level = 'city'
         GROUP BY char
     """, conn)
+    # Add global total villages to all rows
+    global_char_df['total_villages'] = global_total_villages
     logger.info(f"Loaded {len(global_char_df)} global character frequencies")
 
     # Load regional character frequency

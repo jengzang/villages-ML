@@ -61,12 +61,21 @@ Thumbs.db
 logs/
 
 # Test outputs
-test-output/*
-!test-output/.gitignore
-!test-output/README.md
+tests/output/*
+!tests/output/.gitignore
+!tests/output/README.md
 
 # Pytest cache
 .pytest_cache/
 
 # Temporary test files
 test_import.py
+
+# Batch files (Windows-specific scripts)
+*.bat
+
+# Environment variables (API keys, secrets)
+.env
+.env.local
+config/secrets.json
+**/api_keys.txt

@@ -17,6 +17,7 @@ from .semantic import category as semantic_category
 from .semantic import labels as semantic_labels
 from .semantic import composition as semantic_composition
 from .semantic import centrality as semantic_centrality
+from .semantic import subcategories as semantic_subcategories
 from .clustering import assignments as cluster_assignments
 from .spatial import hotspots as spatial_hotspots
 from .spatial import integration as spatial_integration
@@ -57,6 +58,7 @@ app.include_router(semantic_category.router, prefix="/api")
 app.include_router(semantic_labels.router, prefix="/api")
 app.include_router(semantic_composition.router, prefix="/api")
 app.include_router(semantic_centrality.router, prefix="/api")
+app.include_router(semantic_subcategories.router, prefix="/api")
 app.include_router(cluster_assignments.router, prefix="/api")
 app.include_router(spatial_hotspots.router, prefix="/api")
 app.include_router(spatial_integration.router, prefix="/api")

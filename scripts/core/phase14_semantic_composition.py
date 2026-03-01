@@ -9,6 +9,11 @@ This script analyzes how semantic categories combine in village names:
 4. Identify semantic conflicts
 5. Calculate PMI scores
 
+LEXICON VERSION: v3_expanded (78 subcategories)
+- Provides fine-grained semantic analysis
+- Matches semantic_bigrams table structure
+- Path: data/semantic_lexicon_v3_expanded.json
+
 Approach: Offline-heavy, maximum accuracy, leverages Phase 2 semantic labels
 """
 
@@ -37,20 +42,30 @@ def step1_create_tables(db_path: str):
 
 
 def step2_analyze_compositions(db_path: str):
-    """Step 2: Analyze all semantic compositions."""
+    """Step 2: Analyze all semantic compositions - Generate BOTH basic and detailed tables."""
     print("\n" + "="*60)
-    print("Step 2: Analyzing Semantic Compositions")
+    print("Step 2: Analyzing Semantic Compositions (Dual Version)")
     print("="*60)
 
     conn = sqlite3.connect(db_path)
     cursor = conn.cursor()
 
-    with SemanticCompositionAnalyzer(db_path) as analyzer:
-        print("\nExtracting semantic compositions...")
+    # ========== Part 1: Generate BASIC tables (9 main categories, v1) ==========
+    print("\n[Part 1] Generating BASIC tables (9 main categories, v1)...")
+
+    # Clear existing data from basic tables
+    cursor.execute("DELETE FROM semantic_bigrams")
+    cursor.execute("DELETE FROM semantic_trigrams")
+    conn.commit()
+
+    lexicon_v1 = project_root / 'data' / 'semantic_lexicon_v1.json'
+
+    with SemanticCompositionAnalyzer(db_path, lexicon_path=str(lexicon_v1)) as analyzer:
+        print("Extracting semantic compositions (v1)...")
         compositions = analyzer.analyze_all_compositions()
 
-        # Store bigrams
-        print("Storing semantic bigrams...")
+        # Store bigrams (basic)
+        print("Storing semantic_bigrams (9 categories)...")
         bigrams = compositions['bigrams']
         total_bigrams = sum(bigrams.values())
 
@@ -62,8 +77,8 @@ def step2_analyze_compositions(db_path: str):
                 VALUES (?, ?, ?, ?)
             """, (cat1, cat2, freq, percentage))
 
-        # Store trigrams
-        print("Storing semantic trigrams...")
+        # Store trigrams (basic)
+        print("Storing semantic_trigrams (9 categories)...")
         trigrams = compositions['trigrams']
         total_trigrams = sum(trigrams.values())
 
@@ -76,29 +91,101 @@ def step2_analyze_compositions(db_path: str):
             """, (cat1, cat2, cat3, freq, percentage))
 
         conn.commit()
+        print(f"[OK] Extracted {len(bigrams):,} unique semantic bigrams (basic)")
+        print(f"[OK] Extracted {len(trigrams):,} unique semantic trigrams (basic)")
 
-        # Print statistics
-        print(f"\n[OK] Extracted {len(bigrams):,} unique semantic bigrams")
-        print(f"[OK] Extracted {len(trigrams):,} unique semantic trigrams")
+    # ========== Part 2: Generate DETAILED tables (76 subcategories, v4_hybrid) ==========
+    print("\n[Part 2] Generating DETAILED tables (76 subcategories, v4_hybrid)...")
+
+    # Create detailed tables if not exist
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS semantic_bigrams_detailed (
+            category1 TEXT NOT NULL,
+            category2 TEXT NOT NULL,
+            frequency INTEGER NOT NULL,
+            percentage REAL NOT NULL,
+            pmi REAL,
+            PRIMARY KEY (category1, category2)
+        )
+    """)
+
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS semantic_trigrams_detailed (
+            category1 TEXT NOT NULL,
+            category2 TEXT NOT NULL,
+            category3 TEXT NOT NULL,
+            frequency INTEGER NOT NULL,
+            percentage REAL NOT NULL,
+            PRIMARY KEY (category1, category2, category3)
+        )
+    """)
+
+    # Clear existing data from detailed tables
+    cursor.execute("DELETE FROM semantic_bigrams_detailed")
+    cursor.execute("DELETE FROM semantic_trigrams_detailed")
+    conn.commit()
+
+    lexicon_v4 = project_root / 'data' / 'semantic_lexicon_v4_hybrid.json'
+
+    with SemanticCompositionAnalyzer(db_path, lexicon_path=str(lexicon_v4)) as analyzer:
+        print("Extracting semantic compositions (v4_hybrid)...")
+        compositions = analyzer.analyze_all_compositions()
+
+        # Store bigrams (detailed)
+        print("Storing semantic_bigrams_detailed (76 subcategories)...")
+        bigrams = compositions['bigrams']
+        total_bigrams = sum(bigrams.values())
+
+        for (cat1, cat2), freq in bigrams.items():
+            percentage = (freq / total_bigrams * 100) if total_bigrams > 0 else 0
+            cursor.execute("""
+                INSERT OR REPLACE INTO semantic_bigrams_detailed
+                (category1, category2, frequency, percentage)
+                VALUES (?, ?, ?, ?)
+            """, (cat1, cat2, freq, percentage))
+
+        # Store trigrams (detailed)
+        print("Storing semantic_trigrams_detailed (76 subcategories)...")
+        trigrams = compositions['trigrams']
+        total_trigrams = sum(trigrams.values())
+
+        for (cat1, cat2, cat3), freq in trigrams.items():
+            percentage = (freq / total_trigrams * 100) if total_trigrams > 0 else 0
+            cursor.execute("""
+                INSERT OR REPLACE INTO semantic_trigrams_detailed
+                (category1, category2, category3, frequency, percentage)
+                VALUES (?, ?, ?, ?, ?)
+            """, (cat1, cat2, cat3, freq, percentage))
+
+        conn.commit()
+        print(f"[OK] Extracted {len(bigrams):,} unique semantic bigrams (detailed)")
+        print(f"[OK] Extracted {len(trigrams):,} unique semantic trigrams (detailed)")
 
     conn.close()
 
 
 def step3_calculate_pmi(db_path: str):
-    """Step 3: Calculate PMI scores."""
+    """Step 3: Calculate PMI scores for BOTH basic and detailed tables."""
     print("\n" + "="*60)
-    print("Step 3: Calculating PMI Scores")
+    print("Step 3: Calculating PMI Scores (Dual Version)")
     print("="*60)
 
     conn = sqlite3.connect(db_path)
     cursor = conn.cursor()
 
+    # ========== Part 1: Calculate PMI for BASIC tables (9 categories) ==========
+    print("\n[Part 1] Calculating PMI for BASIC tables (9 categories)...")
+
+    # Clear existing PMI data
+    cursor.execute("DELETE FROM semantic_pmi")
+    conn.commit()
+
     with SemanticCompositionAnalyzer(db_path) as analyzer:
-        # Get bigrams
+        # Get bigrams from basic table
         cursor.execute("SELECT category1, category2, frequency FROM semantic_bigrams")
         bigrams = {(cat1, cat2): freq for cat1, cat2, freq in cursor.fetchall()}
 
-        print("\nCalculating PMI...")
+        print("Calculating PMI for basic bigrams...")
         pmi_scores = analyzer.calculate_pmi(bigrams)
 
         # Update bigrams table with PMI
@@ -120,27 +207,78 @@ def step3_calculate_pmi(db_path: str):
             """, (cat1, cat2, pmi, freq, is_positive))
 
         conn.commit()
-        print(f"[OK] Calculated PMI for {len(pmi_scores):,} bigrams")
+        print(f"[OK] Calculated PMI for {len(pmi_scores):,} basic bigrams")
+
+    # ========== Part 2: Calculate PMI for DETAILED tables (76 subcategories) ==========
+    print("\n[Part 2] Calculating PMI for DETAILED tables (76 subcategories)...")
+
+    # Create detailed PMI table if not exists
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS semantic_pmi_detailed (
+            category1 TEXT NOT NULL,
+            category2 TEXT NOT NULL,
+            pmi REAL NOT NULL,
+            frequency INTEGER NOT NULL,
+            is_positive INTEGER NOT NULL,
+            PRIMARY KEY (category1, category2)
+        )
+    """)
+
+    # Clear existing detailed PMI data
+    cursor.execute("DELETE FROM semantic_pmi_detailed")
+    conn.commit()
+
+    with SemanticCompositionAnalyzer(db_path) as analyzer:
+        # Get bigrams from detailed table
+        cursor.execute("SELECT category1, category2, frequency FROM semantic_bigrams_detailed")
+        bigrams_detailed = {(cat1, cat2): freq for cat1, cat2, freq in cursor.fetchall()}
+
+        print("Calculating PMI for detailed bigrams...")
+        pmi_scores_detailed = analyzer.calculate_pmi(bigrams_detailed)
+
+        # Update detailed bigrams table with PMI
+        for (cat1, cat2), pmi in pmi_scores_detailed.items():
+            cursor.execute("""
+                UPDATE semantic_bigrams_detailed
+                SET pmi = ?
+                WHERE category1 = ? AND category2 = ?
+            """, (pmi, cat1, cat2))
+
+            # Also store in semantic_pmi_detailed table
+            freq = bigrams_detailed.get((cat1, cat2), 0)
+            is_positive = 1 if pmi > 0 else 0
+
+            cursor.execute("""
+                INSERT OR REPLACE INTO semantic_pmi_detailed
+                (category1, category2, pmi, frequency, is_positive)
+                VALUES (?, ?, ?, ?, ?)
+            """, (cat1, cat2, pmi, freq, is_positive))
+
+        conn.commit()
+        print(f"[OK] Calculated PMI for {len(pmi_scores_detailed):,} detailed bigrams")
 
     conn.close()
 
 
 def step4_detect_patterns(db_path: str):
-    """Step 4: Detect composition patterns."""
+    """Step 4: Detect composition patterns for BOTH basic and detailed tables."""
     print("\n" + "="*60)
-    print("Step 4: Detecting Composition Patterns")
+    print("Step 4: Detecting Composition Patterns (Dual Version)")
     print("="*60)
 
     conn = sqlite3.connect(db_path)
     cursor = conn.cursor()
 
+    # ========== Part 1: Detect patterns for BASIC tables (9 categories) ==========
+    print("\n[Part 1] Detecting patterns for BASIC tables (9 categories)...")
+
     with SemanticCompositionAnalyzer(db_path) as analyzer:
-        # Get bigrams
+        # Get bigrams from basic table
         from collections import Counter
         cursor.execute("SELECT category1, category2, frequency FROM semantic_bigrams")
         bigrams = Counter({(cat1, cat2): freq for cat1, cat2, freq in cursor.fetchall()})
 
-        print("\nDetecting modifier-head patterns...")
+        print("Detecting modifier-head patterns...")
         patterns = analyzer.detect_modifier_head_patterns(bigrams)
 
         total_patterns = sum(p['frequency'] for p in patterns)
@@ -163,7 +301,57 @@ def step4_detect_patterns(db_path: str):
             ))
 
         conn.commit()
-        print(f"[OK] Found {len(patterns):,} composition patterns")
+        print(f"[OK] Found {len(patterns)} composition patterns (basic)")
+
+    # ========== Part 2: Detect patterns for DETAILED tables (76 subcategories) ==========
+    print("\n[Part 2] Detecting patterns for DETAILED tables (76 subcategories)...")
+
+    # Create detailed patterns table if not exists
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS semantic_composition_patterns_detailed (
+            pattern TEXT PRIMARY KEY,
+            pattern_type TEXT NOT NULL,
+            modifier TEXT,
+            head TEXT,
+            frequency INTEGER NOT NULL,
+            percentage REAL NOT NULL,
+            description TEXT
+        )
+    """)
+
+    # Clear existing data
+    cursor.execute("DELETE FROM semantic_composition_patterns_detailed")
+    conn.commit()
+
+    with SemanticCompositionAnalyzer(db_path) as analyzer:
+        # Get bigrams from detailed table
+        cursor.execute("SELECT category1, category2, frequency FROM semantic_bigrams_detailed")
+        bigrams_detailed = Counter({(cat1, cat2): freq for cat1, cat2, freq in cursor.fetchall()})
+
+        print("Detecting modifier-head patterns...")
+        patterns_detailed = analyzer.detect_modifier_head_patterns(bigrams_detailed)
+
+        total_patterns_detailed = sum(p['frequency'] for p in patterns_detailed)
+
+        for pattern in patterns_detailed:
+            percentage = (pattern['frequency'] / total_patterns_detailed * 100) if total_patterns_detailed > 0 else 0
+
+            cursor.execute("""
+                INSERT OR REPLACE INTO semantic_composition_patterns_detailed
+                (pattern, pattern_type, modifier, head, frequency, percentage, description)
+                VALUES (?, ?, ?, ?, ?, ?, ?)
+            """, (
+                pattern['pattern'],
+                pattern['type'],
+                pattern.get('modifier'),
+                pattern.get('head'),
+                pattern['frequency'],
+                percentage,
+                f"{pattern['type']} pattern"
+            ))
+
+        conn.commit()
+        print(f"[OK] Found {len(patterns_detailed)} composition patterns (detailed)")
 
     conn.close()
 

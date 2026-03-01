@@ -98,8 +98,13 @@ villages-ML/
 │   ├── phases/                 # Phase summaries
 │   ├── guides/                 # Implementation guides
 │   └── reports/                # Analysis & status reports
-├── notebooks/                   # Jupyter notebooks
 ├── tests/                       # Unit tests
+│   └── output/                 # Test output files
+├── templates/                   # Report templates
+├── src/                         # Source modules
+├── config/                      # Configuration files
+├── models/                      # ML models (gitignored)
+├── results/                     # Analysis results (gitignored)
 ├── .claude/                     # Claude Code configuration
 │   └── skills/                 # Custom skills
 ├── README.md                    # Project overview
@@ -115,7 +120,7 @@ villages-ML/
 - **`api/`**: FastAPI backend with 30+ endpoints (~90% coverage)
 - **`scripts/`**: Analysis scripts organized by purpose
 - **`docs/`**: All documentation (organized by category)
-- **`notebooks/`**: Jupyter notebooks for exploration
+- **`tests/`**: Unit tests and test outputs
 - **`.claude/`**: Claude Code configuration and custom skills
 
 ## Database Optimization (2026-02-24)

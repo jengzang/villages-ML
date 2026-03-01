@@ -229,8 +229,10 @@ class VTFCalculator:
               - total_villages
               - support_flag
         """
-        # Create global frequency lookup
+        # Create global frequency and count lookups
         global_freq_map = dict(zip(global_vtf['category'], global_vtf['frequency']))
+        global_count_map = dict(zip(global_vtf['category'], global_vtf['vtf_count']))
+        global_total_villages = global_vtf['total_villages'].iloc[0] if len(global_vtf) > 0 else 1
 
         # Check if hierarchical columns exist
         has_hierarchical = all(col in regional_vtf.columns for col in ['city', 'county', 'township'])
@@ -245,8 +247,9 @@ class VTFCalculator:
             total_villages = row['total_villages']
             frequency = row['frequency']
 
-            # Get global frequency
+            # Get global frequency and count
             global_frequency = global_freq_map.get(category, 0.0)
+            global_count = global_count_map.get(category, 0)
 
             # Calculate lift
             lift = frequency / global_frequency if global_frequency > 0 else 0.0
@@ -257,8 +260,8 @@ class VTFCalculator:
             # Calculate log_odds
             log_odds = self._compute_log_odds(frequency, global_frequency)
 
-            # Calculate z_score
-            z_score = self._compute_z_score(vtf_count, total_villages, global_frequency)
+            # Calculate z_score (using counts instead of frequencies)
+            z_score = self._compute_z_score(vtf_count, total_villages, global_count, global_total_villages)
 
             # Support flag (categories with reasonable counts)
             support_flag = 1 if vtf_count >= 10 else 0
@@ -321,12 +324,38 @@ class VTFCalculator:
 
         return np.log(odds_region) - np.log(odds_global)
 
-    def _compute_z_score(self, n_region: int, N_region: int, p_global: float) -> float:
-        """Compute z-score for regional vs global frequency."""
-        expected = N_region * p_global
-        variance = N_region * p_global * (1 - p_global)
+    def _compute_z_score(self, n_region: int, N_region: int, n_global: int, N_global: int) -> float:
+        """
+        Compute z-score for regional vs global frequency using actual counts.
 
-        if variance < 1e-10:
+        Uses standardized difference with separate variance estimation.
+        This method works correctly even when VTF > N (frequency > 1).
+
+        Args:
+            n_region: Count in region (vtf_count)
+            N_region: Total villages in region
+            n_global: Count globally (global vtf_count)
+            N_global: Total villages globally
+
+        Returns:
+            Z-score indicating how many standard deviations the regional rate
+            differs from the global rate
+        """
+        if N_region == 0 or N_global == 0:
             return 0.0
 
-        return (n_region - expected) / np.sqrt(variance)
+        # Calculate rates (can be > 1 for VTF)
+        rate_region = n_region / N_region
+        rate_global = n_global / N_global
+
+        # Use Poisson approximation for variance (appropriate for count data)
+        # Variance of rate = lambda / N, where lambda is the expected count
+        var_region = rate_global / N_region  # Variance under null hypothesis
+
+        if var_region < 1e-10:
+            return 0.0
+
+        # Standardized difference
+        z_score = (rate_region - rate_global) / np.sqrt(var_region)
+
+        return z_score

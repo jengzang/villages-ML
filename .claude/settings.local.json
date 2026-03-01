@@ -55,7 +55,12 @@
       "Bash(PYTHONPATH=/c/Users/joengzaang/PycharmProjects/villages-ML python:*)",
       "Bash(iconv:*)",
       "Bash(dir:*)",
-      "Bash(powershell.exe:*)"
+      "Bash(powershell.exe:*)",
+      "Bash(lsof:*)",
+      "Bash(cd C:/Users/joengzaang/PycharmProjects/villages-ML && cp api/regions/similarity.py phase15-17-api/api/regions/ && cp api/spatial/integration.py phase15-17-api/api/spatial/ && cp api/semantic/subcategories.py phase15-17-api/api/semantic/ && cp data/semantic_lexicon_v4_hybrid.json phase15-17-api/data/ 2>&1)",
+      "Bash(source:*)",
+      "Bash(git rm:*)",
+      "Bash(rm:*)"
     ]
   }
 }

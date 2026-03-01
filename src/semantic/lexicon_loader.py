@@ -24,14 +24,25 @@ class SemanticLexicon:
         self._build_char_to_category_map()
 
     def _load_lexicon(self):
-        """Load lexicon from JSON file."""
+        """Load lexicon from JSON file.
+
+        Supports two formats:
+        - v1/v2/v3: data['categories'] (9 main categories or subcategories)
+        - v4_hybrid: data['subcategories'] (76 subcategories)
+        """
         with open(self.lexicon_path, 'r', encoding='utf-8') as f:
             data = json.load(f)
 
         self.version = data.get('version', 'unknown')
         self.created_at = data.get('created_at', 'unknown')
         self.description = data.get('description', '')
+
+        # Try 'categories' first (v1/v2/v3 format)
         self.categories = data.get('categories', {})
+
+        # Fall back to 'subcategories' (v4_hybrid format)
+        if not self.categories:
+            self.categories = data.get('subcategories', {})
 
         # Validate categories
         if not self.categories:

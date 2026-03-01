@@ -22,16 +22,20 @@ from scipy import stats
 class SemanticCompositionAnalyzer:
     """Analyze semantic composition patterns in village names."""
 
-    def __init__(self, db_path: str = 'data/villages.db', lexicon_path: str = 'data/semantic_lexicon_v2_demo.json'):
+    def __init__(self, db_path: str = 'data/villages.db', lexicon_path: str = 'data/semantic_lexicon_v3_expanded.json'):
+        """
+        Initialize SemanticCompositionAnalyzer.
+
+        HARDCODED: Uses v3_expanded lexicon (78 subcategories) for fine-grained analysis.
+        This matches the semantic_bigrams table structure.
+        """
         self.db_path = db_path
         self.lexicon_path = lexicon_path
         self.conn = None
 
-        # Semantic categories from lexicon
-        self.categories = [
-            'water', 'mountain', 'settlement', 'direction',
-            'clan', 'symbolic', 'agriculture', 'vegetation', 'infrastructure'
-        ]
+        # Note: categories will be loaded from lexicon file
+        # v3_expanded has 78 subcategories instead of 9 main categories
+        self.categories = None  # Will be loaded from lexicon
 
     def __enter__(self):
         self.conn = sqlite3.connect(self.db_path)
@@ -45,6 +49,10 @@ class SemanticCompositionAnalyzer:
         """
         Load character semantic labels from lexicon file.
 
+        Supports two formats:
+        - v1/v2/v3: lexicon['categories'] (9 main categories or subcategories)
+        - v4_hybrid: lexicon['subcategories'] (76 subcategories)
+
         Returns:
             Dictionary mapping character -> category
         """
@@ -54,7 +62,12 @@ class SemanticCompositionAnalyzer:
             lexicon = json.load(f)
 
         labels = {}
+
+        # Try 'categories' first (v1/v2/v3 format)
         categories = lexicon.get('categories', {})
+        if not categories:
+            # Fall back to 'subcategories' (v4_hybrid format)
+            categories = lexicon.get('subcategories', {})
 
         for category, characters in categories.items():
             for char in characters:

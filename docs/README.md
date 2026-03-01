@@ -55,6 +55,8 @@ Detailed implementation summaries for each analysis phase:
 - **`PHASE_12_SUMMARY.md`** - N-gram analysis
 - **`PHASE_13_SUMMARY.md`** - Spatial hotspots
 - **`PHASE_14_SUMMARY.md`** - Semantic composition
+- **`PHASE_17_IMPLEMENTATION_SUMMARY.md`** - ⭐ Semantic subcategory refinement (2026-02-25)
+- **`PHASE_17_SEMANTIC_SUBCATEGORY_GUIDE.md`** - Subcategory implementation guide
 
 **Use Case**: Understanding how each analysis phase was implemented
 
@@ -97,9 +99,14 @@ Step-by-step guides for specific features:
 - **`API_AUDIT_ACTUAL_STATUS.md`** - API audit report
 - **`FASTAPI_PROJECT_STRUCTURE.md`** - FastAPI project structure
 
-#### Recent Updates (2026-02-24)
+#### Recent Updates (2026-02-25)
 
-- **`DATABASE_MIGRATION_FOR_BACKEND.md`** - ⭐ Database schema migration guide (guides/)
+- **`PHASE_17_PILOT_EVALUATION.md`** - ⭐ Semantic subcategory refinement pilot evaluation
+- **`PHASE_17_IMPLEMENTATION_SUMMARY.md`** - Phase 17 implementation summary (phases/)
+
+#### Previous Updates (2026-02-24)
+
+- **`DATABASE_MIGRATION_FOR_BACKEND.md`** - Database schema migration guide (guides/)
 - **`DATABASE_OPTIMIZATION_COMPLETE.md`** - Database optimization details (guides/)
 
 #### Previous Updates (2026-02-21)
