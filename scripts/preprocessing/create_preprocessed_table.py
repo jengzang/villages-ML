@@ -101,6 +101,13 @@ def main():
     df['longitude'] = pd.to_numeric(df['longitude'], errors='coerce')
     df['latitude'] = pd.to_numeric(df['latitude'], errors='coerce')
 
+    # Fill county for cities without county-level divisions (Dongguan, Zhongshan)
+    logger.info("Filling county for cities without county-level divisions...")
+    null_county_mask = df['区县级'].isna()
+    df.loc[null_county_mask, '区县级'] = df.loc[null_county_mask, '市级']
+    filled_count = null_county_mask.sum()
+    logger.info(f"  Filled {filled_count} records (Dongguan: {(df['市级'] == '东莞市').sum()}, Zhongshan: {(df['市级'] == '中山市').sum()})")
+
     # Step 1: Basic text cleaning
     logger.info("Step 1: Basic text cleaning...")
     cleaning_results = []
