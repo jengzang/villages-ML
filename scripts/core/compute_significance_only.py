@@ -83,10 +83,13 @@ def compute_significance_from_regional_analysis(
     conn = sqlite3.connect(db_path)
 
     try:
-        # Load regional analysis data
+        # Load regional analysis data (with hierarchy - 2026-03-01)
         query = """
         SELECT
             region_level,
+            city,
+            county,
+            township,
             region_name,
             char,
             frequency as regional_freq,
@@ -129,6 +132,9 @@ def compute_significance_from_regional_analysis(
             results.append({
                 'run_id': run_id,
                 'region_level': row['region_level'],
+                'city': row['city'] if pd.notna(row['city']) else None,
+                'county': row['county'] if pd.notna(row['county']) else None,
+                'township': row['township'] if pd.notna(row['township']) else None,
                 'region_name': row['region_name'],
                 'char': row['char'],
                 'chi_square_statistic': chi_square,

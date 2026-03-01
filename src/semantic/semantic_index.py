@@ -33,11 +33,16 @@ class SemanticIndexCalculator:
 
         Args:
             villages_df: DataFrame with columns: 自然村, 市级 (or 县区级, 乡镇)
+                         Optionally: 市级, 区县级, 乡镇级 for full hierarchy
+                         Or: city, county, township (English names)
 
         Returns:
             DataFrame with columns:
               - village_name
               - region_name
+              - city (if available)
+              - county (if available)
+              - township (if available)
               - mountain_score
               - water_score
               - settlement_score
@@ -59,11 +64,33 @@ class SemanticIndexCalculator:
             # Calculate score for each category
             scores = {'village_name': village_name}
 
-            # Determine region name (try different columns)
-            if '市级' in row:
+            # Preserve full hierarchy if available (support both Chinese and English column names)
+            if 'city' in row:
+                scores['city'] = row['city']
+            elif '市级' in row:
+                scores['city'] = row['市级']
+
+            if 'county' in row:
+                scores['county'] = row['county']
+            elif '区县级' in row:
+                scores['county'] = row['区县级']
+
+            if 'township' in row:
+                scores['township'] = row['township']
+            elif '乡镇级' in row:
+                scores['township'] = row['乡镇级']
+
+            # Determine region_name (for backward compatibility)
+            if 'city' in scores:
+                scores['region_name'] = scores['city']
+            elif 'county' in scores:
+                scores['region_name'] = scores['county']
+            elif 'township' in scores:
+                scores['region_name'] = scores['township']
+            elif '市级' in row:
                 scores['region_name'] = row['市级']
-            elif '县区级' in row:
-                scores['region_name'] = row['县区级']
+            elif '区县级' in row:
+                scores['region_name'] = row['区县级']
             elif '乡镇' in row:
                 scores['region_name'] = row['乡镇']
             else:
@@ -96,6 +123,9 @@ class SemanticIndexCalculator:
         Returns:
             DataFrame with columns:
               - region_name
+              - city (if available)
+              - county (if available)
+              - township (if available)
               - category
               - raw_intensity
               - normalized_index
@@ -115,12 +145,35 @@ class SemanticIndexCalculator:
             global_sum = village_scores[score_col].sum()
             global_intensities[category] = global_sum / total_villages if total_villages > 0 else 0.0
 
+        # Determine grouping columns (use full hierarchy if available)
+        group_cols = [level_column]
+        hierarchy_cols = []
+
+        if 'city' in village_scores.columns:
+            hierarchy_cols.append('city')
+        if 'county' in village_scores.columns:
+            hierarchy_cols.append('county')
+        if 'township' in village_scores.columns:
+            hierarchy_cols.append('township')
+
+        # If we have hierarchy columns, group by them instead of just region_name
+        if hierarchy_cols:
+            group_cols = hierarchy_cols
+
         # Calculate regional intensities
         results = []
 
-        for region in village_scores[level_column].unique():
-            region_df = village_scores[village_scores[level_column] == region]
+        for group_key, region_df in village_scores.groupby(group_cols):
             n_villages = len(region_df)
+
+            # Extract hierarchy values
+            if isinstance(group_key, tuple):
+                hierarchy_values = dict(zip(group_cols, group_key))
+            else:
+                hierarchy_values = {group_cols[0]: group_key}
+
+            # Get region_name from the first row
+            region_name = region_df[level_column].iloc[0]
 
             for category in categories:
                 score_col = f'{category}_score'
@@ -136,13 +189,20 @@ class SemanticIndexCalculator:
                     regional_sum, n_villages, global_intensity, total_villages
                 )
 
-                results.append({
-                    'region_name': region,
+                result = {
+                    'region_name': region_name,
                     'category': category,
                     'raw_intensity': float(raw_intensity),
                     'normalized_index': float(normalized_index),
                     'z_score': float(z_score)
-                })
+                }
+
+                # Add hierarchy columns if available
+                for col in hierarchy_cols:
+                    if col in hierarchy_values:
+                        result[col] = hierarchy_values[col]
+
+                results.append(result)
 
         result_df = pd.DataFrame(results)
 
@@ -152,7 +212,9 @@ class SemanticIndexCalculator:
         ).astype(int)
 
         # Sort by region and rank
-        result_df = result_df.sort_values(['region_name', 'rank_within_province']).reset_index(drop=True)
+        sort_cols = hierarchy_cols if hierarchy_cols else ['region_name']
+        sort_cols.append('rank_within_province')
+        result_df = result_df.sort_values(sort_cols).reset_index(drop=True)
 
         return result_df
 

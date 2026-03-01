@@ -46,7 +46,6 @@ def load_villages(conn: sqlite3.Connection) -> pd.DataFrame:
     query = """
         SELECT 市级, 区县级, 乡镇级, 自然村_去前缀 as 自然村
         FROM 广东省自然村_预处理
-        WHERE 有效 = 1
     """
     df = pd.read_sql_query(query, conn)
     logger.info(f"Loaded {len(df)} villages")
@@ -129,27 +128,49 @@ def main():
 
             level_column = level_column_map[level]
 
-            # Prepare data for this level
-            level_df = villages_df[['自然村', level_column]].copy()
-            level_df = level_df.rename(columns={level_column: 'region_name'})
+            # Prepare data for this level - include hierarchy based on level (NEW: 2026-03-01)
+            if level == 'city':
+                # City level: only include city
+                level_df = villages_df[['市级', '自然村']].copy()
+                level_df = level_df.rename(columns={'市级': 'city'})
+                level_df['自然村'] = villages_df['自然村']
+            elif level == 'county':
+                # County level: include city and county
+                level_df = villages_df[['市级', '区县级', '自然村']].copy()
+                level_df = level_df.rename(columns={'市级': 'city', '区县级': 'county'})
+            elif level == 'township':
+                # Township level: include all three
+                level_df = villages_df[['市级', '区县级', '乡镇级', '自然村']].copy()
+                level_df = level_df.rename(columns={'市级': 'city', '区县级': 'county', '乡镇级': 'township'})
 
-            # Filter out NULL region names
-            level_df = level_df[level_df['region_name'].notna()]
+            # Filter out NULL region names for the current level
+            if level == 'city':
+                level_df = level_df[level_df['city'].notna()]
+            elif level == 'county':
+                level_df = level_df[level_df['county'].notna()]
+            elif level == 'township':
+                level_df = level_df[level_df['township'].notna()]
+
             logger.info(f"Processing {len(level_df)} villages with valid {level} names")
 
             # Calculate semantic scores for each village
             logger.info(f"Calculating semantic scores for {len(level_df)} villages...")
-            # Prepare data in the format expected by calculate_semantic_scores
-            score_input_df = villages_df[[level_column, '自然村']].copy()
-            score_input_df = score_input_df[score_input_df[level_column].notna()]
-            score_input_df = score_input_df.rename(columns={level_column: '市级'})
-
-            village_scores = calculator.calculate_semantic_scores(score_input_df)
+            village_scores = calculator.calculate_semantic_scores(level_df)
 
             # Calculate regional indices
             logger.info(f"Calculating regional indices...")
+            # Determine which column to use for grouping based on level
+            if level == 'city':
+                group_column = 'city'
+            elif level == 'county':
+                group_column = 'county'
+            elif level == 'township':
+                group_column = 'township'
+            else:
+                group_column = 'region_name'
+
             regional_indices = calculator.calculate_regional_indices(
-                village_scores, level_column='region_name'
+                village_scores, level_column=group_column
             )
 
             # Add region level

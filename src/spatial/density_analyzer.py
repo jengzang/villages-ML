@@ -82,26 +82,54 @@ class DensityAnalyzer:
             'spatial_cluster_id': lambda x: x.nunique()
         }
 
-        agg_df = features_df.groupby(region_level).agg(agg_dict).reset_index()
+        # Determine grouping columns based on region level
+        if region_level == 'town':
+            group_cols = ['city', 'county', 'town']
+        elif region_level == 'county':
+            group_cols = ['city', 'county']
+        else:  # city
+            group_cols = ['city']
 
-        # Rename columns
-        agg_df.columns = [
-            'region_name',
-            'total_villages',
-            'avg_nn_distance',
-            'avg_local_density',
-            'avg_isolation_score',
-            'n_isolated_villages',
-            'n_spatial_clusters'
-        ]
+        agg_df = features_df.groupby(group_cols).agg(agg_dict).reset_index()
+
+        # Extract hierarchy columns
+        if region_level == 'town':
+            agg_df['region_name'] = agg_df['town']
+            hierarchy_cols = ['city', 'county', 'town']
+        elif region_level == 'county':
+            agg_df['region_name'] = agg_df['county']
+            hierarchy_cols = ['city', 'county']
+            agg_df['town'] = None
+        else:  # city
+            agg_df['region_name'] = agg_df['city']
+            hierarchy_cols = ['city']
+            agg_df['county'] = None
+            agg_df['town'] = None
+
+        # Rename aggregated columns
+        agg_df = agg_df.rename(columns={
+            'village_name': 'total_villages',
+            'nn_distance_1': 'avg_nn_distance',
+            'local_density_5km': 'avg_local_density',
+            'isolation_score': 'avg_isolation_score',
+            'is_isolated': 'n_isolated_villages',
+            'spatial_cluster_id': 'n_spatial_clusters'
+        })
 
         # Add region level
         agg_df.insert(0, 'region_level', region_level)
 
         # Calculate spatial dispersion (coefficient of variation of nn_distance)
-        dispersion = features_df.groupby(region_level)['nn_distance_1'].std() / \
-                    features_df.groupby(region_level)['nn_distance_1'].mean()
+        dispersion = features_df.groupby(group_cols)['nn_distance_1'].std() / \
+                    features_df.groupby(group_cols)['nn_distance_1'].mean()
         agg_df['spatial_dispersion'] = dispersion.values
+
+        # Reorder columns: region_level, city, county, town, region_name, then metrics
+        cols = ['region_level', 'city', 'county', 'town', 'region_name',
+                'total_villages', 'avg_nn_distance', 'avg_local_density',
+                'avg_isolation_score', 'n_isolated_villages', 'n_spatial_clusters',
+                'spatial_dispersion']
+        agg_df = agg_df[cols]
 
         logger.info(f"Generated aggregates for {len(agg_df)} regions")
 

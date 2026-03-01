@@ -976,11 +976,15 @@ def write_semantic_indices(conn: sqlite3.Connection, run_id: str, df: pd.DataFra
     Args:
         conn: SQLite database connection
         run_id: Run identifier
-        df: DataFrame with index columns
+        df: DataFrame with index columns (including optional city, county, township)
 
     Note (2026-02-25):
         Automatically calculates and adds village_count for each region.
         This enables fast filtering by min_villages parameter in API.
+
+    Note (2026-03-01):
+        Now supports hierarchical columns (city, county, township) to distinguish
+        duplicate township names across different counties.
     """
     cursor = conn.cursor()
 
@@ -989,6 +993,15 @@ def write_semantic_indices(conn: sqlite3.Connection, run_id: str, df: pd.DataFra
 
     # Handle NaN values
     df_copy['z_score'] = df_copy['z_score'].where(pd.notna(df_copy['z_score']), None)
+
+    # Check if hierarchy columns exist (any of them)
+    has_hierarchy = any(col in df_copy.columns for col in ['city', 'county', 'township'])
+
+    # Ensure all hierarchy columns exist (fill with None if missing)
+    if has_hierarchy:
+        for col in ['city', 'county', 'township']:
+            if col not in df_copy.columns:
+                df_copy[col] = None
 
     # Calculate village_count for each region (NEW: 2026-02-25)
     logger.info("Calculating village_count for each region...")
@@ -1007,48 +1020,111 @@ def write_semantic_indices(conn: sqlite3.Connection, run_id: str, df: pd.DataFra
     # Calculate village_count for each unique region
     village_counts = {}
 
-    for _, row in df_copy[['region_level', 'region_name']].drop_duplicates().iterrows():
-        region_level = row['region_level']
-        region_name = row['region_name']
+    if has_hierarchy:
+        # Use full hierarchy for counting (NEW: 2026-03-01)
+        for _, row in df_copy[['region_level', 'city', 'county', 'township']].drop_duplicates().iterrows():
+            region_level = row['region_level']
+            city = row['city'] if pd.notna(row['city']) else None
+            county = row['county'] if pd.notna(row['county']) else None
+            township = row['township'] if pd.notna(row['township']) else None
 
-        col_idx = level_column_index.get(region_level)
-        if col_idx is None:
-            logger.warning(f"Unknown region_level: {region_level}")
-            village_counts[(region_level, region_name)] = 0
-            continue
+            # Build WHERE clause based on region level
+            if region_level == 'city' and city:
+                query = """
+                    SELECT COUNT(DISTINCT village_id)
+                    FROM 广东省自然村_预处理
+                    WHERE 市级 = ?
+                """
+                cursor.execute(query, (city,))
+            elif region_level == 'county' and city and county:
+                query = """
+                    SELECT COUNT(DISTINCT village_id)
+                    FROM 广东省自然村_预处理
+                    WHERE 市级 = ? AND 区县级 = ?
+                """
+                cursor.execute(query, (city, county))
+            elif region_level == 'township' and city and county and township:
+                query = """
+                    SELECT COUNT(DISTINCT village_id)
+                    FROM 广东省自然村_预处理
+                    WHERE 市级 = ? AND 区县级 = ? AND 乡镇级 = ?
+                """
+                cursor.execute(query, (city, county, township))
+            else:
+                logger.warning(f"Unknown region_level or missing hierarchy: {region_level}")
+                village_counts[(region_level, city, county, township)] = 0
+                continue
 
-        col_name = columns_info[col_idx][1]
+            count = cursor.fetchone()[0]
+            village_counts[(region_level, city, county, township)] = count
 
-        # Count villages using village_id
-        query = f"""
-            SELECT COUNT(DISTINCT village_id)
-            FROM 广东省自然村_预处理
-            WHERE "{col_name}" = ?
-        """
-        cursor.execute(query, (region_name,))
-        count = cursor.fetchone()[0]
+        # Add village_count to dataframe
+        df_copy['village_count'] = df_copy.apply(
+            lambda row: village_counts.get(
+                (row['region_level'],
+                 row['city'] if pd.notna(row['city']) else None,
+                 row['county'] if pd.notna(row['county']) else None,
+                 row['township'] if pd.notna(row['township']) else None), 0
+            ),
+            axis=1
+        )
+    else:
+        # Legacy behavior: use region_name only
+        for _, row in df_copy[['region_level', 'region_name']].drop_duplicates().iterrows():
+            region_level = row['region_level']
+            region_name = row['region_name']
 
-        village_counts[(region_level, region_name)] = count
+            col_idx = level_column_index.get(region_level)
+            if col_idx is None:
+                logger.warning(f"Unknown region_level: {region_level}")
+                village_counts[(region_level, region_name)] = 0
+                continue
 
-    # Add village_count to dataframe
-    df_copy['village_count'] = df_copy.apply(
-        lambda row: village_counts.get((row['region_level'], row['region_name']), 0),
-        axis=1
-    )
+            col_name = columns_info[col_idx][1]
+
+            # Count villages using village_id
+            query = f"""
+                SELECT COUNT(DISTINCT village_id)
+                FROM 广东省自然村_预处理
+                WHERE "{col_name}" = ?
+            """
+            cursor.execute(query, (region_name,))
+            count = cursor.fetchone()[0]
+
+            village_counts[(region_level, region_name)] = count
+
+        # Add village_count to dataframe
+        df_copy['village_count'] = df_copy.apply(
+            lambda row: village_counts.get((row['region_level'], row['region_name']), 0),
+            axis=1
+        )
 
     logger.info(f"Calculated village_count for {len(village_counts)} unique regions")
 
     # Prepare data for insertion
-    columns = ['run_id', 'region_level', 'region_name', 'category', 'raw_intensity',
-               'normalized_index', 'z_score', 'rank_within_province', 'village_count']
-    data = df_copy[columns].values.tolist()
+    if has_hierarchy:
+        columns = ['run_id', 'region_level', 'city', 'county', 'township', 'region_name',
+                   'category', 'raw_intensity', 'normalized_index', 'z_score',
+                   'rank_within_province', 'village_count']
+        data = df_copy[columns].values.tolist()
 
-    cursor.executemany("""
-        INSERT OR REPLACE INTO semantic_indices
-        (run_id, region_level, region_name, category, raw_intensity, normalized_index,
-         z_score, rank_within_province, village_count)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-    """, data)
+        cursor.executemany("""
+            INSERT OR REPLACE INTO semantic_indices
+            (run_id, region_level, city, county, township, region_name, category,
+             raw_intensity, normalized_index, z_score, rank_within_province, village_count)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        """, data)
+    else:
+        columns = ['run_id', 'region_level', 'region_name', 'category', 'raw_intensity',
+                   'normalized_index', 'z_score', 'rank_within_province', 'village_count']
+        data = df_copy[columns].values.tolist()
+
+        cursor.executemany("""
+            INSERT OR REPLACE INTO semantic_indices
+            (run_id, region_level, region_name, category, raw_intensity, normalized_index,
+             z_score, rank_within_province, village_count)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+        """, data)
 
     conn.commit()
     logger.info(f"Saved {len(data)} semantic indices records for run_id={run_id}")
@@ -1831,7 +1907,7 @@ def write_region_spatial_aggregates(conn: sqlite3.Connection, run_id: str, aggre
     Args:
         conn: SQLite database connection
         run_id: Unique run identifier
-        aggregates_df: DataFrame with regional aggregates
+        aggregates_df: DataFrame with regional aggregates (must include city, county, town columns)
     """
     import time
 
@@ -1842,9 +1918,14 @@ def write_region_spatial_aggregates(conn: sqlite3.Connection, run_id: str, aggre
     aggregates_df['run_id'] = run_id
     aggregates_df['created_at'] = time.time()
 
-    # Select columns
+    # Ensure hierarchy columns exist
+    for col in ['city', 'county', 'town']:
+        if col not in aggregates_df.columns:
+            aggregates_df[col] = None
+
+    # Select columns (including hierarchy)
     columns = [
-        'run_id', 'region_level', 'region_name',
+        'run_id', 'region_level', 'city', 'county', 'town', 'region_name',
         'total_villages', 'avg_nn_distance', 'avg_local_density',
         'avg_isolation_score', 'n_isolated_villages', 'n_spatial_clusters',
         'spatial_dispersion',
@@ -2033,6 +2114,11 @@ def write_semantic_regional_analysis(conn: sqlite3.Connection, df: pd.DataFrame,
     cursor = conn.cursor()
 
     logger.info(f"Writing {len(df)} rows to semantic_regional_analysis table")
+
+    # Clear existing data first to avoid duplicates
+    cursor.execute("DELETE FROM semantic_regional_analysis")
+    conn.commit()
+    logger.info("Cleared existing data from semantic_regional_analysis")
 
     # Prepare data for insertion
     df_copy = df.copy()
