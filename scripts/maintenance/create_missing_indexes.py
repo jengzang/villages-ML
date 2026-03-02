@@ -71,7 +71,8 @@ def create_indexes_by_priority(db_path: str, priority: str = "all"):
     # Priority 2: MEDIUM (15 indexes)
     medium_indexes = [
         # N-gram analysis (use "level" instead of "region_level")
-        "CREATE INDEX IF NOT EXISTS idx_ngram_tendency_lookup ON ngram_tendency(level, ngram, lift DESC)",
+        # Note: idx_ngram_tendency_lookup is redundant with idx_ngram_tendency_level_ngram (created by phase12)
+        # "CREATE INDEX IF NOT EXISTS idx_ngram_tendency_lookup ON ngram_tendency(level, ngram, lift DESC)",
         "CREATE INDEX IF NOT EXISTS idx_ngram_significance_lookup ON ngram_significance(level, ngram, is_significant)",
 
         # Village data
