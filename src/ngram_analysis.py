@@ -30,7 +30,7 @@ class NgramExtractor:
         self.conn = None
 
     def __enter__(self):
-        self.conn = sqlite3.connect(self.db_path)
+        self.conn = sqlite3.connect(self.db_path, timeout=60.0)
         return self
 
     def __exit__(self, exc_type, exc_val, exc_tb):
@@ -101,7 +101,7 @@ class NgramExtractor:
             Dictionary with counters for different positions
         """
         cursor = self.conn.cursor()
-        cursor.execute("SELECT 自然村 FROM 广东省自然村")
+        cursor.execute("SELECT 自然村_去前缀 FROM 广东省自然村_预处理")
 
         all_counter = Counter()
         prefix_counter = Counter()
@@ -149,8 +149,8 @@ class NgramExtractor:
 
         col_index = level_to_index.get(level, 0)
 
-        # Query all columns we need for hierarchical grouping
-        cursor.execute("SELECT * FROM 广东省自然村")
+        # Query all columns we need for hierarchical grouping (use preprocessed table)
+        cursor.execute("SELECT 市级, 区县级, 乡镇级, 自然村_去前缀 FROM 广东省自然村_预处理")
 
         regional_data = defaultdict(lambda: {
             'all': Counter(),
@@ -163,7 +163,7 @@ class NgramExtractor:
             city = row[0]        # 市级
             county = row[1]      # 区县级
             township = row[2]    # 乡镇级
-            village_name = row[4]  # 自然村
+            village_name = row[3]  # 自然村_去前缀
 
             if not village_name:
                 continue
@@ -177,7 +177,7 @@ class NgramExtractor:
                 if not city or not county:
                     continue
                 hierarchical_key = (city, county, None)
-            else:  # 乡镇
+            else:  # 乡镇级
                 if not city or not county or not township:
                     continue
                 hierarchical_key = (city, county, township)
@@ -200,7 +200,7 @@ class NgramAnalyzer:
         self.conn = None
 
     def __enter__(self):
-        self.conn = sqlite3.connect(self.db_path)
+        self.conn = sqlite3.connect(self.db_path, timeout=60.0)
         return self
 
     def __exit__(self, exc_type, exc_val, exc_tb):

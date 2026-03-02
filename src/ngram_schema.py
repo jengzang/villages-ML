@@ -142,7 +142,7 @@ def create_ngram_tables(db_path: str = 'data/villages.db'):
     """Create all n-gram analysis tables."""
     import sqlite3
 
-    conn = sqlite3.connect(db_path)
+    conn = sqlite3.connect(db_path, timeout=60.0)
     cursor = conn.cursor()
 
     # Create tables
