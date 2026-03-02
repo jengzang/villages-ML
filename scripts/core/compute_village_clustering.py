@@ -3,6 +3,8 @@ Phase 4: Compute village-level clustering.
 
 This script computes clustering for individual villages and fills the
 kmeans_cluster_id, dbscan_cluster_id, and gmm_cluster_id columns in village_features.
+
+Note: Uses HDBSCAN instead of DBSCAN for better performance on large datasets.
 """
 
 import sqlite3
@@ -10,9 +12,10 @@ import sys
 from pathlib import Path
 import pandas as pd
 import numpy as np
-from sklearn.cluster import KMeans, DBSCAN
+from sklearn.cluster import KMeans
 from sklearn.mixture import GaussianMixture
 from sklearn.preprocessing import StandardScaler
+import hdbscan
 
 # Add project root to path
 project_root = Path(__file__).parent.parent.parent
@@ -49,14 +52,19 @@ def compute_village_clustering(conn):
     X_scaled = scaler.fit_transform(X)
 
     # KMeans clustering
-    print("Running KMeans clustering (k=8)...")
-    kmeans = KMeans(n_clusters=8, random_state=42, n_init=10)
+    print("Running KMeans clustering (k=10)...")
+    kmeans = KMeans(n_clusters=10, random_state=42, n_init=10)
     df['kmeans_cluster_id'] = kmeans.fit_predict(X_scaled)
 
-    # DBSCAN clustering
-    print("Running DBSCAN clustering (eps=0.3, min_samples=50)...")
-    dbscan = DBSCAN(eps=0.3, min_samples=50)
-    df['dbscan_cluster_id'] = dbscan.fit_predict(X_scaled)
+    # HDBSCAN clustering (replaces DBSCAN for better performance)
+    print("Running HDBSCAN clustering (min_cluster_size=50, min_samples=10)...")
+    clusterer = hdbscan.HDBSCAN(
+        min_cluster_size=50,
+        min_samples=10,
+        metric='euclidean',
+        core_dist_n_jobs=-1  # Use all CPU cores
+    )
+    df['dbscan_cluster_id'] = clusterer.fit_predict(X_scaled)
 
     # GMM clustering
     print("Running GMM clustering (n_components=6)...")
@@ -93,7 +101,12 @@ def compute_village_clustering(conn):
     # Print cluster statistics
     print("\nCluster statistics:")
     print(f"  KMeans: {df['kmeans_cluster_id'].nunique()} clusters")
-    print(f"  DBSCAN: {df['dbscan_cluster_id'].nunique()} clusters (including noise: {(df['dbscan_cluster_id'] == -1).sum()})")
+
+    # HDBSCAN statistics
+    n_clusters = len(set(df['dbscan_cluster_id'])) - (1 if -1 in df['dbscan_cluster_id'].values else 0)
+    n_noise = (df['dbscan_cluster_id'] == -1).sum()
+    print(f"  HDBSCAN: {n_clusters} clusters, {n_noise} noise points ({n_noise/len(df)*100:.1f}%)")
+
     print(f"  GMM: {df['gmm_cluster_id'].nunique()} clusters")
 
 def main():
