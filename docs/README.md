@@ -1,227 +1,321 @@
 # Documentation Index
 
-This directory contains all project documentation organized by category.
+广东省自然村分析系统 - 文档索引
+
+本目录包含项目的所有文档，按类别组织。
+
+---
 
 ## 📁 Directory Structure
 
 ```
 docs/
-├── README.md                    # This file - documentation index
-├── frontend/                    # Frontend & API documentation
-├── phases/                      # Phase implementation summaries
-├── guides/                      # Implementation guides
-├── reports/                     # Analysis & status reports
-└── analysis_results_data.json  # Raw analysis data
+├── README.md                          # 本文件 - 文档索引
+├── RUN_ALL_PHASES_GUIDE.md          # ⭐ 执行指南（新）
+├── FEATURE_OVERVIEW.md               # 功能概览
+├── LEXICON_VERSIONS.md               # 词典版本
+├── DATABASE_OPTIMIZATION_2026-03-02.md  # 数据库优化记录
+│
+├── frontend/                          # 前端/API文档（3个）
+│   ├── API_REFERENCE.md              # 完整API参考
+│   ├── API_QUICK_REFERENCE.md        # 快速参考
+│   └── FRONTEND_INTEGRATION_GUIDE.md # 前端集成指南
+│
+├── guides/                            # 实现指南（8个）
+│   ├── CHAR_EMBEDDINGS_GUIDE.md
+│   ├── SPATIAL_ANALYSIS_GUIDE.md
+│   ├── LLM_LABELING_GUIDE.md
+│   ├── DATABASE_MIGRATION_FOR_BACKEND.md
+│   ├── TENDENCY_SIGNIFICANCE_GUIDE.md
+│   ├── ZSCORE_NORMALIZATION_GUIDE.md
+│   ├── RUN_ID_MANAGEMENT_QUICK_GUIDE.md
+│   └── DATABASE_MAINTENANCE_SCRIPTS.md
+│
+├── phases/                            # Phase实现文档（10个）
+│   ├── PHASE_0_PREPROCESSING_SUMMARY.md
+│   ├── PHASE_01_IMPLEMENTATION_SUMMARY.md
+│   ├── PHASE_02_IMPLEMENTATION_SUMMARY.md
+│   ├── PHASE_03_IMPLEMENTATION_SUMMARY.md
+│   ├── PHASE_11_SUMMARY.md
+│   ├── PHASE_12_SUMMARY.md
+│   ├── PHASE_13_SUMMARY.md
+│   ├── PHASE_14_SUMMARY.md
+│   ├── PHASE_15_16_IMPLEMENTATION_SUMMARY.md
+│   └── PHASE_17_IMPLEMENTATION_SUMMARY.md
+│
+└── reports/                           # 分析报告（5个）
+    ├── PROJECT_STATUS.md
+    ├── COMPREHENSIVE_ANALYSIS_REPORT.md
+    ├── DATABASE_STATUS_REPORT.md
+    ├── ANALYSIS_RESULTS_SHOWCASE.md
+    └── 分析结果展示_中文版.md
 ```
+
+**文档总数**: 31个（精简后，原73个）
 
 ---
 
 ## 🚀 Quick Start
 
-**New to this project?** Start here:
+**新用户？从这里开始：**
 
-1. **Project Overview**: `../README.md` (root directory)
-2. **Project Instructions**: `../CLAUDE.md` (development guidelines)
-3. **Preprocessing Guide**: `reports/PREPROCESSING_QUICK_START.md`
-4. **API Quick Start**: `frontend/API_QUICK_REFERENCE.md`
+1. **项目概览**: `../README.md` (根目录)
+2. **项目指南**: `../CLAUDE.md` (开发指南)
+3. **执行指南**: `RUN_ALL_PHASES_GUIDE.md` ⭐ **推荐**
+4. **API快速参考**: `frontend/API_QUICK_REFERENCE.md`
+5. **项目状态**: `reports/PROJECT_STATUS.md`
 
 ---
 
 ## 📚 Documentation by Category
 
-### Frontend & API Documentation (`frontend/`)
+### 1. 执行与配置
 
-Complete API documentation for the FastAPI backend:
+**如何运行分析流水线？**
 
-- **`API_REFERENCE.md`** - Complete API endpoint reference (30+ endpoints)
-- **`API_QUICK_REFERENCE.md`** - Quick reference guide (one-page)
-- **`FRONTEND_INTEGRATION_GUIDE.md`** - Vue 3 integration guide with examples
-- **`API_DEPLOYMENT_GUIDE.md`** - Deployment instructions (Docker, Nginx)
-- **`API_FINAL_GUIDE.md`** - Comprehensive API guide
+- **`RUN_ALL_PHASES_GUIDE.md`** ⭐ - 完整执行指南
+  - 所有17个phase的详细说明
+  - 命令行参数详解
+  - 使用场景示例
+  - 常见问题解答
 
-**Use Case**: Building a frontend application or deploying the API
-
----
-
-### Phase Summaries (`phases/`)
-
-Detailed implementation summaries for each analysis phase:
-
-- **`PHASE_0_PREPROCESSING_SUMMARY.md`** - Data preprocessing (prefix cleaning)
-- **`PHASE_01_IMPLEMENTATION_SUMMARY.md`** - Character embeddings (Word2Vec)
-- **`PHASE_02_IMPLEMENTATION_SUMMARY.md`** - LLM semantic labeling
-- **`PHASE_03_IMPLEMENTATION_SUMMARY.md`** - Semantic co-occurrence analysis
-- **`PHASE_11_SUMMARY.md`** - Query policy framework
-- **`PHASE_12_SUMMARY.md`** - N-gram analysis
-- **`PHASE_13_SUMMARY.md`** - Spatial hotspots
-- **`PHASE_14_SUMMARY.md`** - Semantic composition
-- **`PHASE_17_IMPLEMENTATION_SUMMARY.md`** - ⭐ Semantic subcategory refinement (2026-02-25)
-- **`PHASE_17_SEMANTIC_SUBCATEGORY_GUIDE.md`** - Subcategory implementation guide
-
-**Use Case**: Understanding how each analysis phase was implemented
+- **`FEATURE_OVERVIEW.md`** - 功能概览
+- **`LEXICON_VERSIONS.md`** - 语义词典版本管理
+- **`DATABASE_OPTIMIZATION_2026-03-02.md`** - 数据库优化记录
 
 ---
 
-### Implementation Guides (`guides/`)
+### 2. Frontend & API Documentation
 
-Step-by-step guides for specific features:
+**如何使用API？**
 
-- **`DATABASE_MIGRATION_FOR_BACKEND.md`** - ⭐ Database schema migration guide (2026-02-24)
-- **`CHAR_EMBEDDINGS_GUIDE.md`** - Character embedding generation
-- **`LLM_LABELING_GUIDE.md`** - LLM-assisted semantic labeling
-- **`LLM_SETUP_GUIDE.md`** - LLM API setup instructions
-- **`PHASE_03_SEMANTIC_COOCCURRENCE_GUIDE.md`** - Semantic co-occurrence
-- **`SPATIAL_ANALYSIS_GUIDE.md`** - Spatial analysis (k-NN, DBSCAN, KDE)
-- **`SPATIAL_TENDENCY_INTEGRATION_GUIDE.md`** - Spatial-tendency integration
-- **`TENDENCY_SIGNIFICANCE_GUIDE.md`** - Statistical significance testing
-- **`ZSCORE_NORMALIZATION_GUIDE.md`** - Z-score normalization
-- **`DATABASE_OPTIMIZATION_COMPLETE.md`** - Database optimization details
+📂 `frontend/` (3个文档)
 
-**Use Case**: Implementing or modifying specific analysis features
+- **`API_REFERENCE.md`** - 完整API参考
+  - 94个端点详细说明
+  - 请求/响应示例
+  - 错误处理
 
----
+- **`API_QUICK_REFERENCE.md`** - 快速参考（一页）
+  - 常用端点速查
+  - 快速上手
 
-### Analysis & Status Reports (`reports/`)
+- **`FRONTEND_INTEGRATION_GUIDE.md`** - 前端集成指南
+  - Vue 3集成示例
+  - 最佳实践
 
-#### Analysis Results
-
-- **`COMPREHENSIVE_ANALYSIS_REPORT.md`** - Complete analysis report (8000 words, Chinese)
-- **`ANALYSIS_RESULTS_SHOWCASE.md`** - Analysis results showcase (English)
-- **`分析结果展示_中文版.md`** - Analysis results showcase (Chinese)
-- **`COVERAGE_ANALYSIS_REPORT.md`** - Data coverage analysis
-
-#### Database & Implementation Status
-
-- **`PROJECT_STATUS.md`** - Overall project status
-- **`DATABASE_STATUS_REPORT.md`** - Database verification (44 tables, 2.3 GB)
-- **`DATABASE_VERIFICATION_SUMMARY.md`** - Data quality metrics
-- **`API_IMPLEMENTATION_SUMMARY.md`** - API implementation status
-- **`API_AUDIT_ACTUAL_STATUS.md`** - API audit report
-- **`FASTAPI_PROJECT_STRUCTURE.md`** - FastAPI project structure
-
-#### Recent Updates (2026-02-25)
-
-- **`PHASE_17_PILOT_EVALUATION.md`** - ⭐ Semantic subcategory refinement pilot evaluation
-- **`PHASE_17_IMPLEMENTATION_SUMMARY.md`** - Phase 17 implementation summary (phases/)
-
-#### Previous Updates (2026-02-24)
-
-- **`DATABASE_MIGRATION_FOR_BACKEND.md`** - Database schema migration guide (guides/)
-- **`DATABASE_OPTIMIZATION_COMPLETE.md`** - Database optimization details (guides/)
-
-#### Previous Updates (2026-02-21)
-
-- **`API_IMPLEMENTATION_UPDATE_20260221.md`** - Latest API updates
-- **`IMPLEMENTATION_COMPLETE_SPATIAL_INTEGRATION.md`** - Spatial integration completion
-- **`SPATIAL_TENDENCY_INTEGRATION_API.md`** - Spatial-tendency API documentation
-- **`SPATIAL_TENDENCY_INTEGRATION_FIX.md`** - Performance fix details
-- **`NEW_ENDPOINTS_QUICK_REFERENCE.md`** - New endpoints reference
-
-#### Preprocessing Reports
-
-- **`PREPROCESSING_QUICK_START.md`** - Preprocessing quick start
-- **`PREFIX_CLEANING_AUDIT_REPORT.md`** - Prefix cleaning audit (5,782 prefixes)
-
-**Use Case**: Understanding project status, data quality, and recent changes
+**适用场景**: 构建前端应用、API集成
 
 ---
 
-## 🔍 Finding Documentation
+### 3. Implementation Guides
 
-### By Task
+**如何实现特定功能？**
 
-| Task | Documentation |
-|------|---------------|
-| **Migrate backend after DB optimization** | `guides/DATABASE_MIGRATION_FOR_BACKEND.md` |
-| **Start using the API** | `frontend/API_QUICK_REFERENCE.md` |
-| **Build a frontend** | `frontend/FRONTEND_INTEGRATION_GUIDE.md` |
-| **Deploy the API** | `frontend/API_DEPLOYMENT_GUIDE.md` |
-| **Understand analysis results** | `reports/COMPREHENSIVE_ANALYSIS_REPORT.md` |
-| **Check project status** | `reports/PROJECT_STATUS.md` |
-| **Implement new features** | `guides/` (relevant guide) |
-| **Understand a phase** | `phases/` (relevant phase summary) |
+📂 `guides/` (8个文档)
 
-### By Topic
+#### 核心分析指南
 
-| Topic | Documentation |
-|-------|---------------|
-| **Character Analysis** | `phases/PHASE_01_IMPLEMENTATION_SUMMARY.md` |
-| **Semantic Analysis** | `phases/PHASE_02_IMPLEMENTATION_SUMMARY.md` |
-| **Spatial Analysis** | `guides/SPATIAL_ANALYSIS_GUIDE.md` |
-| **N-gram Analysis** | `phases/PHASE_12_SUMMARY.md` |
-| **API Endpoints** | `frontend/API_REFERENCE.md` |
-| **Database Schema** | `reports/DATABASE_STATUS_REPORT.md` |
-| **Data Preprocessing** | `reports/PREPROCESSING_QUICK_START.md` |
+- **`CHAR_EMBEDDINGS_GUIDE.md`** - 字符嵌入
+  - Word2Vec训练
+  - 相似度计算
 
----
+- **`SPATIAL_ANALYSIS_GUIDE.md`** - 空间分析
+  - k-NN、DBSCAN、KDE
+  - 热点检测
 
-## 📊 Project Statistics
+- **`LLM_LABELING_GUIDE.md`** - LLM语义标注
+  - API配置
+  - 标注流程
 
-- **Total Villages**: 285,860 (Guangdong Province)
-- **Database Tables**: 45 (all populated)
-- **API Endpoints**: 30-34 endpoints (~90% coverage)
-- **Analysis Phases**: 15 phases (all completed)
-- **Documentation Files**: 40+ markdown files
-- **Code Lines**: ~31,000 lines (60+ modules)
+#### 统计分析指南
 
----
+- **`TENDENCY_SIGNIFICANCE_GUIDE.md`** - 倾向性与显著性
+  - Lift计算
+  - 卡方检验
 
-## 🔗 External Resources
+- **`ZSCORE_NORMALIZATION_GUIDE.md`** - Z分数标准化
+  - 标准化方法
+  - 应用场景
 
-- **GitHub Repository**: [villages-ML](https://github.com/jengzang/villages-ML)
-- **API Documentation**: http://localhost:8000/docs (when server is running)
-- **Project Root**: `../README.md`
-- **Development Guide**: `../CLAUDE.md`
+#### 数据库与管理
 
----
+- **`DATABASE_MIGRATION_FOR_BACKEND.md`** ⭐ - 数据库迁移
+  - Schema变更
+  - 后端适配
 
-## 📝 Documentation Standards
+- **`DATABASE_MAINTENANCE_SCRIPTS.md`** - 数据库维护
+  - 维护脚本
+  - 最佳实践
 
-All documentation follows these standards:
+- **`RUN_ID_MANAGEMENT_QUICK_GUIDE.md`** - Run ID管理
+  - 版本控制
+  - 查询策略
 
-- **Format**: Markdown (.md)
-- **Language**: English (with Chinese translations where appropriate)
-- **Structure**: Clear headings, table of contents, code examples
-- **Updates**: Documentation is updated with each major feature addition
-- **Location**: All docs in `docs/` directory (organized by category)
+**适用场景**: 实现或修改分析功能
 
 ---
 
-## 🆕 Recent Updates
+### 4. Phase Implementation Summaries
 
-**2026-02-21**: Major documentation reorganization
-- Created organized directory structure (frontend/, phases/, guides/, reports/)
-- Added comprehensive documentation index (this file)
-- Moved 40+ documentation files to appropriate categories
-- Updated CLAUDE.md with new documentation structure
+**每个Phase做了什么？**
 
-**2026-02-21**: Spatial-Tendency Integration API
-- Added 4 new API endpoints
-- Complete API documentation
-- Performance optimization (7.49s execution time)
-- 643 integration records created
+📂 `phases/` (10个文档)
+
+#### 核心Phases (0-3)
+
+- **`PHASE_0_PREPROCESSING_SUMMARY.md`** - 数据预处理
+  - 前缀清理（5,782个）
+  - 文本标准化
+
+- **`PHASE_01_IMPLEMENTATION_SUMMARY.md`** - 字符嵌入
+  - Word2Vec训练（9,209字符）
+  - 相似度预计算
+
+- **`PHASE_02_IMPLEMENTATION_SUMMARY.md`** - 频率分析
+  - 字符频率统计
+  - 区域倾向性
+
+- **`PHASE_03_IMPLEMENTATION_SUMMARY.md`** - 语义分析
+  - LLM标注（9类）
+  - 共现网络（15,432边）
+
+#### 高级Phases (11-17)
+
+- **`PHASE_11_SUMMARY.md`** - 查询策略框架
+- **`PHASE_12_SUMMARY.md`** - N-gram分析（1,909,959模式）
+- **`PHASE_13_SUMMARY.md`** - 空间热点（8个热点）
+- **`PHASE_14_SUMMARY.md`** - 语义组合（8种模式）
+- **`PHASE_15_16_IMPLEMENTATION_SUMMARY.md`** - 区域相似度 + 语义中心性
+- **`PHASE_17_IMPLEMENTATION_SUMMARY.md`** - 混合分析
+
+**适用场景**: 理解分析流程、复现实验
 
 ---
 
-## 💡 Contributing
+### 5. Analysis & Status Reports
 
-When adding new documentation:
+**项目进展如何？分析结果是什么？**
 
-1. **Choose the right directory**:
-   - `frontend/` - API and frontend-related docs
-   - `phases/` - Phase implementation summaries
-   - `guides/` - Step-by-step implementation guides
-   - `reports/` - Analysis results and status reports
+📂 `reports/` (5个文档)
 
-2. **Follow naming conventions**:
-   - Phase summaries: `PHASE_XX_SUMMARY.md`
-   - Guides: `FEATURE_NAME_GUIDE.md`
-   - Reports: `REPORT_TYPE_REPORT.md`
+#### 项目状态
 
-3. **Update this index** when adding new documentation
+- **`PROJECT_STATUS.md`** ⭐ - 项目总体状态
+  - 完成度：95%
+  - 代码规模：51,782行
+  - 数据库：70张表，2.5GB
 
-4. **Keep documentation up-to-date** with code changes
+- **`DATABASE_STATUS_REPORT.md`** - 数据库状态
+  - 表结构验证
+  - 数据质量报告
+
+#### 分析结果
+
+- **`COMPREHENSIVE_ANALYSIS_REPORT.md`** ⭐ - 综合分析报告（中文）
+  - 8000字完整报告
+  - 15个phase结果
+  - 深度洞察
+
+- **`ANALYSIS_RESULTS_SHOWCASE.md`** - 结果展示（英文）
+  - 可视化结果
+  - 关键发现
+
+- **`分析结果展示_中文版.md`** - 结果展示（中文）
+  - 中文版本
+  - 详细解读
+
+**适用场景**: 了解项目进展、查看分析结果
 
 ---
 
-**Last Updated**: 2026-02-21
+## 🔍 Documentation by Task
+
+### 任务1: 我想运行分析
+
+1. 阅读 `RUN_ALL_PHASES_GUIDE.md`
+2. 检查 `reports/PROJECT_STATUS.md` 了解当前状态
+3. 运行 `python run_all_phases.py --list`
+
+### 任务2: 我想使用API
+
+1. 快速上手: `frontend/API_QUICK_REFERENCE.md`
+2. 完整参考: `frontend/API_REFERENCE.md`
+3. 前端集成: `frontend/FRONTEND_INTEGRATION_GUIDE.md`
+
+### 任务3: 我想理解某个Phase
+
+1. 查看 `phases/PHASE_XX_SUMMARY.md`
+2. 如需实现细节，查看对应的 `guides/` 文档
+
+### 任务4: 我想修改数据库
+
+1. 阅读 `guides/DATABASE_MIGRATION_FOR_BACKEND.md`
+2. 参考 `guides/DATABASE_MAINTENANCE_SCRIPTS.md`
+3. 检查 `DATABASE_OPTIMIZATION_2026-03-02.md`
+
+### 任务5: 我想查看分析结果
+
+1. 中文版: `reports/COMPREHENSIVE_ANALYSIS_REPORT.md`
+2. 英文版: `reports/ANALYSIS_RESULTS_SHOWCASE.md`
+3. 项目状态: `reports/PROJECT_STATUS.md`
+
+---
+
+## 📊 Documentation Statistics
+
+- **总文档数**: 31个
+- **总行数**: ~12,000行
+- **语言**: 中英文双语
+- **最后更新**: 2026-03-04
+
+### 文档分布
+
+| 类别 | 文档数 | 说明 |
+|------|--------|------|
+| 根目录 | 5 | 执行指南、功能概览 |
+| frontend/ | 3 | API文档 |
+| guides/ | 8 | 实现指南 |
+| phases/ | 10 | Phase文档 |
+| reports/ | 5 | 分析报告 |
+
+---
+
+## 🔄 Recent Updates
+
+### 2026-03-04
+- ✅ 新增 `RUN_ALL_PHASES_GUIDE.md` - 完整执行指南
+- ✅ 精简文档：73个 → 31个（减少58%）
+- ✅ 删除重复/过时文档
+- ✅ 更新文档索引
+
+### 2026-03-02
+- 数据库优化：5.45GB → 2.3GB
+- 新增优化记录文档
+
+### 2026-02-25
+- Phase 17完成
+- 语义子类别分析
+
+---
+
+## 💡 Tips
+
+1. **新用户**: 从 `RUN_ALL_PHASES_GUIDE.md` 开始
+2. **开发者**: 查看 `guides/` 目录
+3. **研究者**: 阅读 `reports/COMPREHENSIVE_ANALYSIS_REPORT.md`
+4. **API用户**: 使用 `frontend/API_QUICK_REFERENCE.md`
+
+---
+
+## 📞 Need Help?
+
+- **项目指南**: `../CLAUDE.md`
+- **项目README**: `../README.md`
+- **执行指南**: `RUN_ALL_PHASES_GUIDE.md`
+- **项目状态**: `reports/PROJECT_STATUS.md`
+
+---
+
+**Last Updated**: 2026-03-04
+**Documentation Version**: 2.0 (Simplified)

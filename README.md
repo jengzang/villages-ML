@@ -4,44 +4,179 @@
 
 ## 项目简介 (Project Overview)
 
-This project focuses on analyzing and modeling village data from Guangdong Province, China. The dataset includes geographic coordinates, administrative divisions, and language distribution information for natural villages.
+本项目专注于广东省自然村数据的统计分析和机器学习建模，包含 **285,000+ 自然村**的地理坐标、行政区划、语言分布等信息。
 
-## 快速开始 (Quick Start)
+主要功能：
+- 字符频率统计与区域倾向性分析
+- 语义标注与共现网络分析
+- 空间分布模式与热点检测
+- 聚类分析与命名模式识别
+- N-gram 模式提取与语义组合分析
 
-### 运行完整分析管道 (Run Complete Analysis Pipeline)
+**📖 想了解完整功能？** 查看 [功能总览文档](docs/FEATURE_OVERVIEW.md)（6300+ 行详细说明）
 
-使用 `run_all_phases.py` 脚本可以一次性运行所有分析阶段，或选择性地运行特定阶段。
+---
+
+## 🚀 第一次使用？从这里开始！
+
+### 1️⃣ 环境准备
+
+**系统要求**：
+- Python 3.8+ （推荐 3.10+）
+- 2GB+ 可用内存
+- 5GB+ 磁盘空间
+
+**安装依赖**：
 
 ```bash
-# 查看所有可用的分析阶段
-python run_all_phases.py --list
+# 克隆项目后，进入项目目录
+cd villages-ML
 
-# 运行所有分析阶段（Phase 0-6）
-python run_all_phases.py --all
+# 创建虚拟环境（推荐）
+python -m venv venv
 
-# 运行特定阶段（例如：Phase 1, 2, 3）
-python run_all_phases.py --phases 1,2,3
+# 激活虚拟环境
+# Windows (Git Bash):
+source venv/Scripts/activate
+# Linux/Mac:
+source venv/bin/activate
 
-# 使用自定义run ID前缀
-python run_all_phases.py --all --run-id-prefix production
-
-# 预览将要执行的命令（不实际运行）
-python run_all_phases.py --all --dry-run
+# 安装依赖包
+pip install -r requirements.txt
 ```
 
-### 分析阶段说明 (Analysis Phases)
+### 2️⃣ 检查数据库
 
-| Phase | 名称 | 说明 | 预计时间 |
-|-------|------|------|----------|
-| 0 | 数据预处理 | 清理村名，去除行政村前缀 | ~50秒 |
-| 1 | 字符嵌入 | 训练Word2Vec字符向量 | ~5秒 |
-| 2 | 频率与倾向性分析 | 计算字符频率和区域倾向性 | ~90秒 |
-| 3 | 空间分析 | 分析空间分布模式 | ~2分钟 |
-| 4 | 聚类分析 | 基于命名特征聚类村落 | ~3分钟 |
-| 5 | N-gram分析 | 提取字符n-gram模式 | ~2分钟 |
-| 6 | 语义组合分析 | 分析语义组合模式 | ~2分钟 |
+确认数据库文件存在：
 
-**总运行时间**：约10-15分钟（完整管道）
+```bash
+# 检查数据库文件
+ls -lh data/villages.db
+
+# 应该看到一个 2GB+ 的文件
+# 如果文件不存在或太小，请联系项目维护者获取完整数据库
+```
+
+### 3️⃣ 运行第一个分析
+
+**⚠️ 重要：必须先运行 Phase 0（数据预处理）**
+
+Phase 0 会创建预处理表 `广东省自然村_预处理`，所有其他阶段都依赖这个表。
+
+```bash
+# 第一步：运行数据预处理（必须！）
+python run_all_phases.py --phases 0
+
+# 第二步：查看所有可用阶段
+python run_all_phases.py --list
+
+# 第三步：运行核心分析阶段（Phase 0-7，约 30-50 分钟）
+python run_all_phases.py --group core
+
+# 或者运行所有 17 个阶段（约 1-2 小时）
+python run_all_phases.py --all
+```
+
+### 4️⃣ 查看结果
+
+```bash
+# 查询分析结果
+python scripts/query_results.py --list-runs
+
+# 查看全局字符频率（前 20 个）
+python scripts/query_results.py --run-id <run_id> --type global --top 20
+```
+
+---
+
+## 📖 快速参考
+
+### 常用命令
+
+```bash
+# 查看所有阶段
+python run_all_phases.py --list
+
+# 查看某个阶段的详细信息
+python run_all_phases.py --info 12
+
+# 预览执行计划（不实际运行）
+python run_all_phases.py --all --dry-run
+
+# 运行特定阶段
+python run_all_phases.py --phases 0,1,2,3
+
+# 运行阶段组
+python run_all_phases.py --group core        # 核心阶段 (0-7)
+python run_all_phases.py --group statistical # 统计阶段 (8-10)
+python run_all_phases.py --group advanced    # 高级阶段 (11-17)
+```
+
+### 分析阶段概览
+
+项目包含 **17 个分析阶段**，分为三组：
+
+**核心阶段 (Phase 0-7)** - 必需的基础分析：
+| Phase | 名称 | 说明 | 时间 |
+|-------|------|------|------|
+| 0 | 数据预处理 | ⚠️ **必须首先运行** - 清理村名，去除前缀 | 2-5 min |
+| 1 | 字符嵌入 | Word2Vec 训练（9,209 字符，100 维） | 5-10 min |
+| 2 | 频率分析 | 字符频率与区域倾向性统计 | 3-5 min |
+| 3 | 语义分析 | 语义标注与共现网络（9 类别） | 3-5 min |
+| 4 | 空间分析 | 空间分布、k-NN、DBSCAN 聚类 | 5-10 min |
+| 5 | 特征工程 | 提取 230+ 特征 | 3-5 min |
+| 6 | 聚类分析 | KMeans 区域聚类 | 3-5 min |
+| 7 | 特征物化 | 预计算特征存储 | 2-3 min |
+
+**统计阶段 (Phase 8-10)** - 统计显著性检验：
+| Phase | 名称 | 说明 | 时间 |
+|-------|------|------|------|
+| 8 | 倾向性分析 | Lift、Log-odds 计算 | 2-3 min |
+| 9 | Z-score 标准化 | 标准化倾向性分数 | 2-3 min |
+| 10 | 显著性检验 | Chi-square、p-value、效应量 | 2-3 min |
+
+**高级阶段 (Phase 11-17)** - 可选的深度分析：
+| Phase | 名称 | 说明 | 时间 |
+|-------|------|------|------|
+| 11 | 查询策略 | 在线服务策略框架 | 1-2 min |
+| 12 | N-gram 分析 | 提取 1,909,959 个模式 | 5-10 min |
+| 13 | 空间热点 | 热点检测（8 个热点） | 2-3 min |
+| 14 | 语义组合 | 语义组合模式（8 种） | 3-5 min |
+| 15 | 区域相似度 | 区域命名相似度分析 | 2-3 min |
+| 16 | 语义中心性 | 语义网络中心性分析 | 2-3 min |
+| 17 | 混合分析 | 混合特征分析 | 3-5 min |
+
+**完整运行时间**：约 1-2 小时（全部 17 个阶段）
+
+---
+
+## 📚 详细文档
+
+### 🌟 核心文档（必读）
+
+- **📖 功能总览（最详细）**：[docs/FEATURE_OVERVIEW.md](docs/FEATURE_OVERVIEW.md) ⭐
+  - 6300+ 行完整文档
+  - 系统架构、前后端技术栈
+  - 7 大功能模块详解（搜索、字符、语义、空间、模式、区域、ML）
+  - 30+ API 端点完整说明
+  - 数据库架构、算法详情
+  - **推荐：想深入了解项目的所有功能，从这里开始！**
+
+- **🚀 运行指南**：[docs/RUN_ALL_PHASES_GUIDE.md](docs/RUN_ALL_PHASES_GUIDE.md)
+  - 如何使用 `run_all_phases.py`
+  - 17 个分析阶段详解
+  - 命令行参数说明
+  - 常见问题解答
+
+### 📊 其他文档
+
+- **项目状态报告**：[docs/reports/PROJECT_STATUS.md](docs/reports/PROJECT_STATUS.md)
+- **API 参考文档**：[docs/frontend/API_REFERENCE.md](docs/frontend/API_REFERENCE.md)
+- **文档索引**：[docs/README.md](docs/README.md)
+
+---
+
+## 🔧 高级功能
 
 ### 配置常量 (Configuration Constants)
 
@@ -67,43 +202,281 @@ HOMOPHONE_PAIRS = {
 python run_all_phases.py --phases 0
 ```
 
-## 数据结构 (Data Structure)
+### 数据库结构 (Database Structure)
 
-The project uses a SQLite database (`data/villages.db`) containing information about villages including:
-- Administrative hierarchy (city, county, township, village committee)
-- Village names and pinyin romanization
-- Geographic coordinates (longitude, latitude)
-- Language distribution
-- Data sources and update timestamps
+项目使用 SQLite 数据库 (`data/villages.db`)，包含 44 个表：
 
-## 开发环境 (Development Environment)
+**原始数据表**：
+- `广东省自然村`：原始村庄数据（285K+ 记录）
+- `广东省自然村_预处理`：预处理后的数据（Phase 0 生成）
 
-### Requirements
+**分析结果表**（部分）：
+- `char_regional_analysis`：字符区域分析（频率+倾向性）
+- `pattern_regional_analysis`：模式区域分析
+- `semantic_regional_analysis`：语义区域分析
+- `village_features`：村庄特征（物化）
+- `spatial_clusters`：空间聚类结果
+- `ngram_frequency`：N-gram 频率
+- 更多表请参考 [docs/reports/DATABASE_STATUS_REPORT.md](docs/reports/DATABASE_STATUS_REPORT.md)
 
-- Python 3.8+
-- See `requirements.txt` for Python dependencies
+---
 
-### Setup
+## 🛠️ 开发指南
 
-```bash
-# Create virtual environment
-python -m venv venv
+### 项目结构
 
-# Activate virtual environment
-# On Windows:
-source venv/Scripts/activate
-# On Linux/Mac:
-source venv/bin/activate
-
-# Install dependencies
-pip install -r requirements.txt
+```
+villages-ML/
+├── data/                   # SQLite 数据库
+├── scripts/                # 分析脚本
+│   ├── core/              # 核心阶段脚本 (Phase 0-17)
+│   └── experimental/      # 实验性功能
+├── src/                    # 源代码模块
+│   ├── preprocessing/     # 数据预处理
+│   ├── analysis/          # 分析算法
+│   ├── clustering/        # 聚类算法
+│   └── data/              # 数据访问层
+├── docs/                   # 文档
+├── api/                    # FastAPI 后端（30+ 端点）
+├── tests/                  # 单元测试
+├── run_all_phases.py      # 主执行脚本
+└── requirements.txt       # Python 依赖
 ```
 
-## 自定义技能 (Custom Skills)
+### 自定义技能 (Custom Skills)
 
-This project includes custom Claude Code skills in `.claude/skills/`. Use them by typing `/skill-name` in Claude Code CLI.
+项目包含 Claude Code 自定义技能（`.claude/skills/`）：
+- `/tendency-analysis`：倾向性分析技能
+- 在 Claude Code CLI 中使用 `/skill-name` 调用
 
-## 频率分析管道 (Frequency Analysis Pipeline)
+---
+
+## 🔧 高级功能
+
+以下是项目的高级功能，适合深入研究和定制化分析。
+
+### 查询分析结果
+
+```bash
+# 列出所有运行记录
+python scripts/query_results.py --list-runs
+
+# 查询全局字符频率（前 20 个）
+python scripts/query_results.py --run-id <run_id> --type global --top 20
+
+# 查询特定区域的字符频率
+python scripts/query_results.py --run-id <run_id> --type regional --level city --region 广州市 --top 20
+
+# 查询字符的区域倾向性
+python scripts/query_results.py --run-id <run_id> --type char-tendency --char 村 --level city
+
+# 导出结果到 CSV
+python scripts/query_results.py --run-id <run_id> --type global --top 100 --output results.csv
+```
+
+### Python API 查询
+
+```python
+import sqlite3
+from src.data.db_query import (
+    get_latest_run_id,
+    get_global_frequency,
+    get_regional_frequency,
+    get_char_tendency_by_region
+)
+
+# 连接数据库
+conn = sqlite3.connect('data/villages.db')
+
+# 获取最新运行 ID
+run_id = get_latest_run_id(conn)
+
+# 查询全局频率
+df = get_global_frequency(conn, run_id, top_n=20)
+print(df)
+
+# 查询字符跨城市倾向性
+df = get_char_tendency_by_region(conn, run_id, '村', 'city')
+print(df)
+
+conn.close()
+```
+
+### 单独运行特定分析
+
+除了使用 `run_all_phases.py`，你也可以单独运行特定的分析脚本：
+
+```bash
+# 形态学分析
+python scripts/run_morphology_analysis.py --run-id morph_001
+
+# 村级聚类（MiniBatchKMeans）
+python scripts/run_village_clustering.py --db-path data/villages.db --output-dir results/clustering --k 50
+
+# DBSCAN 聚类（异常检测）
+python scripts/run_dbscan_clustering.py --db-path data/villages.db --output-dir results/dbscan --eps 0.5
+
+# GMM 聚类（软聚类）
+python scripts/run_gmm_clustering.py --db-path data/villages.db --output-dir results/gmm --n-components 50
+
+# 聚类可视化
+python scripts/visualize_clusters.py --db-path data/villages.db --cluster-file results/clustering/village_clusters.csv --output-dir results/viz
+```
+
+---
+
+## 📊 分析结果示例
+
+### 字符频率分析
+
+全局高频字符（前 10）：
+- 村 (87,919 次，30.76%)
+- 新 (45,123 次，15.82%)
+- 大 (38,456 次，13.47%)
+- 坑 (35,789 次，12.54%)
+- ...
+
+### 区域倾向性分析
+
+珠三角地区特征字符：
+- 涌（Lift: 8.5）- 水系相关
+- 围（Lift: 6.2）- 聚落形态
+- 塘（Lift: 4.8）- 水系相关
+
+山区特征字符：
+- 坑（Lift: 7.3）- 地形相关
+- 岭（Lift: 5.9）- 地形相关
+- 坳（Lift: 4.5）- 地形相关
+
+### 语义标签统计
+
+| 语义类别 | 村庄数量 | 百分比 |
+|---------|---------|--------|
+| settlement（聚落） | 87,919 | 30.76% |
+| direction（方位） | 77,069 | 26.96% |
+| mountain（山地） | 75,030 | 26.25% |
+| water（水系） | 47,324 | 16.55% |
+| clan（姓氏） | 29,599 | 10.35% |
+
+---
+
+## 🚢 部署说明
+
+### 在线服务策略
+
+项目实现了"离线重、在线轻"的部署策略：
+
+**离线阶段**（无性能限制）：
+- 运行所有 17 个分析阶段
+- 预计算所有特征和统计结果
+- 存储到数据库
+
+**在线阶段**（2 核 / 2GB 服务器）：
+- 仅加载预计算结果
+- 强制查询限制（最大 500-5000 行）
+- 禁止全表扫描
+- 支持分页查询
+
+### 启动 API 服务器
+
+```bash
+# 启动 FastAPI 服务器
+bash start_api.sh
+
+# 或手动启动
+cd api
+uvicorn main:app --host 0.0.0.0 --port 8000
+```
+
+API 文档：访问 `http://localhost:8000/docs`
+
+---
+
+## 🧪 测试
+
+```bash
+# 运行所有测试
+pytest
+
+# 运行带覆盖率的测试
+pytest --cov=src tests/
+
+# 运行特定测试
+pytest tests/test_preprocessing.py
+```
+
+---
+
+## 📝 更新日志
+
+### 2026-03-04
+- ✅ 完善 README.md，添加"第一次使用"指南
+- ✅ 优化文档结构，突出快速开始部分
+
+### 2026-02-24
+- ✅ 数据库优化：从 5.45GB 减少到 2.3GB（58% 减少）
+- ✅ 移除 run_id 冗余，合并频率+倾向性表
+- ✅ 添加 17 个索引优化查询性能
+
+### 2026-02-16
+- ✅ 实现在线服务策略框架（Phase 11）
+- ✅ 实现特征物化管道（Phase 10）
+- ✅ 实现村级聚类分析（MiniBatchKMeans, DBSCAN, GMM）
+- ✅ 实现 UMAP 可视化
+
+### 2026-02-15
+- ✅ 实现形态学模式分析功能
+- ✅ 添加 N-gram 分析（Phase 12）
+- ✅ 添加空间热点检测（Phase 13）
+
+### 2026-02-14
+- ✅ 实现语义分析管道（Phase 3）
+- ✅ 实现形态学分析管道
+- ✅ 添加 9 个语义类别的虚拟词频（VTF）分析
+
+### 2026-02-13
+- ✅ 实现字符频率分析管道（Phase 2）
+- ✅ 实现区域倾向性分析
+- ✅ 添加数据库持久化功能
+
+---
+
+## 🤝 贡献指南
+
+欢迎贡献！请遵循以下步骤：
+
+1. Fork 本仓库
+2. 创建特性分支 (`git checkout -b feature/AmazingFeature`)
+3. 提交更改 (`git commit -m 'Add some AmazingFeature'`)
+4. 推送到分支 (`git push origin feature/AmazingFeature`)
+5. 开启 Pull Request
+
+---
+
+## 📄 许可证
+
+TBD
+
+---
+
+## 📧 联系方式
+
+如有问题或建议，请：
+- 提交 Issue
+- **查看完整功能文档**：[docs/FEATURE_OVERVIEW.md](docs/FEATURE_OVERVIEW.md) ⭐（最详细）
+- 查看文档索引：[docs/README.md](docs/README.md)
+- 参考运行指南：[docs/RUN_ALL_PHASES_GUIDE.md](docs/RUN_ALL_PHASES_GUIDE.md)
+
+---
+
+## 🙏 致谢
+
+感谢所有为广东省自然村数据收集和整理做出贡献的人员。
+
+---
+
+<details>
+<summary>📦 详细功能列表（点击展开）</summary>
 
 ### 运行分析 (Running Analysis)
 
@@ -910,4 +1283,8 @@ python scripts/test_query_policy.py
 ## License
 
 TBD
+
+</details>
+
+
 
