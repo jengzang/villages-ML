@@ -99,7 +99,7 @@ def populate_audit_log(conn: sqlite3.Connection):
         有前缀,
         需要审核
     FROM 广东省自然村_预处理
-    WHERE 有效 = 1
+    WHERE 字符数量 > 0
     """
 
     cursor.execute(query)

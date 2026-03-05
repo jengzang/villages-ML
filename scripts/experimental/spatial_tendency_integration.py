@@ -177,7 +177,7 @@ def load_villages_with_chars(
             区县级 as county,
             乡镇级 as town
         FROM 广东省自然村_预处理
-        WHERE 有效 = 1
+        WHERE 字符数量 > 0
     """
 
     df = pd.read_sql_query(query, conn)

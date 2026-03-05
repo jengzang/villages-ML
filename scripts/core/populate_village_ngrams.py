@@ -38,7 +38,7 @@ def populate_village_ngrams(db_path: str = 'data/villages.db', batch_size: int =
 
     # Get total count for progress bar
     cursor.execute("""
-        SELECT COUNT(*) FROM 广东省自然村_预处理 WHERE 有效 = 1
+        SELECT COUNT(*) FROM 广东省自然村_预处理 WHERE 字符数量 > 0
     """)
     total_villages = cursor.fetchone()[0]
     print(f"\\nProcessing {total_villages:,} villages...")
@@ -47,7 +47,7 @@ def populate_village_ngrams(db_path: str = 'data/villages.db', batch_size: int =
     cursor.execute("""
         SELECT village_id, 村委会, 自然村_去前缀
         FROM 广东省自然村_预处理
-        WHERE 有效 = 1
+        WHERE 字符数量 > 0
     """)
 
     # Fetch all villages first to avoid cursor issues

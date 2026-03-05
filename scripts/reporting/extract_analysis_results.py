@@ -31,7 +31,7 @@ def main():
     cursor = conn.cursor()
     cursor.execute('SELECT COUNT(*) FROM 广东省自然村')
     total_villages = cursor.fetchone()[0]
-    cursor.execute('SELECT COUNT(*) FROM 广东省自然村_预处理 WHERE 有效=1')
+    cursor.execute('SELECT COUNT(*) FROM 广东省自然村_预处理 WHERE 字符数量 > 0')
     valid_villages = cursor.fetchone()[0]
 
     results['overview'] = {

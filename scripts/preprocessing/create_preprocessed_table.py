@@ -120,49 +120,35 @@ def main():
             '自然村_基础清洗': cleaned.clean_name,
             '有括号': 1 if cleaned.had_brackets else 0,
             '有噪音': 1 if cleaned.had_noise else 0,
-            '有效': 1 if cleaned.is_valid else 0,
-            '无效原因': cleaned.invalid_reason
         })
 
     df_clean = pd.concat([df, pd.DataFrame(cleaning_results)], axis=1)
 
     # Step 2: Administrative prefix removal
     logger.info("Step 2: Administrative prefix removal...")
-    # Select only valid rows
-    valid_df = df_clean[df_clean['有效'] == 1].copy()
+    # Process ALL villages (removed invalid filtering)
 
     # Prepare input dataframe with required columns
     # batch_clean_prefixes expects columns: 自然村, 村委会
     input_df = pd.DataFrame({
-        '自然村': valid_df['自然村_基础清洗'].values,
-        '村委会': valid_df['村委会'].values
+        '自然村': df_clean['自然村_基础清洗'].values,
+        '村委会': df_clean['村委会'].values
     })
 
     df_prefix_results = batch_clean_prefixes(
         input_df,
-        min_length=2,  # Changed from 3 to 2 to match new implementation
+        min_length=2,
         confidence_threshold=0.7
     )
 
-    # Merge results back with original valid rows
-    df_prefix = valid_df.copy()
-    df_prefix['自然村_去前缀'] = df_prefix_results['自然村_去前缀'].values
-    df_prefix['有前缀'] = df_prefix_results['有前缀'].values
-    df_prefix['去除的前缀'] = df_prefix_results['去除的前缀'].values
-    df_prefix['前缀匹配来源'] = df_prefix_results['前缀匹配来源'].values
-    df_prefix['前缀置信度'] = df_prefix_results['前缀置信度'].values
-    df_prefix['需要审核'] = df_prefix_results['需要审核'].values
-
-    # Merge back with invalid rows
-    df_invalid = df_clean[df_clean['有效'] == 0].copy()
-    df_invalid['自然村_去前缀'] = df_invalid['自然村_基础清洗']
-    df_invalid['有前缀'] = 0
-    df_invalid['去除的前缀'] = ""
-    df_invalid['前缀匹配来源'] = "invalid"
-    df_invalid['前缀置信度'] = 0.0
-    df_invalid['需要审核'] = 0
-
-    df_combined = pd.concat([df_prefix, df_invalid], ignore_index=True)
+    # Merge results back
+    df_combined = df_clean.copy()
+    df_combined['自然村_去前缀'] = df_prefix_results['自然村_去前缀'].values
+    df_combined['有前缀'] = df_prefix_results['有前缀'].values
+    df_combined['去除的前缀'] = df_prefix_results['去除的前缀'].values
+    df_combined['前缀匹配来源'] = df_prefix_results['前缀匹配来源'].values
+    df_combined['前缀置信度'] = df_prefix_results['前缀置信度'].values
+    df_combined['需要审核'] = df_prefix_results['需要审核'].values
 
     # Step 3: Numbered village normalization
     logger.info("Step 3: Numbered village normalization...")
@@ -191,17 +177,12 @@ def main():
         if idx % 10000 == 0:
             logger.info(f"  Progress: {idx}/{len(df_final)}")
 
-        if row['有效'] == 1:
-            char_set = extract_char_set(row['自然村_规范化'])
-            char_sets.append({
-                '字符集': json.dumps(list(char_set), ensure_ascii=False),
-                '字符数量': len(char_set)
-            })
-        else:
-            char_sets.append({
-                '字符集': "[]",
-                '字符数量': 0
-            })
+        # Extract character set for all villages
+        char_set = extract_char_set(row['自然村_规范化'])
+        char_sets.append({
+            '字符集': json.dumps(list(char_set), ensure_ascii=False),
+            '字符数量': len(char_set)
+        })
 
     df_final = pd.concat([df_final, pd.DataFrame(char_sets)], axis=1)
 
@@ -240,13 +221,14 @@ def main():
     logger.info(f"Verification: {count} rows written")
 
     # Statistics (using df_final which has all the metadata)
-    valid_count = df_final['有效'].sum()
-    prefix_count = df_final[df_final['有效'] == 1]['有前缀'].sum()
-    numbered_count = df_final[df_final['有效'] == 1]['有编号后缀'].sum()
+    total_count = len(df_final)
+    valid_count = (df_final['字符数量'] > 0).sum()
+    prefix_count = df_final[df_final['字符数量'] > 0]['有前缀'].sum()
+    numbered_count = df_final[df_final['字符数量'] > 0]['有编号后缀'].sum()
 
     logger.info(f"\nPreprocessing Statistics:")
-    logger.info(f"  Total villages: {count}")
-    logger.info(f"  Valid villages: {valid_count}")
+    logger.info(f"  Total villages: {total_count}")
+    logger.info(f"  Valid villages (字符数量 > 0): {valid_count}")
     logger.info(f"  Prefixes removed: {prefix_count} ({100*prefix_count/valid_count:.1f}%)")
     logger.info(f"  Numbered villages: {numbered_count} ({100*numbered_count/valid_count:.1f}%)")
 

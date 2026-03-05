@@ -166,7 +166,7 @@ def get_regional_hierarchy(conn: sqlite3.Connection, use_preprocessed: bool = Tr
     # Determine table name and filter
     if use_preprocessed:
         table_name = '广东省自然村_预处理'
-        where_clause = 'WHERE 有效 = 1 AND'
+        where_clause = 'WHERE 字符数量 > 0 AND'
     else:
         table_name = '广东省自然村'
         where_clause = 'WHERE'
@@ -218,7 +218,7 @@ def get_region_village_counts(conn: sqlite3.Connection, level: str, use_preproce
     # Determine table name and filter
     if use_preprocessed:
         table_name = '广东省自然村_预处理'
-        where_clause = f'WHERE 有效 = 1 AND {column} IS NOT NULL'
+        where_clause = f'WHERE 字符数量 > 0 AND {column} IS NOT NULL'
     else:
         table_name = '广东省自然村'
         where_clause = f'WHERE {column} IS NOT NULL'

@@ -17,9 +17,9 @@ def get_phase0_stats(conn):
     df = pd.read_sql_query("""
         SELECT
             COUNT(*) as total_villages,
-            SUM(CASE WHEN 有效 = 1 THEN 1 ELSE 0 END) as valid_villages,
+            SUM(CASE WHEN 字符数量 > 0 THEN 1 ELSE 0 END) as valid_villages,
             COUNT(DISTINCT 市级) as cities,
-            COUNT(DISTINCT 县区级) as counties
+            COUNT(DISTINCT 区县级) as counties
         FROM 广东省自然村_预处理
     """, conn)
 

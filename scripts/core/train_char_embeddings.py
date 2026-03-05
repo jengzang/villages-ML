@@ -24,8 +24,8 @@ import sqlite3
 import pandas as pd
 from pathlib import Path
 
-# Add src to path
-sys.path.insert(0, str(Path(__file__).parent.parent))
+# Add project root to path
+sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 
 from src.nlp import CharacterEmbeddingTrainer, EmbeddingStorage
 
@@ -36,7 +36,7 @@ def load_villages(db_path: str) -> pd.DataFrame:
     conn = sqlite3.connect(db_path)
     # Use preprocessed table with prefix-cleaned names
     df = pd.read_sql_query(
-        "SELECT 自然村_去前缀 as 自然村 FROM 广东省自然村_预处理 WHERE 有效 = 1",
+        "SELECT 自然村_去前缀 as 自然村 FROM 广东省自然村_预处理 WHERE 字符数量 > 0",
         conn
     )
     conn.close()
