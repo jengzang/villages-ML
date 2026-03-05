@@ -19,7 +19,7 @@ def compute_char_frequency_global(villages_df: pd.DataFrame) -> pd.DataFrame:
     - p_c = n_c / N (frequency)
 
     Args:
-        villages_df: DataFrame with columns [char_set_json, is_valid]
+        villages_df: DataFrame with columns [char_set_json] or [字符集]
 
     Returns:
         DataFrame with columns:
@@ -29,8 +29,15 @@ def compute_char_frequency_global(villages_df: pd.DataFrame) -> pd.DataFrame:
         - frequency: Proportion (village_count / total_villages)
         - rank: Rank by frequency (1 = most common)
     """
-    # Filter to valid villages only
-    valid_df = villages_df[villages_df['is_valid']].copy()
+    # Handle both column names (English and Chinese)
+    char_set_col = 'char_set_json' if 'char_set_json' in villages_df.columns else '字符集'
+
+    # Filter to valid villages only (if is_valid column exists, otherwise use all)
+    if 'is_valid' in villages_df.columns:
+        valid_df = villages_df[villages_df['is_valid']].copy()
+    else:
+        valid_df = villages_df.copy()
+
     total_villages = len(valid_df)
 
     logger.info(f"Computing global frequencies for {total_villages:,} valid villages")
@@ -42,7 +49,7 @@ def compute_char_frequency_global(villages_df: pd.DataFrame) -> pd.DataFrame:
     # Count character occurrences (binary presence per village)
     char_counts = {}
 
-    for char_set_json in valid_df['char_set_json']:
+    for char_set_json in valid_df[char_set_col]:
         char_set = set(json.loads(char_set_json))
         for char in char_set:
             char_counts[char] = char_counts.get(char, 0) + 1
@@ -77,7 +84,7 @@ def compute_char_frequency_by_region(
     Compute character frequencies by region with hierarchical grouping.
 
     Args:
-        villages_df: DataFrame with columns [市级, 区县级, 乡镇级, char_set_json, is_valid]
+        villages_df: DataFrame with columns [市级, 区县级, 乡镇级, 字符集 or char_set_json]
         region_level: 'city', 'county', or 'township'
 
     Returns:
@@ -104,8 +111,14 @@ def compute_char_frequency_by_region(
 
     region_col = level_map[region_level]
 
-    # Filter to valid villages
-    valid_df = villages_df[villages_df['is_valid']].copy()
+    # Handle both column names (English and Chinese)
+    char_set_col = 'char_set_json' if 'char_set_json' in villages_df.columns else '字符集'
+
+    # Filter to valid villages (if is_valid column exists, otherwise use all)
+    if 'is_valid' in villages_df.columns:
+        valid_df = villages_df[villages_df['is_valid']].copy()
+    else:
+        valid_df = villages_df.copy()
 
     logger.info(f"Computing {region_level}-level frequencies with hierarchical grouping")
 
@@ -146,7 +159,7 @@ def compute_char_frequency_by_region(
 
         # Count characters in this region
         char_counts = {}
-        for char_set_json in group['char_set_json']:
+        for char_set_json in group[char_set_col]:
             char_set = set(json.loads(char_set_json))
             for char in char_set:
                 char_counts[char] = char_counts.get(char, 0) + 1

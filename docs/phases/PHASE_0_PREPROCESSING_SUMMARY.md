@@ -292,14 +292,8 @@ python scripts/generate_audit_report.py
 # Phase 1: Character frequency
 python scripts/phase1_frequency_analysis.py
 
-# Phase 2: Regional tendency
+# Phase 2: Regional tendency (includes z-score and significance testing)
 python scripts/phase2_regional_tendency.py
-
-# Phase 8: Z-score normalization
-python scripts/phase8_zscore_normalization.py
-
-# Phase 9: Significance testing
-python scripts/phase9_significance_testing.py
 ```
 
 ### Step 7: Generate Impact Report

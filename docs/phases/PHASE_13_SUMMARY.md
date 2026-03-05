@@ -330,7 +330,8 @@ b3220d3 feat: 實現交互式地圖生成
 
 ### Complements Phase 1-12
 - **Phase 1-7**: Frequency and morphology analysis (linguistic)
-- **Phase 8-10**: Clustering analysis (semantic)
+- **Phase 2**: Tendency analysis with statistical testing (z-score, significance)
+- **Phase 6**: Clustering analysis (semantic)
 - **Phase 11**: Feature materialization (all features)
 - **Phase 12**: Export and reproducibility
 - **Phase 13**: Spatial analysis (geographic) ← NEW

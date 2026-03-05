@@ -124,7 +124,8 @@ def load_villages(
         base_conditions = []
 
     # Build query - use actual column names from database
-    query = f"SELECT 市级, 区县级, 乡镇级, {village_col} as 自然村 FROM {table_name}"
+    # Include 字符集 column for character frequency analysis
+    query = f"SELECT 市级, 区县级, 乡镇级, {village_col} as 自然村, 字符集 FROM {table_name}"
     conditions = base_conditions.copy()
     params = []
 

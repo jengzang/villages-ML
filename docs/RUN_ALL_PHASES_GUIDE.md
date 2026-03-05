@@ -62,10 +62,7 @@ python run_all_phases.py --phases 0-5,12,14-17
 # 核心阶段 (Phase 0-7)
 python run_all_phases.py --group core
 
-# 统计阶段 (Phase 8-10)
-python run_all_phases.py --group statistical
-
-# 高级阶段 (Phase 11-17)
+# 高级阶段 (Phase 10-15)
 python run_all_phases.py --group advanced
 ```
 
@@ -210,31 +207,18 @@ python run_all_phases.py --show-groups
 
 **总时间**: 26-48分钟
 
-### Statistical Phases (统计阶段 8-10)
-
-**统计增强**，提供显著性检验：
-
-| Phase | 名称 | 时间 | 说明 |
-|-------|------|------|------|
-| 8 | Tendency Analysis | 2-3 min | 倾向性分析 |
-| 9 | Z-score Normalization | 2-3 min | Z分数标准化 |
-| 10 | Significance Testing | 2-3 min | 显著性检验 |
-
-**总时间**: 6-9分钟
-**依赖**: Phase 0, 2
-
-### Advanced Phases (高级阶段 11-17)
+### Advanced Phases (高级阶段 10-15)
 
 **高级分析**，可选但提供深度洞察：
 
 | Phase | 名称 | 时间 | 说明 |
 |-------|------|------|------|
+| 10 | Significance Testing | 2-3 min | 显著性检验 |
 | 11 | Query Policy Framework | 1-2 min | 查询策略框架 |
 | 12 | N-gram Analysis | 5-10 min | N-gram模式分析 |
 | 13 | Spatial Hotspots | 2-3 min | 空间热点检测 |
 | 14 | Semantic Composition | 3-5 min | 语义组合模式 |
 | 15 | Region Similarity | 2-3 min | 区域相似度 |
-| 16 | Semantic Centrality | 2-3 min | 语义中心性 |
 | 17 | Hybrid Analysis | 3-5 min | 混合分析 |
 
 **总时间**: 18-31分钟
@@ -250,9 +234,7 @@ Phase 0 (预处理) ← 必须首先运行
     │       ├─→ Phase 16 (语义中心性)
     │       └─→ Phase 17 (混合分析)
     │
-    ├─→ Phase 2 (频率)
-    │       ├─→ Phase 8 (倾向性)
-    │       ├─→ Phase 9 (Z分数)
+    ├─→ Phase 2 (频率 + 倾向性 + 统计检验)
     │       └─→ Phase 10 (显著性)
     │
     ├─→ Phase 3 (语义)

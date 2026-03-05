@@ -1907,25 +1907,29 @@ def write_region_spatial_aggregates(conn: sqlite3.Connection, run_id: str, aggre
     Args:
         conn: SQLite database connection
         run_id: Unique run identifier
-        aggregates_df: DataFrame with regional aggregates (must include city, county, town columns)
+        aggregates_df: DataFrame with regional aggregates
     """
     import time
 
     logger.info(f"Writing {len(aggregates_df)} regional spatial aggregates to database")
+
+    # Delete existing data for this run_id to avoid UNIQUE constraint violations
+    cursor = conn.cursor()
+    cursor.execute("DELETE FROM region_spatial_aggregates WHERE run_id = ?", (run_id,))
+    conn.commit()
 
     # Prepare data
     aggregates_df = aggregates_df.copy()
     aggregates_df['run_id'] = run_id
     aggregates_df['created_at'] = time.time()
 
-    # Ensure hierarchy columns exist
-    for col in ['city', 'county', 'town']:
-        if col not in aggregates_df.columns:
-            aggregates_df[col] = None
+    # Remove duplicates based on (region_level, region_name) to avoid UNIQUE constraint violations
+    aggregates_df = aggregates_df.drop_duplicates(subset=['region_level', 'region_name'], keep='first')
+    logger.info(f"After deduplication: {len(aggregates_df)} unique regional aggregates")
 
-    # Select columns (including hierarchy)
+    # Select columns (no hierarchical columns after database optimization)
     columns = [
-        'run_id', 'region_level', 'city', 'county', 'town', 'region_name',
+        'run_id', 'region_level', 'region_name',
         'total_villages', 'avg_nn_distance', 'avg_local_density',
         'avg_isolation_score', 'n_isolated_villages', 'n_spatial_clusters',
         'spatial_dispersion',

@@ -73,7 +73,7 @@ python run_all_phases.py --list
 # 第三步：运行核心分析阶段（Phase 0-7，约 30-50 分钟）
 python run_all_phases.py --group core
 
-# 或者运行所有 17 个阶段（约 1-2 小时）
+# 或者运行所有 15 个阶段（约 1-2 小时）
 python run_all_phases.py --all
 ```
 

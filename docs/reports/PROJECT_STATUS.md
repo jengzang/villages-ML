@@ -373,9 +373,8 @@ Looking back at implementations, the following concerns were overly cautious for
 - Regional aggregates
 - Precomputed for fast queries
 
-### Phase 8-10: Statistical Enhancements
-- Z-score normalization
-- Statistical significance testing
+### Phase 10: Statistical Significance Testing
+- Statistical significance testing (integrated into Phase 2)
 - Bonferroni correction
 - Effect size computation
 

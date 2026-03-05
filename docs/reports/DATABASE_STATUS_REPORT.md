@@ -110,14 +110,13 @@
 
 ---
 
-### ✅ Phase 8-10: 统计显著性分析
+### ✅ Phase 2: 区域倾向性分析（含统计显著性）
 **状态**: 完成
 **表**:
-- `character_tendency`: 957,654 行（区域倾向性）
-- `character_significance`: 27,448 行（显著性检验）
-- `tendency_significance`: 数据已填充（Z-score 标准化）
+- `char_regional_analysis`: 329,326 行（包含频率、倾向性、z-score、显著性）
+- 包含指标: lift, log_lift, log_odds, z_score, p_value, is_significant
 
-**说明**: 已完成字符区域倾向性的 Z-score 标准化和统计显著性检验。
+**说明**: Phase 2 已完成字符区域倾向性分析，包括 Z-score 标准化和统计显著性检验。原 Phase 8-10 的功能已整合到 Phase 2 中。
 
 ---
 

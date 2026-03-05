@@ -80,7 +80,9 @@ def run_tendency_analysis_with_significance(
 
         # Step 2: Load village data
         logger.info("Loading village data...")
-        villages_df = load_villages(conn)
+        villages_chunks = load_villages(conn)
+        # Convert generator to DataFrame
+        villages_df = pd.concat(villages_chunks, ignore_index=True)
         logger.info(f"Loaded {len(villages_df)} villages")
 
         # Step 3: Compute character frequency

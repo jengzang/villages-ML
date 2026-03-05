@@ -4,6 +4,7 @@ Region Feature Builder for Clustering.
 Constructs feature vectors from semantic and morphological data.
 """
 
+import logging
 import sqlite3
 import pandas as pd
 import numpy as np
@@ -15,6 +16,8 @@ from ..data.db_query import (
     get_pattern_frequency_regional,
     get_regional_frequency
 )
+
+logger = logging.getLogger(__name__)
 
 
 class RegionFeatureBuilder:
@@ -127,12 +130,18 @@ class RegionFeatureBuilder:
         Returns:
             DataFrame with columns: region_name, suf2_*_rate, suf3_*_rate
         """
+        # Handle dummy run_id (when morphology data doesn't exist)
+        if run_id == "dummy_morph":
+            logger.warning("Morphology run_id is 'dummy_morph' - returning empty morphology features")
+            return pd.DataFrame(columns=['region_name'])
+
         # Get pattern frequency data for suffix_2 and suffix_3
         suffix2_df = get_pattern_frequency_regional(self.conn, run_id, 'suffix_2', region_level)
         suffix3_df = get_pattern_frequency_regional(self.conn, run_id, 'suffix_3', region_level)
 
         if suffix2_df.empty and suffix3_df.empty:
-            raise ValueError(f"No pattern frequency data found for run_id={run_id}, region_level={region_level}")
+            logger.warning(f"No pattern frequency data found for run_id={run_id}, region_level={region_level}")
+            return pd.DataFrame(columns=['region_name'])
 
         # Calculate global frequency for each pattern
         suffix2_global = suffix2_df.groupby('pattern')['frequency'].sum().sort_values(ascending=False)

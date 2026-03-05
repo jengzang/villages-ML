@@ -22,6 +22,7 @@ from src.semantic.vtf_calculator import VTFCalculator
 from src.semantic.semantic_index import SemanticIndexCalculator
 from src.data.db_writer import (
     create_analysis_tables,
+    create_semantic_tables,
     write_semantic_vtf_global,
     write_semantic_vtf_regional,
     write_semantic_tendency,
@@ -74,21 +75,20 @@ def run_semantic_analysis_pipeline(
     try:
         # Create tables if needed
         create_analysis_tables(conn)
+        create_semantic_tables(conn)
 
-        # Load global character frequency
-        global_char_df = pd.read_sql_query(f"""
+        # Load global character frequency (no run_id after database optimization)
+        global_char_df = pd.read_sql_query("""
             SELECT char as character, village_count, total_villages, frequency
             FROM char_frequency_global
-            WHERE run_id = '{char_run_id}'
         """, conn)
         logger.info(f"Loaded {len(global_char_df)} global character frequencies")
 
-        # Load regional character frequency
-        regional_char_df = pd.read_sql_query(f"""
+        # Load regional character frequency (from char_regional_analysis after optimization)
+        regional_char_df = pd.read_sql_query("""
             SELECT region_level, region_name, char as character,
                    village_count, total_villages, frequency
-            FROM char_frequency_regional
-            WHERE run_id = '{char_run_id}'
+            FROM char_regional_analysis
         """, conn)
         logger.info(f"Loaded {len(regional_char_df)} regional character frequencies")
 

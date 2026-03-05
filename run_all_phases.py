@@ -4,8 +4,8 @@
 Villages-ML Complete Analysis Pipeline Runner
 广东省自然村分析系统 - 完整分析流水线执行器
 
-This script orchestrates ALL 17 analysis phases for the Guangdong villages dataset.
-本脚本编排执行广东省村庄数据集的全部17个分析阶段。
+This script orchestrates ALL 15 analysis phases for the Guangdong villages dataset.
+本脚本编排执行广东省村庄数据集的全部15个分析阶段。
 
 ================================================================================
 QUICK START 快速开始
@@ -41,17 +41,18 @@ PHASE GROUPS 阶段分组
 Core Phases (核心阶段 0-7) - Required for basic analysis:
   Phase 0  : Data Preprocessing (数据预处理) - CRITICAL
   Phase 1  : Character Embeddings (字符嵌入)
-  Phase 2  : Frequency Analysis (频率分析)
+  Phase 2  : Frequency Analysis (频率分析) - Includes tendency & z-score
   Phase 3  : Semantic Analysis (语义分析)
   Phase 4  : Spatial Analysis (空间分析)
   Phase 5  : Feature Engineering (特征工程)
   Phase 6  : Clustering Analysis (聚类分析)
   Phase 7  : Feature Materialization (特征物化)
 
-Statistical Phases (统计阶段 8-10) - Statistical enhancements:
-  Phase 8  : Tendency Analysis (倾向性分析)
-  Phase 9  : Z-score Normalization (Z分数标准化)
+Statistical Phases (统计阶段 10) - Statistical enhancements:
   Phase 10 : Significance Testing (显著性检验)
+
+  Note: Phase 8 (Tendency Analysis) and Phase 9 (Z-score Normalization)
+  have been removed as these are now performed by Phase 2.
 
 Advanced Phases (高级阶段 11-17) - Advanced analysis:
   Phase 11 : Query Policy Framework (查询策略框架)
@@ -71,8 +72,8 @@ Phase 0（预处理）必须首先运行 - 所有其他阶段都依赖它！
 
 Dependency Chain (依赖链):
   Phase 0 → All other phases (所有其他阶段)
-  Phase 1 → Phase 14, 16, 17 (语义相关分析)
-  Phase 2 → Phase 8, 9, 10 (统计增强)
+  Phase 1 → Phase 3, 14, 16, 17 (语义相关分析)
+  Phase 2 → Phase 10 (统计增强) - Phase 2 now includes tendency & z-score
   Phase 4 → Phase 13 (空间热点)
   Phase 5 → Phase 6, 7 (聚类和物化)
 
@@ -81,17 +82,16 @@ EXECUTION TIME 预计执行时间
 ================================================================================
 
 Estimated time for full dataset (285K villages, 全量数据集):
-  Phase 0  : 2-5 min    | Phase 9  : 2-3 min
-  Phase 1  : 5-10 min   | Phase 10 : 2-3 min
-  Phase 2  : 3-5 min    | Phase 11 : 1-2 min
-  Phase 3  : 3-5 min    | Phase 12 : 5-10 min
-  Phase 4  : 5-10 min   | Phase 13 : 2-3 min
-  Phase 5  : 3-5 min    | Phase 14 : 3-5 min
-  Phase 6  : 3-5 min    | Phase 15 : 2-3 min
-  Phase 7  : 2-3 min    | Phase 16 : 2-3 min
-  Phase 8  : 2-3 min    | Phase 17 : 3-5 min
+  Phase 0  : 2-5 min    | Phase 10 : 2-3 min
+  Phase 1  : 5-10 min   | Phase 11 : 1-2 min
+  Phase 2  : 3-5 min    | Phase 12 : 5-10 min
+  Phase 3  : 3-5 min    | Phase 13 : 2-3 min
+  Phase 4  : 5-10 min   | Phase 14 : 3-5 min
+  Phase 5  : 3-5 min    | Phase 15 : 2-3 min
+  Phase 6  : 3-5 min    | Phase 16 : 2-3 min
+  Phase 7  : 2-3 min    | Phase 17 : 3-5 min
 
-  Total: 60-120 minutes (1-2 hours, 总计1-2小时)
+  Total: 50-100 minutes (0.8-1.7 hours, 总计约1-2小时)
 
 ================================================================================
 """
@@ -394,11 +394,12 @@ PHASES = {
         "description": "LLM-assisted semantic labeling and co-occurrence analysis",
         "description_zh": "LLM辅助语义标注和共现分析",
         "group": "core",
-        "dependencies": [0],
+        "dependencies": [0, 1],  # Depends on Phase 1 for character embeddings
         "estimated_time": "3-5 min",
         "output_tables": ["semantic_labels", "semantic_cooccurrence", "semantic_network_edges"],
         "critical": True,
-        "use_run_id": True
+        "use_run_id": True,
+        "special_run_id_handling": True  # Requires --char-run-id and --output-run-id
     },
     4: {
         "name": "Spatial Analysis",
@@ -442,11 +443,12 @@ PHASES = {
         "description": "KMeans, DBSCAN, GMM clustering on 121 counties",
         "description_zh": "对121个区县进行KMeans、DBSCAN、GMM聚类",
         "group": "core",
-        "dependencies": [0, 5],
+        "dependencies": [0, 3, 5],  # Depends on Phase 3 (semantic) and Phase 5 (features)
         "estimated_time": "3-5 min",
         "output_tables": ["regional_features", "cluster_assignments", "cluster_profiles"],
         "critical": True,
-        "use_run_id": True
+        "use_run_id": True,
+        "special_run_id_handling": True  # Requires --semantic-run-id, --morphology-run-id, --output-run-id
     },
     7: {
         "name": "Feature Materialization",
@@ -465,41 +467,10 @@ PHASES = {
         "use_run_id": True
     },
 
-    # ========== STATISTICAL PHASES (8-10) ==========
-    8: {
-        "name": "Tendency Analysis",
-        "name_zh": "倾向性分析",
-        "script": "scripts/core/run_tendency_with_significance.py",
-        "args": [
-            "--db-path", "data/villages.db",
-            "--mode", "tendency"
-        ],
-        "description": "Compute lift and log-odds ratios for regional tendencies",
-        "description_zh": "计算区域倾向性的lift和log-odds比率",
-        "group": "statistical",
-        "dependencies": [0, 2],
-        "estimated_time": "2-3 min",
-        "output_tables": ["char_regional_analysis"],
-        "critical": False,
-        "use_run_id": True
-    },
-    9: {
-        "name": "Z-score Normalization",
-        "name_zh": "Z分数标准化",
-        "script": "scripts/core/run_tendency_with_significance.py",
-        "args": [
-            "--db-path", "data/villages.db",
-            "--mode", "zscore"
-        ],
-        "description": "Normalize tendency scores using z-score transformation",
-        "description_zh": "使用z-score变换标准化倾向性分数",
-        "group": "statistical",
-        "dependencies": [0, 2, 8],
-        "estimated_time": "2-3 min",
-        "output_tables": ["char_regional_analysis"],
-        "critical": False,
-        "use_run_id": True
-    },
+    # ========== STATISTICAL PHASES (10) ==========
+    # Note: Phase 8 (Tendency Analysis) and Phase 9 (Z-score Normalization) have been removed
+    # as these calculations are now performed by Phase 2 (Frequency Analysis) and stored
+    # directly in the char_regional_analysis table.
     10: {
         "name": "Significance Testing",
         "name_zh": "显著性检验",
@@ -510,7 +481,7 @@ PHASES = {
         "description": "Chi-square test, p-values, effect sizes, confidence intervals",
         "description_zh": "卡方检验、p值、效应量、置信区间",
         "group": "statistical",
-        "dependencies": [0, 2, 8],
+        "dependencies": [0, 2],
         "estimated_time": "2-3 min",
         "output_tables": ["char_regional_analysis"],
         "critical": False,
@@ -677,8 +648,72 @@ def run_phase(phase_id, run_id_prefix="run", dry_run=False, db_path="data/villag
     # Build command
     cmd = ["python", phase['script']]
 
-    # Add run-id if the script supports it
-    if phase.get('use_run_id', True) and phase_id > 0:
+    # Handle special run ID cases (e.g., Phase 3 needs --char-run-id and --output-run-id)
+    if phase.get('special_run_id_handling') and phase_id == 3:
+        # Phase 3 needs char-run-id from Phase 1
+        import sqlite3
+        try:
+            conn = sqlite3.connect(db_path)
+            cursor = conn.cursor()
+            cursor.execute("SELECT DISTINCT run_id FROM char_embeddings ORDER BY run_id DESC LIMIT 1")
+            result = cursor.fetchone()
+            conn.close()
+
+            if result:
+                char_run_id = result[0]
+                output_run_id = f"{run_id_prefix}_{phase_id:02d}_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
+                cmd.extend(["--char-run-id", char_run_id])
+                cmd.extend(["--output-run-id", output_run_id])
+                print(f"Using char-run-id: {char_run_id}")
+                print(f"Output run-id: {output_run_id}")
+            else:
+                print(f"❌ Error: No character embeddings found in database. Run Phase 1 first.")
+                return False
+        except Exception as e:
+            print(f"❌ Error querying database for char-run-id: {e}")
+            return False
+    # Handle Phase 6 (Clustering) - needs semantic-run-id and morphology-run-id
+    elif phase.get('special_run_id_handling') and phase_id == 6:
+        import sqlite3
+        try:
+            conn = sqlite3.connect(db_path)
+            cursor = conn.cursor()
+
+            # Get semantic run ID from Phase 3
+            cursor.execute("SELECT DISTINCT run_id FROM semantic_vtf_global ORDER BY run_id DESC LIMIT 1")
+            semantic_result = cursor.fetchone()
+
+            # Get morphology run ID from Phase 12 (ngram patterns) - use dummy if not available
+            cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='pattern_frequency_regional'")
+            pattern_table_exists = cursor.fetchone()
+
+            if pattern_table_exists:
+                cursor.execute("SELECT DISTINCT run_id FROM pattern_frequency_regional ORDER BY run_id DESC LIMIT 1")
+                morphology_result = cursor.fetchone()
+                morphology_run_id = morphology_result[0] if morphology_result else "dummy_morph"
+            else:
+                morphology_run_id = "dummy_morph"
+                print(f"⚠️  Warning: No morphology data found. Using dummy value (morphology features will be skipped).")
+
+            conn.close()
+
+            if semantic_result:
+                semantic_run_id = semantic_result[0]
+                output_run_id = f"{run_id_prefix}_{phase_id:02d}_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
+                cmd.extend(["--semantic-run-id", semantic_run_id])
+                cmd.extend(["--morphology-run-id", morphology_run_id])
+                cmd.extend(["--output-run-id", output_run_id])
+                print(f"Using semantic-run-id: {semantic_run_id}")
+                print(f"Using morphology-run-id: {morphology_run_id}")
+                print(f"Output run-id: {output_run_id}")
+            else:
+                print(f"❌ Error: No semantic analysis data found in database. Run Phase 3 first.")
+                return False
+        except Exception as e:
+            print(f"❌ Error querying database for run IDs: {e}")
+            return False
+    # Add run-id if the script supports it (standard case)
+    elif phase.get('use_run_id', True) and phase_id > 0:
         run_id = f"{run_id_prefix}_{phase_id:02d}_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
         cmd.extend(["--run-id", run_id])
 

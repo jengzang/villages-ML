@@ -81,8 +81,29 @@ def compute_significance_from_regional_analysis(
     logger.info(f"Output run_id: {run_id}")
 
     conn = sqlite3.connect(db_path)
+    cursor = conn.cursor()
 
     try:
+        # Add significance columns if they don't exist
+        logger.info("Ensuring significance columns exist...")
+        columns_to_add = [
+            ('chi_square_statistic', 'REAL'),
+            ('p_value', 'REAL'),
+            ('is_significant', 'INTEGER'),
+            ('effect_size', 'REAL'),
+            ('effect_size_interpretation', 'TEXT')
+        ]
+
+        for col_name, col_type in columns_to_add:
+            try:
+                cursor.execute(f"ALTER TABLE char_regional_analysis ADD COLUMN {col_name} {col_type}")
+                logger.info(f"Added column: {col_name}")
+            except sqlite3.OperationalError as e:
+                if "duplicate column name" in str(e):
+                    pass  # Column already exists
+                else:
+                    raise
+        conn.commit()
         # Load regional analysis data (with hierarchy - 2026-03-01)
         query = """
         SELECT
@@ -105,7 +126,13 @@ def compute_significance_from_regional_analysis(
         logger.info(f"Loaded {len(df)} records")
 
         # Compute significance for each row
-        results = []
+        logger.info("Computing significance metrics...")
+
+        chi_squares = []
+        p_values = []
+        is_significants = []
+        effect_sizes = []
+        effect_interps = []
 
         for idx, row in df.iterrows():
             if idx % 10000 == 0:
@@ -129,44 +156,57 @@ def compute_significance_from_regional_analysis(
             else:
                 effect_interp = 'large'
 
-            results.append({
-                'run_id': run_id,
-                'region_level': row['region_level'],
-                'city': row['city'] if pd.notna(row['city']) else None,
-                'county': row['county'] if pd.notna(row['county']) else None,
-                'township': row['township'] if pd.notna(row['township']) else None,
-                'region_name': row['region_name'],
-                'char': row['char'],
-                'chi_square_statistic': chi_square,
-                'p_value': p_value,
-                'is_significant': is_significant,
-                'significance_level': str(significance_level),
-                'effect_size': effect_size,
-                'effect_size_interpretation': effect_interp,
-                'ci_lower': None,  # Can be computed if needed
-                'ci_upper': None,
-                'created_at': time.time()
-            })
+            chi_squares.append(chi_square)
+            p_values.append(p_value)
+            is_significants.append(is_significant)
+            effect_sizes.append(effect_size)
+            effect_interps.append(effect_interp)
 
-        # Convert to DataFrame
-        results_df = pd.DataFrame(results)
+        # Add computed columns to dataframe
+        df['chi_square_statistic'] = chi_squares
+        df['p_value'] = p_values
+        df['is_significant'] = is_significants
+        df['effect_size'] = effect_sizes
+        df['effect_size_interpretation'] = effect_interps
 
-        # Save to database
-        logger.info(f"Saving {len(results_df)} significance records...")
+        # Update database with significance values
+        logger.info(f"Updating {len(df)} records with significance values...")
 
-        # Clear existing data for this run_id
-        cursor = conn.cursor()
-        cursor.execute("DELETE FROM tendency_significance WHERE run_id = ?", (run_id,))
-        conn.commit()
+        for idx, row in df.iterrows():
+            if idx % 10000 == 0:
+                logger.info(f"Updating {idx}/{len(df)}...")
 
-        # Insert new data
-        results_df.to_sql('tendency_significance', conn, if_exists='append', index=False)
+            cursor.execute("""
+                UPDATE char_regional_analysis
+                SET chi_square_statistic = ?,
+                    p_value = ?,
+                    is_significant = ?,
+                    effect_size = ?,
+                    effect_size_interpretation = ?
+                WHERE region_level = ?
+                    AND COALESCE(city, '') = COALESCE(?, '')
+                    AND COALESCE(county, '') = COALESCE(?, '')
+                    AND COALESCE(township, '') = COALESCE(?, '')
+                    AND char = ?
+            """, (
+                row['chi_square_statistic'],
+                row['p_value'],
+                row['is_significant'],
+                row['effect_size'],
+                row['effect_size_interpretation'],
+                row['region_level'],
+                row['city'] if pd.notna(row['city']) else None,
+                row['county'] if pd.notna(row['county']) else None,
+                row['township'] if pd.notna(row['township']) else None,
+                row['char']
+            ))
+
         conn.commit()
 
         # Print summary
         logger.info("\n=== Summary Statistics ===")
-        for level in results_df['region_level'].unique():
-            level_df = results_df[results_df['region_level'] == level]
+        for level in df['region_level'].unique():
+            level_df = df[df['region_level'] == level]
             n_total = len(level_df)
             n_significant = level_df['is_significant'].sum()
             pct_significant = (n_significant / n_total * 100) if n_total > 0 else 0
@@ -188,7 +228,7 @@ def compute_significance_from_regional_analysis(
                               f"p={row['p_value']:.4f}, effect={row['effect_size']:.3f}")
 
         logger.info(f"\n✓ Significance computation completed successfully")
-        logger.info(f"✓ Saved to tendency_significance table with run_id={run_id}")
+        logger.info(f"✓ Updated char_regional_analysis table with significance metrics")
 
     except Exception as e:
         logger.error(f"Error during significance computation: {e}")
