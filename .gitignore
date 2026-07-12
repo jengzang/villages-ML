@@ -47,7 +47,7 @@ models/
 *.csv
 *.parquet
 data/*
-!data/semantic_lexicon_v1.json
+!data/semantic_lexicon*
 
 # Analysis results (generated files, not to be committed)
 results/
@@ -79,3 +79,5 @@ test_import.py
 .env.local
 config/secrets.json
 **/api_keys.txt
+
+.agents/
