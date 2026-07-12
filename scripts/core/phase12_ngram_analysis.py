@@ -10,6 +10,7 @@ This script performs comprehensive n-gram analysis on village names:
 5. Clean up non-significant data (NEW: 2026-02-25)
 6. Detect structural patterns
 7. Auto-update active_run_ids (NEW: 2026-02-25)
+8. Populate village-level n-grams (NEW: 2026-07-12)
 
 Approach: Offline-heavy, maximum accuracy, full dataset
 
@@ -836,6 +837,99 @@ def step8_create_optimization_indexes(db_path: str):
     print("Expected API performance improvement: 95%+ (2-3s -> 0.1-0.15s)")
 
 
+def step9_populate_village_ngrams(db_path: str):
+    """Step 9: Populate village-level n-gram data for API endpoints.
+
+    API endpoints that consume this table:
+    - GET /api/villages/village/ngrams/{village_id}
+    - GET /api/villages/village/complete/{village_id}
+    """
+    print("\n" + "=" * 60)
+    print("Step 9: Populating village_ngrams Table")
+    print("=" * 60)
+
+    conn = sqlite3.connect(db_path, timeout=60.0)
+    cursor = conn.cursor()
+
+    cursor.execute("""
+        SELECT COUNT(*) FROM 广东省自然村_预处理 WHERE 字符数量 > 0
+    """)
+    total_villages = cursor.fetchone()[0]
+    print(f"\nProcessing {total_villages:,} villages...")
+
+    cursor.execute("""
+        SELECT village_id, 村委会, 自然村_去前缀
+        FROM 广东省自然村_预处理
+        WHERE 字符数量 > 0
+    """)
+    villages = cursor.fetchall()
+    print(f"Loaded {len(villages):,} villages from database")
+
+    batch = []
+    processed = 0
+    insert_cursor = conn.cursor()
+
+    for row in villages:
+        village_id, village_committee, village_name = row
+
+        if not village_name or not village_committee or not village_id:
+            continue
+
+        # Extract bigrams
+        bigrams_pos = NgramExtractor.extract_positional_ngrams(village_name, n=2)
+        bigrams_all = bigrams_pos['all']
+        prefix_bigram = bigrams_pos['prefix'][0] if bigrams_pos['prefix'] else None
+        suffix_bigram = bigrams_pos['suffix'][0] if bigrams_pos['suffix'] else None
+
+        # Extract trigrams
+        trigrams_pos = NgramExtractor.extract_positional_ngrams(village_name, n=3)
+        trigrams_all = trigrams_pos['all']
+        prefix_trigram = trigrams_pos['prefix'][0] if trigrams_pos['prefix'] else None
+        suffix_trigram = trigrams_pos['suffix'][0] if trigrams_pos['suffix'] else None
+
+        bigrams_json = json.dumps(bigrams_all, ensure_ascii=False) if bigrams_all else None
+        trigrams_json = json.dumps(trigrams_all, ensure_ascii=False) if trigrams_all else None
+
+        batch.append((
+            village_id,
+            village_committee,
+            village_name,
+            2,
+            bigrams_json,
+            trigrams_json,
+            prefix_bigram,
+            suffix_bigram,
+            prefix_trigram,
+            suffix_trigram
+        ))
+
+        processed += 1
+
+        if len(batch) >= 1000:
+            insert_cursor.executemany("""
+                INSERT OR REPLACE INTO village_ngrams
+                (village_id, 村委会, 自然村, n, bigrams, trigrams, prefix_bigram, suffix_bigram, prefix_trigram, suffix_trigram)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """, batch)
+            conn.commit()
+            batch = []
+            print(f"  Progress: {processed:,}/{total_villages:,} ({100*processed/total_villages:.1f}%)")
+
+    # Insert remaining
+    if batch:
+        insert_cursor.executemany("""
+            INSERT OR REPLACE INTO village_ngrams
+            (village_id, 村委会, 自然村, n, bigrams, trigrams, prefix_bigram, suffix_bigram, prefix_trigram, suffix_trigram)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        """, batch)
+        conn.commit()
+
+    cursor.execute("SELECT COUNT(*) FROM village_ngrams")
+    count = cursor.fetchone()[0]
+    print(f"\n[OK] Populated village_ngrams table with {count:,} records")
+    conn.close()
+
+
 def main():
     """Main execution function."""
     db_path = 'data/villages.db'
@@ -862,6 +956,7 @@ def main():
         step6_cleanup_insignificant_data(db_path)  # NEW: Clean up non-significant data
         step7_detect_patterns(db_path)
         step8_create_optimization_indexes(db_path)  # NEW: Create optimization indexes
+        step9_populate_village_ngrams(db_path)  # NEW: Per-village n-grams for API
 
         end_time = datetime.now()
         duration = (end_time - start_time).total_seconds()

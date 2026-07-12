@@ -517,7 +517,7 @@ PHASES = {
         "group": "advanced",
         "dependencies": [0],
         "estimated_time": "5-10 min",
-        "output_tables": ["ngram_frequency", "structural_patterns"],
+        "output_tables": ["ngram_frequency", "structural_patterns", "village_ngrams"],
         "critical": False,
         "use_run_id": True
     },
