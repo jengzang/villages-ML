@@ -25,7 +25,6 @@ from ..clustering.clustering_engine import ClusteringEngine
 from ..clustering.cluster_profiler import ClusterProfiler
 from ..data.db_writer import (
     create_clustering_tables,
-    write_region_vectors,
     write_cluster_assignments,
     write_cluster_profiles,
     write_clustering_metrics
@@ -153,9 +152,6 @@ def run_clustering_pipeline(
         # Step 8: Write results to database
         logger.info("Writing results to database...")
 
-        # Write region vectors
-        write_region_vectors(conn, output_run_id, region_df)
-
         # Write cluster assignments
         write_cluster_assignments(
             conn, output_run_id, region_df[['region_name']],
@@ -205,9 +201,6 @@ def run_clustering_pipeline(
 
             with open(output_path / 'config.json', 'w', encoding='utf-8') as f:
                 json.dump(config, f, ensure_ascii=False, indent=2)
-
-            # Export region vectors
-            region_df.to_csv(output_path / 'region_vectors.csv', index=False, encoding='utf-8-sig')
 
             # Export cluster assignments
             assignments_df = region_df[['region_name']].copy()

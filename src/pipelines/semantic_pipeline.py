@@ -24,9 +24,6 @@ from src.data.db_writer import (
     create_analysis_tables,
     create_semantic_tables,
     write_semantic_vtf_global,
-    write_semantic_vtf_regional,
-    write_semantic_tendency,
-    write_semantic_indices
 )
 
 logger = logging.getLogger(__name__)
@@ -121,8 +118,6 @@ def run_semantic_analysis_pipeline(
         # Step 5: Write results to database
         logger.info("\\n=== Step 5: Writing results to database ===")
         write_semantic_vtf_global(conn, output_run_id, global_vtf_df)
-        write_semantic_vtf_regional(conn, output_run_id, all_regional_vtf_df)
-        write_semantic_tendency(conn, output_run_id, tendency_df)
 
         logger.info("Database write completed")
 
@@ -136,20 +131,6 @@ def run_semantic_analysis_pipeline(
             global_vtf_df.to_csv(output_path / 'semantic_vtf_global.csv',
                                 index=False, encoding='utf-8-sig')
             logger.info("Exported semantic_vtf_global.csv")
-
-            # Export regional VTF by level
-            for level in region_levels:
-                level_df = regional_vtf_dfs[level]
-                level_df.to_csv(output_path / f'semantic_vtf_regional_{level}.csv',
-                              index=False, encoding='utf-8-sig')
-                logger.info(f"Exported semantic_vtf_regional_{level}.csv")
-
-            # Export tendency by level
-            for level in region_levels:
-                level_tendency_df = tendency_df[tendency_df['region_level'] == level]
-                level_tendency_df.to_csv(output_path / f'semantic_tendency_{level}.csv',
-                                        index=False, encoding='utf-8-sig')
-                logger.info(f"Exported semantic_tendency_{level}.csv")
 
         elapsed = time.time() - start_time
         logger.info(f"\\n=== Pipeline completed in {elapsed:.2f}s ===")

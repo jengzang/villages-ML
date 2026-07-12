@@ -452,20 +452,18 @@ PHASES = {
         "special_run_id_handling": True  # Requires --semantic-run-id, --morphology-run-id, --output-run-id
     },
     7: {
-        "name": "Feature Materialization",
-        "name_zh": "特征物化",
+        "name": "Feature Materialization (DEPRECATED)",
+        "name_zh": "特征物化（已废弃）",
         "script": "scripts/core/fill_aggregates_tables.py",
-        "args": [
-            "--db-path", "data/villages.db"
-        ],
-        "description": "Materialize regional aggregates (city/county/township level)",
-        "description_zh": "物化区域聚合特征（市/县/镇级别）",
+        "args": [],
+        "description": "DEPRECATED: Replaced by real-time SQL GROUP BY + semantic_indices join",
+        "description_zh": "已废弃：替换为实时SQL GROUP BY + semantic_indices关联查询",
         "group": "core",
-        "dependencies": [0, 5],
-        "estimated_time": "2-3 min",
-        "output_tables": ["regional_aggregates"],
+        "dependencies": [],
+        "estimated_time": "<1 min",
+        "output_tables": [],
         "critical": False,
-        "use_run_id": True
+        "use_run_id": False
     },
 
     # ========== STATISTICAL PHASES (10) ==========
@@ -568,7 +566,7 @@ PHASES = {
         "group": "advanced",
         "dependencies": [0, 5, 6],
         "estimated_time": "2-3 min",
-        "output_tables": ["region_vectors"],
+        "output_tables": ["region_similarity"],
         "critical": False,
         "use_run_id": True
     },
