@@ -11,6 +11,7 @@ This script:
 import sqlite3
 import logging
 import sys
+import argparse
 from pathlib import Path
 import pandas as pd
 
@@ -66,12 +67,18 @@ def load_villages_from_preprocessed(conn: sqlite3.Connection) -> pd.DataFrame:
 
 
 def main():
-    db_path = project_root / 'data' / 'villages.db'
+    parser = argparse.ArgumentParser(description='Generate village_features table')
+    parser.add_argument('--run-id', type=str, required=True, help='Run ID for this execution')
+    parser.add_argument('--db-path', type=str, default='data/villages.db', help='Path to database')
+    args = parser.parse_args()
+
+    db_path = project_root / args.db_path
 
     logger.info("=" * 80)
     logger.info("Generating village_features table")
     logger.info("=" * 80)
     logger.info(f"Database: {db_path}")
+    logger.info(f"Run ID: {args.run_id}")
 
     # Connect to database
     conn = sqlite3.connect(str(db_path))
@@ -105,9 +112,12 @@ def main():
         # Step 4: Write to database
         logger.info("Writing features to database...")
 
+        # Add run_id column to dataframe
+        combined_df['run_id'] = args.run_id
+
         # Prepare columns for insertion
         columns_to_write = [
-            'village_id', 'city', 'county', 'town', 'village_committee', 'village_name', 'pinyin',
+            'village_id', 'run_id', 'city', 'county', 'town', 'village_committee', 'village_name', 'pinyin',
             'name_length', 'suffix_1', 'suffix_2', 'suffix_3', 'prefix_1', 'prefix_2', 'prefix_3',
             'sem_mountain', 'sem_water', 'sem_settlement', 'sem_direction', 'sem_clan',
             'sem_symbolic', 'sem_agriculture', 'sem_vegetation', 'sem_infrastructure',

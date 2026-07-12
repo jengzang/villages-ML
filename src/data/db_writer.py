@@ -1172,8 +1172,7 @@ def create_clustering_tables(conn: sqlite3.Connection) -> None:
     """
     Create clustering result tables if they don't exist.
 
-    Creates 4 tables:
-    - region_vectors: Region feature vectors
+    Creates 3 tables:
     - cluster_assignments: Cluster assignments for regions
     - cluster_profiles: Cluster profiles with distinguishing features
     - clustering_metrics: Clustering evaluation metrics
@@ -1183,21 +1182,7 @@ def create_clustering_tables(conn: sqlite3.Connection) -> None:
     """
     cursor = conn.cursor()
 
-    # Table 1: region_vectors
-    cursor.execute("""
-        CREATE TABLE IF NOT EXISTS region_vectors (
-            run_id TEXT NOT NULL,
-            region_level TEXT NOT NULL,
-            region_id TEXT NOT NULL,
-            region_name TEXT NOT NULL,
-            N_villages INTEGER NOT NULL,
-            feature_json TEXT NOT NULL,
-            created_at REAL NOT NULL,
-            PRIMARY KEY (run_id, region_level, region_id)
-        )
-    """)
-
-    # Table 2: cluster_assignments
+    # Table 1: cluster_assignments
     cursor.execute("""
         CREATE TABLE IF NOT EXISTS cluster_assignments (
             run_id TEXT NOT NULL,
@@ -1214,7 +1199,7 @@ def create_clustering_tables(conn: sqlite3.Connection) -> None:
         )
     """)
 
-    # Table 3: cluster_profiles
+    # Table 2: cluster_profiles
     cursor.execute("""
         CREATE TABLE IF NOT EXISTS cluster_profiles (
             run_id TEXT NOT NULL,
@@ -1230,7 +1215,7 @@ def create_clustering_tables(conn: sqlite3.Connection) -> None:
         )
     """)
 
-    # Table 4: clustering_metrics
+    # Table 3: clustering_metrics
     cursor.execute("""
         CREATE TABLE IF NOT EXISTS clustering_metrics (
             run_id TEXT NOT NULL,
@@ -1250,50 +1235,6 @@ def create_clustering_tables(conn: sqlite3.Connection) -> None:
     conn.commit()
     logger.info("Clustering tables created successfully")
 
-
-def write_region_vectors(conn: sqlite3.Connection, run_id: str, df: pd.DataFrame, batch_size: int = 10000) -> None:
-    """
-    Write region feature vectors to database.
-
-    Args:
-        conn: SQLite database connection
-        run_id: Run identifier
-        df: DataFrame with region vectors (must include region_name, N_villages, and feature columns)
-        batch_size: Number of rows to insert per batch
-    """
-    import time
-
-    cursor = conn.cursor()
-
-    # Extract feature columns (exclude metadata columns)
-    metadata_cols = ['region_name', 'N_villages']
-    feature_cols = [col for col in df.columns if col not in metadata_cols]
-
-    # Prepare data for insertion
-    data = []
-    for _, row in df.iterrows():
-        features = {col: float(row[col]) for col in feature_cols}
-        data.append((
-            run_id,
-            'county',  # Default to county level
-            row['region_name'],
-            row['region_name'],
-            int(row['N_villages']),
-            json.dumps(features, ensure_ascii=False),
-            time.time()
-        ))
-
-    # Batch insert
-    for i in range(0, len(data), batch_size):
-        batch = data[i:i + batch_size]
-        cursor.executemany("""
-            INSERT OR REPLACE INTO region_vectors
-            (run_id, region_level, region_id, region_name, N_villages, feature_json, created_at)
-            VALUES (?, ?, ?, ?, ?, ?, ?)
-        """, batch)
-
-    conn.commit()
-    logger.info(f"Saved {len(data)} region vectors for run_id={run_id}")
 
 
 def write_cluster_assignments(
@@ -1447,11 +1388,9 @@ def create_feature_materialization_tables(conn: sqlite3.Connection) -> None:
 
     Creates 4 tables:
     - village_features: Materialized village-level features
-    - city_aggregates: City-level aggregates (kept for structure, computed dynamically)
-    - county_aggregates: County-level aggregates (kept for structure, computed dynamically)
-    - town_aggregates: Town-level aggregates (kept for structure, computed dynamically)
 
-    Note: Aggregate tables are kept empty and computed dynamically at runtime.
+    Note: city/county/town_aggregates have been removed (deprecated, replaced by
+    real-time SQL GROUP BY + semantic_indices JOIN).
 
     Args:
         conn: SQLite database connection
@@ -1462,6 +1401,7 @@ def create_feature_materialization_tables(conn: sqlite3.Connection) -> None:
     cursor.execute("""
         CREATE TABLE IF NOT EXISTS village_features (
             village_id TEXT PRIMARY KEY,
+            run_id TEXT,
             city TEXT,
             county TEXT,
             town TEXT,
@@ -1491,45 +1431,17 @@ def create_feature_materialization_tables(conn: sqlite3.Connection) -> None:
         )
     """)
 
-    # Table 2: city_aggregates (structure kept, not populated)
+    # Add run_id column to existing village_features (migration)
+    try:
+        cursor.execute("ALTER TABLE village_features ADD COLUMN run_id TEXT")
+    except sqlite3.OperationalError:
+        pass  # Column already exists
+
+    # Table 2: city_aggregates (deprecated, schema kept for compatibility, not populated)
     cursor.execute("""
         CREATE TABLE IF NOT EXISTS city_aggregates (
             run_id TEXT NOT NULL,
             city TEXT NOT NULL,
-            total_villages INTEGER NOT NULL,
-            avg_name_length REAL NOT NULL,
-            sem_mountain_count INTEGER NOT NULL,
-            sem_water_count INTEGER NOT NULL,
-            sem_settlement_count INTEGER NOT NULL,
-            sem_direction_count INTEGER NOT NULL,
-            sem_clan_count INTEGER NOT NULL,
-            sem_symbolic_count INTEGER NOT NULL,
-            sem_agriculture_count INTEGER NOT NULL,
-            sem_vegetation_count INTEGER NOT NULL,
-            sem_infrastructure_count INTEGER NOT NULL,
-            sem_mountain_pct REAL NOT NULL,
-            sem_water_pct REAL NOT NULL,
-            sem_settlement_pct REAL NOT NULL,
-            sem_direction_pct REAL NOT NULL,
-            sem_clan_pct REAL NOT NULL,
-            sem_symbolic_pct REAL NOT NULL,
-            sem_agriculture_pct REAL NOT NULL,
-            sem_vegetation_pct REAL NOT NULL,
-            sem_infrastructure_pct REAL NOT NULL,
-            top_suffixes_json TEXT,
-            top_prefixes_json TEXT,
-            cluster_distribution_json TEXT,
-            created_at REAL NOT NULL,
-            PRIMARY KEY (run_id, city)
-        )
-    """)
-
-    # Table 3: county_aggregates (structure kept, not populated)
-    cursor.execute("""
-        CREATE TABLE IF NOT EXISTS county_aggregates (
-            run_id TEXT NOT NULL,
-            city TEXT NOT NULL,
-            county TEXT NOT NULL,
             total_villages INTEGER NOT NULL,
             avg_name_length REAL NOT NULL,
             sem_mountain_count INTEGER NOT NULL,

@@ -67,7 +67,13 @@
       "Bash(do:*)",
       "Bash(sed:*)",
       "Bash(xargs wc:*)",
-      "Bash(wc:*)"
+      "Bash(wc:*)",
+      "Bash(.venv/bin/python -c \"import py_compile; py_compile.compile\\('src/spatial/spatial_clustering.py', doraise=True\\); print\\('OK'\\)\")",
+      "Bash(.venv/bin/python -c \"import py_compile; py_compile.compile\\('scripts/core/run_spatial_analysis.py', doraise=True\\); print\\('OK'\\)\")",
+      "Bash(.venv/bin/python -c \"import py_compile; py_compile.compile\\('run_all_phases.py', doraise=True\\); print\\('OK'\\)\")",
+      "Bash(.venv/bin/python *)",
+      "Bash(.venv/bin/pip list *)",
+      "Bash(awk '{print $2}')"
     ]
   }
 }
