@@ -24,6 +24,7 @@ from src.data.db_writer import (
     create_analysis_tables,
     create_semantic_tables,
     write_semantic_vtf_global,
+    write_semantic_indices,
 )
 
 logger = logging.getLogger(__name__)
@@ -120,6 +121,48 @@ def run_semantic_analysis_pipeline(
         write_semantic_vtf_global(conn, output_run_id, global_vtf_df)
 
         logger.info("Database write completed")
+
+        # Step 5b: Calculate and write semantic indices
+        logger.info("\\n=== Step 5b: Calculating semantic indices ===")
+        index_calculator = SemanticIndexCalculator(lexicon)
+
+        villages_df = pd.read_sql_query("""
+            SELECT 市级, 区县级, 乡镇级, 自然村_去前缀 as 自然村
+            FROM 广东省自然村_预处理
+        """, conn)
+        logger.info(f"Loaded {len(villages_df)} villages for index calculation")
+
+        all_indices = []
+        level_config = [
+            ('city', '市级', 'city'),
+            ('county', '区县级', 'county'),
+            ('township', '乡镇级', 'township'),
+        ]
+        for level, col_name, group_col in level_config:
+            logger.info(f"Processing {level} level...")
+            if level == 'city':
+                level_df = villages_df[['市级', '自然村']].copy()
+                level_df = level_df.rename(columns={'市级': 'city'})
+            elif level == 'county':
+                level_df = villages_df[['市级', '区县级', '自然村']].copy()
+                level_df = level_df.rename(columns={'市级': 'city', '区县级': 'county'})
+            else:
+                level_df = villages_df[['市级', '区县级', '乡镇级', '自然村']].copy()
+                level_df = level_df.rename(columns={'市级': 'city', '区县级': 'county', '乡镇级': 'township'})
+
+            level_df = level_df[level_df[group_col].notna()]
+
+            village_scores = index_calculator.calculate_semantic_scores(level_df)
+            regional_indices = index_calculator.calculate_regional_indices(
+                village_scores, level_column=group_col
+            )
+            regional_indices['region_level'] = level
+            all_indices.append(regional_indices)
+            logger.info(f"  {len(regional_indices)} region-category pairs")
+
+        combined_indices = pd.concat(all_indices, ignore_index=True)
+        write_semantic_indices(conn, output_run_id, combined_indices)
+        logger.info(f"Wrote {len(combined_indices)} semantic indices records")
 
         # Step 6: Export CSV reports (if output_dir specified)
         if output_dir:

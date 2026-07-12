@@ -27,8 +27,12 @@ from datetime import datetime
 project_root = Path(__file__).parent.parent.parent
 sys.path.insert(0, str(project_root))
 
+import pandas as pd
+
 from src.semantic_composition import SemanticCompositionAnalyzer
 from src.semantic_composition_schema import create_semantic_composition_tables
+from src.semantic.lexicon_loader import SemanticLexicon
+from src.semantic.semantic_index import SemanticIndexCalculator
 
 
 def step1_create_tables(db_path: str):
@@ -473,6 +477,126 @@ def step6_extract_village_structures(db_path: str):
     conn.close()
 
 
+def step7_generate_semantic_indices_detailed(db_path: str):
+    """Step 7: Generate semantic_indices_detailed using v4_hybrid lexicon (76 subcategories)."""
+    print("\n" + "="*60)
+    print("Step 7: Generating semantic_indices_detailed (76 subcategories)")
+    print("="*60)
+
+    conn = sqlite3.connect(db_path)
+    cursor = conn.cursor()
+
+    # Create detailed table
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS semantic_indices_detailed (
+            run_id TEXT NOT NULL,
+            region_level TEXT NOT NULL,
+            region_name TEXT NOT NULL,
+            category TEXT NOT NULL,
+            raw_intensity REAL NOT NULL,
+            normalized_index REAL NOT NULL,
+            z_score REAL,
+            rank_within_province INTEGER NOT NULL,
+            village_count INTEGER,
+            city TEXT,
+            county TEXT,
+            township TEXT,
+            PRIMARY KEY (run_id, region_level, region_name, category)
+        )
+    """)
+    conn.commit()
+
+    # Clear existing data
+    cursor.execute("DELETE FROM semantic_indices_detailed")
+    conn.commit()
+
+    # Load v4_hybrid lexicon
+    lexicon_v4 = str(project_root / 'data' / 'semantic_lexicon_v4_hybrid.json')
+    lexicon = SemanticLexicon(lexicon_v4)
+    print(f"Loaded v4_hybrid lexicon: {len(lexicon.list_categories())} categories")
+
+    # Load villages
+    villages_df = pd.read_sql_query("""
+        SELECT 市级, 区县级, 乡镇级, 自然村_去前缀 as 自然村
+        FROM 广东省自然村_预处理
+    """, conn)
+    print(f"Loaded {len(villages_df):,} villages")
+
+    # Calculate indices for each region level
+    calculator = SemanticIndexCalculator(lexicon)
+    run_id = "semantic_indices_detailed_001"
+    all_indices = []
+
+    level_config = [
+        ('city', '市级', 'city'),
+        ('county', '区县级', 'county'),
+        ('township', '乡镇级', 'township'),
+    ]
+
+    for level, col_name, group_col in level_config:
+        print(f"\nProcessing {level} level...")
+        if level == 'city':
+            level_df = villages_df[['市级', '自然村']].copy()
+            level_df = level_df.rename(columns={'市级': 'city'})
+        elif level == 'county':
+            level_df = villages_df[['市级', '区县级', '自然村']].copy()
+            level_df = level_df.rename(columns={'市级': 'city', '区县级': 'county'})
+        else:
+            level_df = villages_df[['市级', '区县级', '乡镇级', '自然村']].copy()
+            level_df = level_df.rename(columns={'市级': 'city', '区县级': 'county', '乡镇级': 'township'})
+
+        level_df = level_df[level_df[group_col].notna()]
+
+        village_scores = calculator.calculate_semantic_scores(level_df)
+        regional_indices = calculator.calculate_regional_indices(
+            village_scores, level_column=group_col
+        )
+        regional_indices['region_level'] = level
+        regional_indices['run_id'] = run_id
+        all_indices.append(regional_indices)
+        print(f"  {len(regional_indices)} region-category pairs")
+
+    combined = pd.concat(all_indices, ignore_index=True)
+
+    # Add village_count
+    col_name_map = {'city': '市级', 'county': '区县级', 'township': '乡镇级'}
+    village_counts = {}
+    for (lvl, rname), grp in combined.groupby(['region_level', 'region_name']):
+        col = col_name_map.get(lvl, '市级')
+        cursor.execute(
+            f'SELECT COUNT(*) FROM 广东省自然村_预处理 WHERE "{col}" = ?',
+            (rname,)
+        )
+        village_counts[(lvl, rname)] = cursor.fetchone()[0]
+
+    combined['village_count'] = combined.apply(
+        lambda r: village_counts.get((r['region_level'], r['region_name']), 0), axis=1
+    )
+
+    # Write to database
+    print(f"\nWriting {len(combined):,} records to semantic_indices_detailed...")
+    columns = ['run_id', 'region_level', 'region_name', 'category',
+               'raw_intensity', 'normalized_index', 'z_score',
+               'rank_within_province', 'village_count']
+    data = combined[columns].values.tolist()
+
+    cursor.executemany("""
+        INSERT OR REPLACE INTO semantic_indices_detailed
+        (run_id, region_level, region_name, category,
+         raw_intensity, normalized_index, z_score, rank_within_province, village_count)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+    """, data)
+    conn.commit()
+
+    cursor.execute("SELECT COUNT(*) FROM semantic_indices_detailed")
+    cnt = cursor.fetchone()[0]
+    cursor.execute("SELECT COUNT(DISTINCT category) FROM semantic_indices_detailed")
+    cats = cursor.fetchone()[0]
+    print(f"[OK] semantic_indices_detailed: {cnt:,} records, {cats} categories")
+
+    conn.close()
+
+
 def main():
     """Main execution function."""
     db_path = 'data/villages.db'
@@ -492,6 +616,7 @@ def main():
         step4_detect_patterns(db_path)
         step5_detect_conflicts(db_path)
         step6_extract_village_structures(db_path)
+        step7_generate_semantic_indices_detailed(db_path)
 
         end_time = datetime.now()
         duration = (end_time - start_time).total_seconds()

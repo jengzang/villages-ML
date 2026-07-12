@@ -396,7 +396,7 @@ PHASES = {
         "group": "core",
         "dependencies": [0, 1],  # Depends on Phase 1 for character embeddings
         "estimated_time": "3-5 min",
-        "output_tables": ["semantic_labels", "semantic_cooccurrence", "semantic_network_edges"],
+        "output_tables": ["semantic_vtf_global", "semantic_indices"],
         "critical": True,
         "use_run_id": True,
         "special_run_id_handling": True  # Requires --char-run-id and --output-run-id
@@ -550,7 +550,7 @@ PHASES = {
         "group": "advanced",
         "dependencies": [0, 1, 3],
         "estimated_time": "3-5 min",
-        "output_tables": ["semantic_composition_patterns", "semantic_bigrams", "semantic_trigrams"],
+        "output_tables": ["semantic_bigrams", "semantic_trigrams", "semantic_composition_patterns", "semantic_conflicts", "village_semantic_structure", "semantic_pmi", "semantic_indices_detailed"],
         "critical": False,
         "use_run_id": True
     },
