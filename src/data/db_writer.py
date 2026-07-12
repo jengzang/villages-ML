@@ -1437,73 +1437,9 @@ def create_feature_materialization_tables(conn: sqlite3.Connection) -> None:
     except sqlite3.OperationalError:
         pass  # Column already exists
 
-    # Table 2: city_aggregates (deprecated, schema kept for compatibility, not populated)
-    cursor.execute("""
-        CREATE TABLE IF NOT EXISTS city_aggregates (
-            run_id TEXT NOT NULL,
-            city TEXT NOT NULL,
-            total_villages INTEGER NOT NULL,
-            avg_name_length REAL NOT NULL,
-            sem_mountain_count INTEGER NOT NULL,
-            sem_water_count INTEGER NOT NULL,
-            sem_settlement_count INTEGER NOT NULL,
-            sem_direction_count INTEGER NOT NULL,
-            sem_clan_count INTEGER NOT NULL,
-            sem_symbolic_count INTEGER NOT NULL,
-            sem_agriculture_count INTEGER NOT NULL,
-            sem_vegetation_count INTEGER NOT NULL,
-            sem_infrastructure_count INTEGER NOT NULL,
-            sem_mountain_pct REAL NOT NULL,
-            sem_water_pct REAL NOT NULL,
-            sem_settlement_pct REAL NOT NULL,
-            sem_direction_pct REAL NOT NULL,
-            sem_clan_pct REAL NOT NULL,
-            sem_symbolic_pct REAL NOT NULL,
-            sem_agriculture_pct REAL NOT NULL,
-            sem_vegetation_pct REAL NOT NULL,
-            sem_infrastructure_pct REAL NOT NULL,
-            top_suffixes_json TEXT,
-            top_prefixes_json TEXT,
-            cluster_distribution_json TEXT,
-            created_at REAL NOT NULL,
-            PRIMARY KEY (run_id, city, county)
-        )
-    """)
-
-    # Table 4: town_aggregates (structure kept, not populated)
-    cursor.execute("""
-        CREATE TABLE IF NOT EXISTS town_aggregates (
-            run_id TEXT NOT NULL,
-            city TEXT NOT NULL,
-            county TEXT NOT NULL,
-            town TEXT NOT NULL,
-            total_villages INTEGER NOT NULL,
-            avg_name_length REAL NOT NULL,
-            sem_mountain_count INTEGER NOT NULL,
-            sem_water_count INTEGER NOT NULL,
-            sem_settlement_count INTEGER NOT NULL,
-            sem_direction_count INTEGER NOT NULL,
-            sem_clan_count INTEGER NOT NULL,
-            sem_symbolic_count INTEGER NOT NULL,
-            sem_agriculture_count INTEGER NOT NULL,
-            sem_vegetation_count INTEGER NOT NULL,
-            sem_infrastructure_count INTEGER NOT NULL,
-            sem_mountain_pct REAL NOT NULL,
-            sem_water_pct REAL NOT NULL,
-            sem_settlement_pct REAL NOT NULL,
-            sem_direction_pct REAL NOT NULL,
-            sem_clan_pct REAL NOT NULL,
-            sem_symbolic_pct REAL NOT NULL,
-            sem_agriculture_pct REAL NOT NULL,
-            sem_vegetation_pct REAL NOT NULL,
-            sem_infrastructure_pct REAL NOT NULL,
-            top_suffixes_json TEXT,
-            top_prefixes_json TEXT,
-            cluster_distribution_json TEXT,
-            created_at REAL NOT NULL,
-            PRIMARY KEY (run_id, city, county, town)
-        )
-    """)
+    # Tables 2-4 (city/county/town_aggregates): DEPRECATED and removed.
+    # These were superseded by real-time SQL GROUP BY on 广东省自然村
+    # + semantic_indices JOIN. No data was ever populated.
 
     conn.commit()
     logger.info("Feature materialization tables created successfully")
@@ -1530,11 +1466,6 @@ def create_feature_materialization_indexes(conn: sqlite3.Connection) -> None:
     cursor.execute("CREATE INDEX IF NOT EXISTS idx_village_features_kmeans_cluster ON village_features(kmeans_cluster_id)")
     cursor.execute("CREATE INDEX IF NOT EXISTS idx_village_features_dbscan_cluster ON village_features(dbscan_cluster_id)")
     cursor.execute("CREATE INDEX IF NOT EXISTS idx_village_features_gmm_cluster ON village_features(gmm_cluster_id)")
-
-    # Indexes for aggregates (kept for structure compatibility)
-    cursor.execute("CREATE INDEX IF NOT EXISTS idx_city_aggregates_run_id ON city_aggregates(run_id)")
-    cursor.execute("CREATE INDEX IF NOT EXISTS idx_county_aggregates_run_id ON county_aggregates(run_id)")
-    cursor.execute("CREATE INDEX IF NOT EXISTS idx_town_aggregates_run_id ON town_aggregates(run_id)")
 
     conn.commit()
     logger.info("Feature materialization indexes created successfully")
