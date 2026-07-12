@@ -4,8 +4,8 @@
 Villages-ML Complete Analysis Pipeline Runner
 广东省自然村分析系统 - 完整分析流水线执行器
 
-This script orchestrates ALL 15 analysis phases for the Guangdong villages dataset.
-本脚本编排执行广东省村庄数据集的全部15个分析阶段。
+This script orchestrates ALL 17 analysis phases for the Guangdong villages dataset.
+本脚本编排执行广东省村庄数据集的全部17个分析阶段。
 
 ================================================================================
 QUICK START 快速开始
@@ -33,6 +33,9 @@ QUICK START 快速开始
 
 7. Skip failed phases and continue (跳过失败继续执行):
    python run_all_phases.py --all --continue-on-error
+
+8. Clean rebuild: drop ALL derived tables, restart from scratch (全新开始):
+   python run_all_phases.py --all --clear
 
 ================================================================================
 PHASE GROUPS 阶段分组
@@ -268,6 +271,8 @@ def print_execution_plan(phases_to_run: List[int], args):
     print(f"🏷️  Run ID prefix: {args.run_id_prefix}")
     print(f"🔍 Dry run: {'Yes' if args.dry_run else 'No'}")
     print(f"⚠️  Continue on error: {'Yes' if args.continue_on_error else 'No'}")
+    if args.clear:
+        print(f"🧹 Clear mode: ALL derived tables will be dropped before execution")
 
     # Estimate total time
     total_min_time = 0
@@ -812,6 +817,11 @@ def main():
         help="Continue executing remaining phases even if one fails (失败后继续执行)"
     )
     behavior_group.add_argument(
+        "--clear",
+        action="store_true",
+        help="DROP all tables except 广东省自然村 before running. Forces a clean rebuild. (删除除了原始数据之外的所有表)"
+    )
+    behavior_group.add_argument(
         "--skip-dependencies",
         action="store_true",
         help="Skip dependency checking (advanced users only, 跳过依赖检查)"
@@ -886,6 +896,48 @@ def main():
 
     # Print execution plan
     print_execution_plan(phases_to_run, args)
+
+    # Handle --clear: drop all tables except raw data
+    if args.clear and not args.dry_run:
+        import sqlite3 as _sqlite3
+        print("\n" + "=" * 60)
+        print("CLEAR MODE: 清除所有衍生表（保留广东省自然村）")
+        print("=" * 60)
+
+        _conn = _sqlite3.connect(args.db_path)
+        _cursor = _conn.cursor()
+        _cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name != '广东省自然村' AND name NOT LIKE 'sqlite_%'")
+        tables_to_drop = [r[0] for r in _cursor.fetchall()]
+
+        if tables_to_drop:
+            print(f"将删除 {len(tables_to_drop)} 张表:")
+            for t in sorted(tables_to_drop):
+                _cursor.execute(f"SELECT COUNT(*) FROM \"{t}\"")
+                cnt = _cursor.fetchone()[0]
+                print(f"  - {t:45s} ({cnt:,} rows)")
+
+            print(f"\n⚠️  这不可逆！数据将永久丢失。")
+            response = input("确认删除？输入 'yes' 继续: ")
+            if response == 'yes':
+                for t in tables_to_drop:
+                    _cursor.execute(f"DROP TABLE \"{t}\"")
+                _conn.commit()
+                print(f"[OK] 已删除 {len(tables_to_drop)} 张表，保留 广东省自然村")
+            else:
+                print("已取消。")
+                _conn.close()
+                return 0
+        else:
+            print("没有可清除的表。")
+        _conn.close()
+    elif args.clear and args.dry_run:
+        import sqlite3 as _sqlite3
+        _conn = _sqlite3.connect(args.db_path)
+        _cursor = _conn.cursor()
+        _cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name != '广东省自然村' AND name NOT LIKE 'sqlite_%'")
+        tables_to_drop = [r[0] for r in _cursor.fetchall()]
+        print(f"\n🔍 --clear (dry-run): 将会删除 {len(tables_to_drop)} 张衍生表，保留 广东省自然村")
+        _conn.close()
 
     # Confirm execution (unless dry-run)
     if not args.dry_run and len(phases_to_run) > 3:
