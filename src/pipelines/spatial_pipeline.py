@@ -36,6 +36,7 @@ def run_spatial_analysis_pipeline(
     run_id: str,
     eps_km: float = 0.5,
     min_samples: int = 5,
+    method: str = 'dbscan',
     feature_run_id: Optional[str] = None,
     output_dir: Optional[str] = None,
     generate_maps: bool = False
@@ -46,7 +47,7 @@ def run_spatial_analysis_pipeline(
     Pipeline steps:
     1. Load coordinates from database
     2. Calculate k-nearest neighbors
-    3. Run DBSCAN spatial clustering
+    3. Run DBSCAN/HDBSCAN spatial clustering
     4. Extract spatial features
     5. Detect hotspots
     6. Calculate regional aggregates
@@ -57,8 +58,9 @@ def run_spatial_analysis_pipeline(
     Args:
         db_path: Path to SQLite database
         run_id: Unique identifier for this spatial analysis run
-        eps_km: DBSCAN epsilon in kilometers (default: 0.5, reduced from 2.0 for finer clustering)
-        min_samples: DBSCAN min_samples (default: 5)
+        eps_km: DBSCAN epsilon in kilometers (default: 0.5)
+        min_samples: DBSCAN min_samples / HDBSCAN min_cluster_size (default: 5)
+        method: Clustering method - 'dbscan' or 'hdbscan' (default: 'dbscan')
         feature_run_id: Optional run_id to integrate with semantic features
         output_dir: Optional directory for maps and exports
         generate_maps: Whether to generate interactive maps
@@ -71,7 +73,7 @@ def run_spatial_analysis_pipeline(
     logger.info("="*80)
     logger.info(f"Run ID: {run_id}")
     logger.info(f"Database: {db_path}")
-    logger.info(f"DBSCAN parameters: eps={eps_km}km, min_samples={min_samples}")
+    logger.info(f"Clustering: {method}, eps={eps_km}km, min_samples={min_samples}")
 
     start_time = time.time()
 
@@ -116,7 +118,7 @@ def run_spatial_analysis_pipeline(
         logger.info("\n" + "="*80)
         logger.info("Step 5: Running spatial clustering")
         logger.info("="*80)
-        clusterer = SpatialClusterer(eps_km=eps_km, min_samples=min_samples)
+        clusterer = SpatialClusterer(eps_km=eps_km, min_samples=min_samples, method=method)
         labels = clusterer.fit(coords)
 
         n_clusters = len(set(labels)) - (1 if -1 in labels else 0)

@@ -1,5 +1,5 @@
 """
-Spatial Clustering using DBSCAN.
+Spatial Clustering using DBSCAN or HDBSCAN.
 
 Performs geographic clustering based on coordinate proximity.
 """
@@ -17,27 +17,30 @@ EARTH_RADIUS_KM = 6371.0
 
 
 class SpatialClusterer:
-    """Perform spatial clustering on geographic coordinates."""
+    """Perform spatial clustering on geographic coordinates.
 
-    def __init__(self, eps_km: float = 2.0, min_samples: int = 5):
+    Supports DBSCAN (method='dbscan') and HDBSCAN (method='hdbscan').
+    """
+
+    def __init__(self, eps_km: float = 2.0, min_samples: int = 5, method: str = 'dbscan'):
         """
         Initialize spatial clusterer.
 
         Args:
-            eps_km: Maximum distance between two samples (in km) for one to be
-                   considered as in the neighborhood of the other
-            min_samples: Minimum number of samples in a neighborhood for a point
-                        to be considered as a core point
+            eps_km: Maximum distance between two samples (in km) - used by DBSCAN
+            min_samples: DBSCAN min_samples / HDBSCAN min_cluster_size
+            method: 'dbscan' or 'hdbscan'
         """
         self.eps_km = eps_km
         self.min_samples = min_samples
-        self.eps_rad = eps_km / EARTH_RADIUS_KM  # Convert to radians
+        self.method = method
+        self.eps_rad = eps_km / EARTH_RADIUS_KM
         self.model = None
         self.labels_ = None
 
     def fit(self, coords: np.ndarray) -> np.ndarray:
         """
-        Perform DBSCAN clustering on coordinates.
+        Perform clustering on coordinates.
 
         Args:
             coords: Array of shape (n_points, 2) with [latitude, longitude] in degrees
@@ -46,13 +49,17 @@ class SpatialClusterer:
             Cluster labels (array of shape (n_points,))
             -1 indicates noise points
         """
-        logger.info(f"Running DBSCAN clustering with eps={self.eps_km}km, min_samples={self.min_samples}")
+        coords_rad = np.radians(coords)
         logger.info(f"Input: {len(coords)} villages")
 
-        # Convert to radians for haversine metric
-        coords_rad = np.radians(coords)
+        if self.method == 'hdbscan':
+            return self._fit_hdbscan(coords_rad)
+        else:
+            return self._fit_dbscan(coords_rad)
 
-        # Run DBSCAN
+    def _fit_dbscan(self, coords_rad: np.ndarray) -> np.ndarray:
+        logger.info(f"Running DBSCAN with eps={self.eps_km}km, min_samples={self.min_samples}")
+
         self.model = DBSCAN(
             eps=self.eps_rad,
             min_samples=self.min_samples,
@@ -60,18 +67,35 @@ class SpatialClusterer:
             algorithm='ball_tree',
             n_jobs=-1
         )
-
         self.labels_ = self.model.fit_predict(coords_rad)
+        self._log_results()
+        return self.labels_
 
-        # Log results
+    def _fit_hdbscan(self, coords_rad: np.ndarray) -> np.ndarray:
+        try:
+            import hdbscan
+        except ImportError:
+            logger.error("hdbscan not installed. Run: pip install hdbscan")
+            raise
+
+        logger.info(f"Running HDBSCAN with min_cluster_size={self.min_samples}")
+
+        self.model = hdbscan.HDBSCAN(
+            min_cluster_size=self.min_samples,
+            metric='haversine',
+            cluster_selection_method='eom',
+            n_jobs=-1
+        )
+        self.labels_ = self.model.fit_predict(coords_rad)
+        self._log_results()
+        return self.labels_
+
+    def _log_results(self):
         n_clusters = len(set(self.labels_)) - (1 if -1 in self.labels_ else 0)
         n_noise = list(self.labels_).count(-1)
-
         logger.info(f"Clustering complete:")
         logger.info(f"  - {n_clusters} clusters found")
-        logger.info(f"  - {n_noise} noise points ({n_noise/len(coords)*100:.1f}%)")
-
-        return self.labels_
+        logger.info(f"  - {n_noise} noise points ({n_noise/len(self.labels_)*100:.1f}%)")
 
     def get_cluster_profiles(self, coords: np.ndarray, labels: np.ndarray,
                             df: pd.DataFrame) -> pd.DataFrame:

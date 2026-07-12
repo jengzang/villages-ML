@@ -1835,6 +1835,11 @@ def write_spatial_clusters(conn: sqlite3.Connection, run_id: str, clusters_df: p
 
     logger.info(f"Writing {len(clusters_df)} spatial clusters to database")
 
+    # Delete existing data for this run_id to make the write idempotent
+    cursor = conn.cursor()
+    cursor.execute("DELETE FROM spatial_clusters WHERE run_id = ?", (run_id,))
+    conn.commit()
+
     # Prepare data
     clusters_df = clusters_df.copy()
     clusters_df['run_id'] = run_id
@@ -1878,6 +1883,11 @@ def write_spatial_hotspots(conn: sqlite3.Connection, run_id: str, hotspots_df: p
     import time
 
     logger.info(f"Writing {len(hotspots_df)} spatial hotspots to database")
+
+    # Delete existing data for this run_id to make the write idempotent
+    cursor = conn.cursor()
+    cursor.execute("DELETE FROM spatial_hotspots WHERE run_id = ?", (run_id,))
+    conn.commit()
 
     # Prepare data
     hotspots_df = hotspots_df.copy()

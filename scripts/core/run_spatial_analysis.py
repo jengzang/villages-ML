@@ -2,13 +2,14 @@
 CLI script for running spatial analysis.
 
 Usage:
-    python scripts/run_spatial_analysis.py \\
-        --run-id spatial_001 \\
-        --eps-km 2.0 \\
-        --min-samples 5 \\
-        --feature-run-id run_002 \\
-        --output-dir results/spatial_001 \\
-        --generate-maps
+    # Single run (default)
+    python scripts/run_spatial_analysis.py --run-id spatial_001 --eps-km 2.0
+
+    # Multi-resolution mode (5 configs)
+    python scripts/run_spatial_analysis.py --multi-resolution
+
+    # With HDBSCAN
+    python scripts/run_spatial_analysis.py --run-id spatial_hdbscan_v1 --method hdbscan
 """
 
 import argparse
@@ -21,6 +22,15 @@ project_root = Path(__file__).parent.parent.parent
 sys.path.insert(0, str(project_root))
 
 from src.pipelines.spatial_pipeline import run_spatial_analysis_pipeline
+
+# Predefined multi-resolution configurations
+MULTI_RESOLUTION_CONFIGS = [
+    {"run_id": "spatial_eps_03",     "eps_km": 0.3,  "min_samples": 5, "method": "dbscan"},
+    {"run_id": "spatial_eps_10",     "eps_km": 10.0, "min_samples": 5, "method": "dbscan"},
+    {"run_id": "spatial_eps_20",     "eps_km": 20.0, "min_samples": 5, "method": "dbscan"},
+    {"run_id": "spatial_hdbscan_v1", "eps_km": 0.0,  "min_samples": 5, "method": "hdbscan"},
+    {"run_id": "spatial_v2",         "eps_km": 0.5,  "min_samples": 5, "method": "dbscan"},
+]
 
 
 def setup_logging(verbose: bool = False):
@@ -39,26 +49,25 @@ def main():
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Examples:
-  # Basic spatial analysis
+  # Single run (requires --run-id)
   python scripts/run_spatial_analysis.py --run-id spatial_001
 
-  # With custom DBSCAN parameters
+  # Custom DBSCAN parameters
   python scripts/run_spatial_analysis.py --run-id spatial_002 --eps-km 3.0 --min-samples 10
 
-  # Integrate with semantic features and generate maps
-  python scripts/run_spatial_analysis.py \\
-      --run-id spatial_003 \\
-      --feature-run-id run_002 \\
-      --output-dir results/spatial_003 \\
-      --generate-maps
+  # HDBSCAN clustering
+  python scripts/run_spatial_analysis.py --run-id spatial_hdbscan_v2 --method hdbscan
+
+  # Multi-resolution mode (runs all 5 predefined configs)
+  python scripts/run_spatial_analysis.py --multi-resolution
         """
     )
 
     parser.add_argument(
         '--run-id',
         type=str,
-        required=True,
-        help='Unique identifier for this spatial analysis run'
+        default=None,
+        help='Unique identifier for this spatial analysis run (required unless --multi-resolution)'
     )
 
     parser.add_argument(
@@ -79,7 +88,21 @@ Examples:
         '--min-samples',
         type=int,
         default=5,
-        help='DBSCAN min_samples parameter (default: 5)'
+        help='DBSCAN min_samples / HDBSCAN min_cluster_size (default: 5)'
+    )
+
+    parser.add_argument(
+        '--method',
+        type=str,
+        choices=['dbscan', 'hdbscan'],
+        default='dbscan',
+        help='Clustering method (default: dbscan)'
+    )
+
+    parser.add_argument(
+        '--multi-resolution',
+        action='store_true',
+        help='Run all 5 predefined spatial configurations (eps=0.3/10/20, hdbscan, v2)'
     )
 
     parser.add_argument(
@@ -110,46 +133,82 @@ Examples:
 
     args = parser.parse_args()
 
-    # Setup logging
+    if not args.multi_resolution and not args.run_id:
+        parser.error("--run-id is required (or use --multi-resolution)")
+
     setup_logging(args.verbose)
     logger = logging.getLogger(__name__)
 
-    logger.info("Starting spatial analysis")
-    logger.info(f"Run ID: {args.run_id}")
-    logger.info(f"Database: {args.db_path}")
-    logger.info(f"DBSCAN parameters: eps={args.eps_km}km, min_samples={args.min_samples}")
+    if args.multi_resolution:
+        logger.info("=" * 80)
+        logger.info("MULTI-RESOLUTION SPATIAL ANALYSIS")
+        logger.info(f"Running {len(MULTI_RESOLUTION_CONFIGS)} configurations")
+        logger.info("=" * 80)
 
-    if args.feature_run_id:
-        logger.info(f"Integrating with semantic features: {args.feature_run_id}")
+        for i, cfg in enumerate(MULTI_RESOLUTION_CONFIGS):
+            logger.info(f"\n{'#'*80}")
+            logger.info(f"Config {i+1}/{len(MULTI_RESOLUTION_CONFIGS)}: {cfg['run_id']}")
+            logger.info(f"  method={cfg['method']}, eps_km={cfg['eps_km']}, min_samples={cfg['min_samples']}")
+            logger.info(f"{'#'*80}")
 
-    if args.generate_maps:
-        if not args.output_dir:
-            logger.error("--output-dir is required when --generate-maps is specified")
+            try:
+                stats = run_spatial_analysis_pipeline(
+                    db_path=args.db_path,
+                    run_id=cfg['run_id'],
+                    eps_km=cfg['eps_km'],
+                    min_samples=cfg['min_samples'],
+                    method=cfg['method'],
+                    feature_run_id=args.feature_run_id,
+                    output_dir=args.output_dir,
+                    generate_maps=args.generate_maps and (i == len(MULTI_RESOLUTION_CONFIGS) - 1),
+                )
+                logger.info(f"Config {cfg['run_id']} complete: "
+                           f"{stats['n_clusters']} clusters, "
+                           f"{stats['n_hotspots']} hotspots, "
+                           f"{stats['elapsed_time']:.1f}s")
+            except Exception as e:
+                logger.error(f"Config {cfg['run_id']} failed: {e}", exc_info=True)
+                logger.warning("Continuing with next configuration...")
+
+        logger.info("\nMulti-resolution spatial analysis complete!")
+
+    else:
+        logger.info("Starting spatial analysis")
+        logger.info(f"Run ID: {args.run_id}")
+        logger.info(f"Database: {args.db_path}")
+        logger.info(f"Method: {args.method}, eps={args.eps_km}km, min_samples={args.min_samples}")
+
+        if args.feature_run_id:
+            logger.info(f"Integrating with semantic features: {args.feature_run_id}")
+
+        if args.generate_maps:
+            if not args.output_dir:
+                logger.error("--output-dir is required when --generate-maps is specified")
+                sys.exit(1)
+            logger.info(f"Maps will be saved to: {args.output_dir}")
+
+        try:
+            stats = run_spatial_analysis_pipeline(
+                db_path=args.db_path,
+                run_id=args.run_id,
+                eps_km=args.eps_km,
+                min_samples=args.min_samples,
+                method=args.method,
+                feature_run_id=args.feature_run_id,
+                output_dir=args.output_dir,
+                generate_maps=args.generate_maps
+            )
+
+            logger.info("\nSpatial analysis complete!")
+            logger.info(f"Results saved with run_id: {args.run_id}")
+            logger.info(f"Villages analyzed: {stats['n_villages']}")
+            logger.info(f"Spatial clusters: {stats['n_clusters']}")
+            logger.info(f"Hotspots detected: {stats['n_hotspots']}")
+            logger.info(f"Elapsed time: {stats['elapsed_time']:.1f}s")
+
+        except Exception as e:
+            logger.error(f"Spatial analysis failed: {e}", exc_info=True)
             sys.exit(1)
-        logger.info(f"Maps will be saved to: {args.output_dir}")
-
-    try:
-        # Run pipeline
-        stats = run_spatial_analysis_pipeline(
-            db_path=args.db_path,
-            run_id=args.run_id,
-            eps_km=args.eps_km,
-            min_samples=args.min_samples,
-            feature_run_id=args.feature_run_id,
-            output_dir=args.output_dir,
-            generate_maps=args.generate_maps
-        )
-
-        logger.info("\nSpatial analysis complete!")
-        logger.info(f"Results saved with run_id: {args.run_id}")
-        logger.info(f"Villages analyzed: {stats['n_villages']}")
-        logger.info(f"Spatial clusters: {stats['n_clusters']}")
-        logger.info(f"Hotspots detected: {stats['n_hotspots']}")
-        logger.info(f"Elapsed time: {stats['elapsed_time']:.1f}s")
-
-    except Exception as e:
-        logger.error(f"Spatial analysis failed: {e}", exc_info=True)
-        sys.exit(1)
 
 
 if __name__ == '__main__':

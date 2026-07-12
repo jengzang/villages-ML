@@ -406,16 +406,17 @@ PHASES = {
         "name_zh": "空间分析",
         "script": "scripts/core/run_spatial_analysis.py",
         "args": [
-            "--db-path", "data/villages.db"
+            "--db-path", "data/villages.db",
+            "--multi-resolution"
         ],
-        "description": "k-NN, DBSCAN clustering, KDE hotspot detection (283,986 villages)",
-        "description_zh": "k-NN、DBSCAN聚类、KDE热点检测（283,986个村庄）",
+        "description": "Multi-resolution spatial clustering: DBSCAN (eps=0.3/0.5/10/20km) + HDBSCAN, KDE hotspots",
+        "description_zh": "多分辨率空间聚类：DBSCAN (eps=0.3/0.5/10/20km) + HDBSCAN，KDE热点检测",
         "group": "core",
         "dependencies": [0],
-        "estimated_time": "5-10 min",
-        "output_tables": ["village_spatial_features", "spatial_clusters"],
+        "estimated_time": "25-50 min",
+        "output_tables": ["village_spatial_features", "spatial_clusters", "spatial_hotspots", "region_spatial_aggregates"],
         "critical": True,
-        "use_run_id": True
+        "use_run_id": False
     },
     5: {
         "name": "Feature Engineering",
@@ -533,7 +534,7 @@ PHASES = {
         "description": "KDE-based hotspot detection (8 hotspot regions)",
         "description_zh": "基于KDE的热点检测（8个热点区域）",
         "group": "advanced",
-        "dependencies": [0, 4],
+        "dependencies": [0],
         "estimated_time": "2-3 min",
         "output_tables": ["spatial_hotspots"],
         "critical": False,
