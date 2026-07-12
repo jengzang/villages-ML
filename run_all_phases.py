@@ -626,6 +626,35 @@ PHASES = {
 }
 
 
+def _sync_active_run_ids(db_path, phase_id, run_id, output_run_id):
+    """Write active_run_ids records after a phase completes successfully.
+
+    The external backend reads active_run_ids to resolve analysis_type → run_id
+    for API queries. Each phase that produces backend-consumed tables must register
+    its run_id here.
+    """
+    import sqlite3
+    from src.data.db_writer import create_active_run_ids_table, upsert_active_run_id
+
+    conn = sqlite3.connect(db_path)
+    try:
+        create_active_run_ids_table(conn)
+
+        if phase_id == 3 and output_run_id:
+            upsert_active_run_id(conn, 'semantic_indices', output_run_id, 'semantic_indices')
+        elif phase_id == 4:
+            upsert_active_run_id(conn, 'spatial_clusters', 'spatial_eps_20', 'spatial_clusters')
+            upsert_active_run_id(conn, 'spatial_integration', 'spatial_multi_tendency', 'spatial_tendency_integration')
+        elif phase_id == 6 and output_run_id:
+            upsert_active_run_id(conn, 'clustering_county', output_run_id, 'cluster_assignments')
+        elif phase_id == 10 and run_id:
+            upsert_active_run_id(conn, 'char_significance', run_id, 'tendency_significance')
+        elif phase_id == 13 and run_id:
+            upsert_active_run_id(conn, 'spatial_hotspots', run_id, 'spatial_hotspots')
+    finally:
+        conn.close()
+
+
 def run_phase(phase_id, run_id_prefix="run", dry_run=False, db_path="data/villages.db"):
     """Run a single analysis phase.
 
@@ -643,6 +672,10 @@ def run_phase(phase_id, run_id_prefix="run", dry_run=False, db_path="data/villag
         return False
 
     phase = PHASES[phase_id]
+
+    # Track generated run_ids for active_run_ids sync after success
+    run_id = None
+    output_run_id = None
 
     # Print phase header
     print(f"\n{'='*80}")
@@ -764,6 +797,7 @@ def run_phase(phase_id, run_id_prefix="run", dry_run=False, db_path="data/villag
 
         elapsed = time.time() - start_time
         print(f"\n✅ [OK] Phase {phase_id} completed successfully in {elapsed:.1f}s ({elapsed/60:.1f} min)")
+        _sync_active_run_ids(db_path, phase_id, run_id, output_run_id)
         return True
 
     except subprocess.CalledProcessError as e:

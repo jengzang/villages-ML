@@ -2256,3 +2256,41 @@ def write_semantic_regional_analysis(conn: sqlite3.Connection, df: pd.DataFrame,
     conn.commit()
 
 
+def create_active_run_ids_table(conn: sqlite3.Connection) -> None:
+    """Create the active_run_ids lookup table used by the external backend.
+
+    The backend reads this table to resolve analysis_type → run_id for API queries.
+    """
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS active_run_ids (
+            analysis_type TEXT PRIMARY KEY,
+            run_id TEXT NOT NULL,
+            table_name TEXT NOT NULL,
+            updated_at TEXT NOT NULL DEFAULT (datetime('now', 'localtime'))
+        )
+    """)
+    conn.commit()
+
+
+def upsert_active_run_id(
+    conn: sqlite3.Connection,
+    analysis_type: str,
+    run_id: str,
+    table_name: str
+) -> None:
+    """Insert or update an active run_id record.
+
+    Used by the orchestrator after each phase completes to keep
+    the backend's analysis_type→run_id mapping current.
+    """
+    conn.execute("""
+        INSERT INTO active_run_ids (analysis_type, run_id, table_name, updated_at)
+        VALUES (?, ?, ?, datetime('now', 'localtime'))
+        ON CONFLICT(analysis_type) DO UPDATE SET
+            run_id = excluded.run_id,
+            table_name = excluded.table_name,
+            updated_at = excluded.updated_at
+    """, (analysis_type, run_id, table_name))
+    conn.commit()
+
+
