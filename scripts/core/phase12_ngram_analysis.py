@@ -720,15 +720,27 @@ def step8_create_optimization_indexes(db_path: str):
     # Part 2: Create regional centroids table
     print("\n[2/3] Creating regional centroids table...")
 
+    required_centroid_cols = {
+        'region_level', 'city', 'county', 'township', 'region_name',
+        'centroid_lon', 'centroid_lat', 'village_count'
+    }
+    cursor.execute('PRAGMA table_info(regional_centroids)')
+    existing_centroid_cols = {row[1] for row in cursor.fetchall()}
+    if existing_centroid_cols and not required_centroid_cols.issubset(existing_centroid_cols):
+        cursor.execute('DROP TABLE regional_centroids')
+        print("  [OK] Rebuilt legacy regional_centroids schema")
+
     # Create table
     cursor.execute('''
     CREATE TABLE IF NOT EXISTS regional_centroids (
         region_level TEXT NOT NULL,
+        city TEXT,
+        county TEXT,
+        township TEXT,
         region_name TEXT NOT NULL,
         centroid_lon REAL NOT NULL,
         centroid_lat REAL NOT NULL,
-        village_count INTEGER NOT NULL,
-        PRIMARY KEY (region_level, region_name)
+        village_count INTEGER NOT NULL
     )
     ''')
     print("  [OK] Table created")
@@ -742,6 +754,7 @@ def step8_create_optimization_indexes(db_path: str):
 
     # Populate data
     print("  Populating data...")
+    cursor.execute('DELETE FROM regional_centroids')
     cursor.execute('''
     INSERT OR REPLACE INTO regional_centroids (region_level, city, county, township, region_name, centroid_lon, centroid_lat, village_count)
     SELECT
@@ -890,4 +903,3 @@ def main():
 
 if __name__ == '__main__':
     main()
-

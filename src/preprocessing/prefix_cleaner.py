@@ -47,6 +47,18 @@ class PrefixCleanedName:
     confidence: float  # 0.0-1.0
     needs_review: bool  # True if confidence < threshold
 
+def normalize_name(value) -> str:
+    """将村名字段统一转换为安全字符串。
+
+    None、NaN 和空值统一转换为空字符串。
+    """
+    if value is None or pd.isna(value):
+        return ""
+
+    if isinstance(value, str):
+        return value.strip()
+
+    return str(value).strip()
 
 def count_chinese_chars(text: str) -> int:
     """Count only Chinese characters (not numbers, punctuation).
@@ -70,10 +82,12 @@ def remove_delimiters(text: str) -> str:
     Returns:
         Text with delimiters removed
     """
+    text = normalize_name(text)
+
     for delimiter in DELIMITERS:
         text = text.replace(delimiter, "")
-    return text
 
+    return text
 
 def try_rule1_delimiter_removal(natural_village: str) -> str:
     """Rule 1: Find the LAST delimiter and remove everything up to and including it.
@@ -248,6 +262,22 @@ def remove_administrative_prefix(
         Rule 4: 王家村东 + 王家村 → 王家村东 (would leave only 东, abort)
         Rule 5: 凤北村 + 凤北村 → 凤北村 (identical, no removal)
     """
+    natural_village = normalize_name(natural_village)
+    administrative_village = normalize_name(administrative_village)
+
+    # 自然村为空时直接退出
+    if not natural_village:
+        return PrefixCleanedName(
+            raw_name="",
+            clean_name="",
+            prefix_removed_name="",
+            had_prefix=False,
+            removed_prefix="",
+            match_source="empty_name",
+            confidence=0.0,
+            needs_review=False
+        )
+
     # Rule 5: Early exit for identical names
     if natural_village == administrative_village:
         return PrefixCleanedName(

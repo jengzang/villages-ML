@@ -15,9 +15,6 @@ networkx>=3.0
 scipy>=1.10.0
 folium>=0.14.0
 
-# Database
-sqlite3
-
 # Data visualization
 matplotlib>=3.7.0
 seaborn>=0.12.0
