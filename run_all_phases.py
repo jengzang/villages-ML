@@ -391,8 +391,8 @@ PHASES = {
         "args": [
             "--db-path", "data/villages.db"
         ],
-        "description": "LLM-assisted semantic labeling and co-occurrence analysis",
-        "description_zh": "LLM辅助语义标注和共现分析",
+        "description": "VTF analysis (9 categories) + semantic intensity indices. Note: semantic_labels is generated separately via LLM-assisted labeling, not by this phase",
+        "description_zh": "VTF分析（9类别）+ 语义强度指数。注：semantic_labels通过LLM辅助标注单独生成，不由此阶段生成",
         "group": "core",
         "dependencies": [0, 1],  # Depends on Phase 1 for character embeddings
         "estimated_time": "3-5 min",
@@ -591,12 +591,12 @@ PHASES = {
         "args": [
             "--db-path", "data/villages.db"
         ],
-        "description": "LLM validation, semantic subcategories, hybrid lexicon creation",
-        "description_zh": "LLM验证、语义子类别、混合词典创建",
+        "description": "Subcategory VTF analysis (76 subcategories). Note: semantic_subcategory_labels is an intermediate table, not an API output",
+        "description_zh": "子类别VTF分析（76个子类别）。注：semantic_subcategory_labels是中间表，非API输出",
         "group": "advanced",
         "dependencies": [0, 1, 3],
         "estimated_time": "3-5 min",
-        "output_tables": ["semantic_labels"],
+        "output_tables": ["semantic_subcategory_vtf_global", "semantic_subcategory_vtf_regional"],
         "critical": False,
         "use_run_id": True
     }
