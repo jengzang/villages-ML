@@ -16,16 +16,32 @@ logger = logging.getLogger(__name__)
 class HotspotDetector:
     """Detect spatial hotspots using KDE."""
 
-    def __init__(self, bandwidth_km: float = 5.0, threshold_percentile: float = 95):
+    def __init__(
+        self,
+        bandwidth_km: float = 5.0,
+        threshold_percentile: float = 95,
+        cluster_eps_km: float = 1.1,
+        cluster_min_samples: int = 3,
+        sample_seed: int = 20260712,
+        full_count_radius_km: float = 3.0,
+    ):
         """
         Initialize hotspot detector.
 
         Args:
             bandwidth_km: KDE bandwidth in kilometers (~0.05 degrees)
             threshold_percentile: Percentile threshold for hotspot detection (default: 95)
+            cluster_eps_km: DBSCAN merge radius for hotspot candidate points
+            cluster_min_samples: DBSCAN min_samples for hotspot candidate points
+            sample_seed: Random seed for reproducible KDE evaluation sampling
+            full_count_radius_km: Radius used to count all villages around each hotspot center
         """
         self.bandwidth_deg = bandwidth_km / 111.0  # Rough conversion to degrees
         self.threshold_percentile = threshold_percentile
+        self.cluster_eps_deg = cluster_eps_km / 111.0
+        self.cluster_min_samples = cluster_min_samples
+        self.sample_seed = sample_seed
+        self.full_count_radius_km = full_count_radius_km
 
     def detect_density_hotspots(
         self,
@@ -60,9 +76,10 @@ class HotspotDetector:
         kde.fit(coords)
 
         # Use all data or sample for density evaluation
-        if sample_size is not None and n_points > sample_size:
+        if sample_size is not None and sample_size > 0 and n_points > sample_size:
             logger.info(f"Sampling {sample_size} points from {n_points} for density evaluation")
-            sample_indices = np.random.choice(n_points, size=sample_size, replace=False)
+            rng = np.random.default_rng(self.sample_seed)
+            sample_indices = rng.choice(n_points, size=sample_size, replace=False)
             eval_coords = coords[sample_indices]
         else:
             logger.info(f"Using all {n_points} points for density evaluation (no sampling)")
@@ -94,7 +111,7 @@ class HotspotDetector:
         hotspot_df['density_score'] = density[hotspot_mask]
 
         # Cluster hotspot points to identify distinct hotspots
-        hotspots = self._cluster_hotspot_points(hotspot_coords, hotspot_df)
+        hotspots = self._cluster_hotspot_points(hotspot_coords, hotspot_df, full_coords=coords)
 
         logger.info(f"Identified {len(hotspots)} distinct density hotspots")
 
@@ -103,7 +120,8 @@ class HotspotDetector:
     def _cluster_hotspot_points(
         self,
         coords: np.ndarray,
-        df: pd.DataFrame
+        df: pd.DataFrame,
+        full_coords: Optional[np.ndarray] = None
     ) -> List[Dict]:
         """
         Cluster hotspot points into distinct hotspots.
@@ -117,9 +135,11 @@ class HotspotDetector:
         """
         from sklearn.cluster import DBSCAN
 
-        # Cluster hotspot points (eps=0.01 degrees ≈ 1.1km for finer granularity)
-        # Reduced from 0.05 to detect more distinct hotspots
-        clusterer = DBSCAN(eps=0.01, min_samples=3, metric='euclidean')
+        clusterer = DBSCAN(
+            eps=self.cluster_eps_deg,
+            min_samples=self.cluster_min_samples,
+            metric='euclidean'
+        )
         labels = clusterer.fit_predict(coords)
 
         hotspots = []
@@ -141,7 +161,19 @@ class HotspotDetector:
                 (cluster_coords[:, 1] - center_lon)**2
             )
             radius_deg = distances.max()
-            radius_km = radius_deg * 111  # Rough conversion
+            core_radius_km = radius_deg * 111  # Rough conversion
+
+            if full_coords is not None:
+                count_radius_deg = self.full_count_radius_km / 111.0
+                full_distances = np.sqrt(
+                    (full_coords[:, 0] - center_lat)**2 +
+                    (full_coords[:, 1] - center_lon)**2
+                )
+                village_count = int((full_distances <= count_radius_deg).sum())
+                radius_km = self.full_count_radius_km
+            else:
+                village_count = len(cluster_df)
+                radius_km = core_radius_km
 
             # Get density score
             density_score = cluster_df['density_score'].mean()
@@ -156,7 +188,7 @@ class HotspotDetector:
                 'center_lat': center_lat,
                 'center_lon': center_lon,
                 'radius_km': radius_km,
-                'village_count': len(cluster_df),
+                'village_count': village_count,
                 'density_score': density_score,
                 'city': city,
                 'county': county,

@@ -7,9 +7,16 @@ Run with: pytest tests/test_spatial_basic.py -v
 import pytest
 import numpy as np
 import pandas as pd
+import sys
+from pathlib import Path
+
+project_root = Path(__file__).parent.parent
+sys.path.insert(0, str(project_root))
+
 from src.spatial.coordinate_loader import CoordinateLoader
 from src.spatial.distance_calculator import DistanceCalculator
 from src.spatial.spatial_clustering import SpatialClusterer
+from src.spatial.hotspot_detector import HotspotDetector
 
 
 class TestCoordinateLoader:
@@ -147,6 +154,43 @@ class TestSpatialClusterer:
             assert 'cluster_size' in profiles.columns
             assert 'centroid_lat' in profiles.columns
             assert 'centroid_lon' in profiles.columns
+
+
+class TestHotspotDetector:
+    """Test hotspot detection."""
+
+    def test_cluster_hotspot_points_uses_full_count_radius(self):
+        detector = HotspotDetector(
+            cluster_eps_km=1.5,
+            cluster_min_samples=2,
+            full_count_radius_km=3.0,
+        )
+        candidate_coords = np.array([
+            [23.0000, 113.0000],
+            [23.0040, 113.0000],
+        ])
+        candidate_df = pd.DataFrame({
+            'density_score': [0.3, 0.4],
+            'city': ['City1', 'City1'],
+            'county': ['County1', 'County1'],
+        })
+        full_coords = np.array([
+            [23.0000, 113.0000],
+            [23.0040, 113.0000],
+            [23.0100, 113.0000],
+            [23.0200, 113.0000],
+            [23.0400, 113.0000],
+        ])
+
+        hotspots = detector._cluster_hotspot_points(
+            candidate_coords,
+            candidate_df,
+            full_coords=full_coords,
+        )
+
+        assert len(hotspots) == 1
+        assert hotspots[0]['radius_km'] == 3.0
+        assert hotspots[0]['village_count'] == 4
 
 
 if __name__ == '__main__':

@@ -1,16 +1,19 @@
 """
-Generate village_spatial_features table from preprocessed data.
+Generate spatial features and hotspot tables from preprocessed data.
 
 This script:
 1. Creates the village_spatial_features table
 2. Loads villages with coordinates from the preprocessed table
 3. Computes spatial features (k-NN distances, density, etc.)
 4. Writes features to the database
+5. Supports hotspot-only mode for Phase 13
 """
 
+import argparse
 import sqlite3
 import logging
 import sys
+import time
 from pathlib import Path
 import pandas as pd
 import numpy as np
@@ -20,7 +23,13 @@ from sklearn.neighbors import NearestNeighbors
 project_root = Path(__file__).parent.parent.parent
 sys.path.insert(0, str(project_root))
 
-from src.data.db_writer import create_feature_materialization_tables
+from src.data.db_writer import (
+    create_spatial_analysis_tables,
+    create_spatial_analysis_indexes,
+    write_spatial_hotspots,
+)
+from src.spatial.coordinate_loader import CoordinateLoader
+from src.spatial.hotspot_detector import HotspotDetector
 
 # Configure logging
 logging.basicConfig(
@@ -29,6 +38,26 @@ logging.basicConfig(
 )
 
 logger = logging.getLogger(__name__)
+
+
+def parse_args():
+    parser = argparse.ArgumentParser(description="Generate spatial features or hotspots")
+    parser.add_argument("--db-path", default=str(project_root / "data" / "villages.db"))
+    parser.add_argument("--run-id", default=f"spatial_{int(time.time())}")
+    parser.add_argument(
+        "--mode",
+        choices=["features", "hotspots"],
+        default="features",
+        help="features: regenerate village_spatial_features; hotspots: regenerate spatial_hotspots only",
+    )
+    parser.add_argument("--hotspot-bandwidth-km", type=float, default=5.0)
+    parser.add_argument("--hotspot-threshold-percentile", type=float, default=90.0)
+    parser.add_argument("--hotspot-sample-size", type=int, default=50000)
+    parser.add_argument("--hotspot-cluster-eps-km", type=float, default=1.1)
+    parser.add_argument("--hotspot-cluster-min-samples", type=int, default=5)
+    parser.add_argument("--hotspot-full-count-radius-km", type=float, default=3.0)
+    parser.add_argument("--hotspot-sample-seed", type=int, default=20260712)
+    return parser.parse_args()
 
 
 def load_villages_with_coordinates(conn: sqlite3.Connection) -> pd.DataFrame:
@@ -127,8 +156,70 @@ def compute_spatial_features(df: pd.DataFrame, k: int = 10) -> pd.DataFrame:
     return features
 
 
-def main():
-    db_path = project_root / 'data' / 'villages.db'
+def run_hotspot_pipeline(args) -> None:
+    logger.info("=" * 80)
+    logger.info("Generating spatial_hotspots table")
+    logger.info("=" * 80)
+    logger.info(f"Database: {args.db_path}")
+    logger.info(f"Run ID: {args.run_id}")
+    logger.info(
+        "Hotspot parameters: "
+        f"bandwidth={args.hotspot_bandwidth_km}km, "
+        f"threshold=p{args.hotspot_threshold_percentile}, "
+        f"sample_size={args.hotspot_sample_size}, "
+        f"cluster_eps={args.hotspot_cluster_eps_km}km, "
+        f"cluster_min_samples={args.hotspot_cluster_min_samples}, "
+        f"full_count_radius={args.hotspot_full_count_radius_km}km"
+    )
+
+    conn = sqlite3.connect(str(args.db_path))
+    try:
+        create_spatial_analysis_tables(conn)
+        create_spatial_analysis_indexes(conn)
+
+        loader = CoordinateLoader()
+        coords_df = loader.load_coordinates(conn)
+        coords = loader.get_coordinate_array(coords_df)
+        if len(coords_df) == 0:
+            logger.error("No villages with valid coordinates found!")
+            return
+
+        detector = HotspotDetector(
+            bandwidth_km=args.hotspot_bandwidth_km,
+            threshold_percentile=args.hotspot_threshold_percentile,
+            cluster_eps_km=args.hotspot_cluster_eps_km,
+            cluster_min_samples=args.hotspot_cluster_min_samples,
+            sample_seed=args.hotspot_sample_seed,
+            full_count_radius_km=args.hotspot_full_count_radius_km,
+        )
+        hotspots_df = detector.detect_density_hotspots(
+            coords,
+            coords_df,
+            sample_size=args.hotspot_sample_size,
+        )
+        if len(hotspots_df) > 0:
+            hotspots_df["hotspot_id"] = range(len(hotspots_df))
+
+        cursor = conn.cursor()
+        cursor.execute("DELETE FROM spatial_hotspots WHERE run_id = ?", (args.run_id,))
+        if len(hotspots_df) > 0:
+            write_spatial_hotspots(conn, args.run_id, hotspots_df)
+        conn.commit()
+
+        logger.info(f"Detected and wrote {len(hotspots_df)} hotspots")
+        if len(hotspots_df) > 0:
+            logger.info(f"Village count range: {hotspots_df['village_count'].min()} - {hotspots_df['village_count'].max()}")
+            logger.info(f"Average village count: {hotspots_df['village_count'].mean():.1f}")
+    except Exception as e:
+        logger.error(f"Error: {e}", exc_info=True)
+        conn.rollback()
+        raise
+    finally:
+        conn.close()
+
+
+def run_feature_pipeline(args) -> None:
+    db_path = Path(args.db_path)
 
     logger.info("=" * 80)
     logger.info("Generating village_spatial_features table")
@@ -245,6 +336,14 @@ def main():
 
     finally:
         conn.close()
+
+
+def main():
+    args = parse_args()
+    if args.mode == "hotspots":
+        run_hotspot_pipeline(args)
+    else:
+        run_feature_pipeline(args)
 
 
 if __name__ == '__main__':
