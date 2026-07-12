@@ -123,7 +123,7 @@ python run_all_phases.py --group advanced    # 高级阶段 (11-17)
 | 1 | 字符嵌入 | Word2Vec 训练（9,209 字符，100 维） | 5-10 min |
 | 2 | 频率分析 | 字符频率与区域倾向性统计（含 Z-score） | 3-5 min |
 | 3 | 语义分析 | VTF（9 类别）+ 语义指数，输出 semantic_vtf_global + semantic_indices | 3-5 min |
-| 4 | 空间分析 | 多分辨率空间聚类（DBSCAN 0.3/0.5/10/20km + HDBSCAN） | 25-50 min |
+| 4 | 空间分析 | 多分辨率空间聚类 + spatial_tendency_integration（⚠️ Phase 14 后需重跑，见下方说明） | 25-50 min |
 | 5 | 特征工程 | 提取 230+ 特征 | 3-5 min |
 | 6 | 聚类分析 | ⚠️ 前端实际已不依赖 因表不大 仍然保留生成 - KMeans 区域聚类（区县级） | 3-5 min |
 
@@ -149,6 +149,11 @@ python run_all_phases.py --group advanced    # 高级阶段 (11-17)
 | 18 | 形态模式分析 | 提取后缀/前缀模式，输出 pattern_frequency_global 和 pattern_regional_analysis | 3-5 min |
 
 **完整运行时间**：约 1-2 小时（全部 18 个阶段）
+
+> ⚠️ **Phase 4 依赖说明**: Phase 4 的 `--integrate-tendency` 步骤生成 `spatial_tendency_integration` 表，其中 `character_category` 列需要从 `semantic_subcategory_labels` 表读取字符→语义类别映射。但该表由 Phase 14（语义组合）创建，而 Phase 4 的依赖链仅含 Phase 0 和 Phase 2（`semantic_subcategory_labels` 尚未存在）。因此首次按序运行时，`character_category` 列为 NULL。**建议在 Phase 14 完成后单独重跑 Phase 4** 以回填字符类别数据：
+> ```bash
+> python run_all_phases.py --phases 4
+> ```
 
 ---
 
@@ -415,6 +420,7 @@ pytest tests/test_preprocessing.py
 ### 2026-07-12
 - ✅ 后端对接修复：补齐 4 张缺失表（semantic_regional_analysis, pattern_frequency_global, pattern_regional_analysis, spatial_tendency_integration）
 - ✅ spatial_tendency_integration 增加 6 列（character_category, global_tendency_mean, tendency_deviation, spatial_specificity, p_value, u_statistic）满足后端 API
+- ⚠️ character_category 依赖 Phase 14 的 semantic_subcategory_labels 表，Phase 4 首次运行该列为 NULL，Phase 14 后需重跑 Phase 4 回填
 - ✅ 修复 Phase 4 依赖链（新增 Phase 2 依赖）和 Phase 6 表名引用
 - ✅ 删除 6 张已废弃的空表（char_frequency_regional, regional_tendency 等优化前旧表）
 - ✅ 新增 tendency_significance 索引 + semantic_regional_analysis 索引
