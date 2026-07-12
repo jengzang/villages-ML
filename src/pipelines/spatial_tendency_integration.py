@@ -71,21 +71,17 @@ def load_tendency_results(
     return df
 
 
-def load_spatial_features(
-    conn: sqlite3.Connection,
-    spatial_run_id: str
-) -> pd.DataFrame:
+def load_spatial_features(conn: sqlite3.Connection) -> pd.DataFrame:
     """
-    Load spatial features from database.
+    Load spatial features from database (optimized schema without run_id).
 
     Args:
         conn: Database connection
-        spatial_run_id: Run ID for spatial analysis
 
     Returns:
         DataFrame with spatial features
     """
-    logger.info(f"Loading spatial features for run_id={spatial_run_id}")
+    logger.info("Loading spatial features from village_spatial_features")
 
     query = """
         SELECT
@@ -103,10 +99,9 @@ def load_spatial_features(
             isolation_score,
             is_isolated
         FROM village_spatial_features
-        WHERE run_id = ?
     """
 
-    df = pd.read_sql_query(query, conn, params=[spatial_run_id])
+    df = pd.read_sql_query(query, conn)
     logger.info(f"Loaded {len(df)} village spatial features")
 
     return df
@@ -325,7 +320,7 @@ def run_integration(
         tendency_df = load_tendency_results(conn, tendency_run_id, region_level)
 
         logger.info("Loading spatial features...")
-        spatial_df = load_spatial_features(conn, spatial_run_id)
+        spatial_df = load_spatial_features(conn)
 
         logger.info("Loading village data...")
         villages_df = load_villages_with_chars(conn)
