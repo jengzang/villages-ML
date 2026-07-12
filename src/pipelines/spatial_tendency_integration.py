@@ -12,7 +12,7 @@ import logging
 import sqlite3
 import time
 from pathlib import Path
-from typing import List, Optional
+from typing import Dict, List, Optional
 
 import numpy as np
 import pandas as pd
@@ -24,6 +24,17 @@ from src.data.db_writer import (
 )
 
 logger = logging.getLogger(__name__)
+
+
+def _load_char_category_map(conn: sqlite3.Connection) -> Dict[str, str]:
+    """Load character→category mapping from semantic_subcategory_labels."""
+    try:
+        cursor = conn.execute("""
+            SELECT char, parent_category FROM semantic_subcategory_labels
+        """)
+        return {row[0]: row[1] for row in cursor.fetchall()}
+    except sqlite3.OperationalError:
+        return {}
 
 
 def load_tendency_results(
@@ -170,7 +181,9 @@ def integrate_spatial_tendency(
     villages_df: pd.DataFrame,
     character: str,
     tendency_run_id: str,
-    spatial_run_id: str
+    spatial_run_id: str,
+    global_tendency: Optional[float] = None,
+    char_category: Optional[str] = None,
 ) -> pd.DataFrame:
     """
     Integrate spatial and tendency data for a specific character.
@@ -182,6 +195,8 @@ def integrate_spatial_tendency(
         character: Character to analyze
         tendency_run_id: Tendency analysis run ID
         spatial_run_id: Spatial analysis run ID
+        global_tendency: Global mean lift for this character (across all regions)
+        char_category: Semantic category label for this character
 
     Returns:
         DataFrame with integrated results
@@ -217,6 +232,11 @@ def integrate_spatial_tendency(
         logger.warning(f"No villages with character '{character}' in spatial clusters")
         return pd.DataFrame()
 
+    # Global ratio for spatial_specificity
+    total_village_count = len(villages_df)
+    global_char_count = len(villages_with_char)
+    global_ratio = global_char_count / total_village_count if total_village_count > 0 else 0.0
+
     cluster_stats = []
     n_clusters = char_spatial['spatial_cluster_id'].nunique()
     logger.info(f"Processing {n_clusters} clusters...")
@@ -249,6 +269,17 @@ def integrate_spatial_tendency(
             p_value = None
             is_significant = False
 
+        # tendency_deviation
+        tendency_deviation = None
+        if tendency_mean is not None and global_tendency is not None:
+            tendency_deviation = tendency_mean - global_tendency
+
+        # spatial_specificity: local_ratio / global_ratio
+        cluster_total = int(cluster_df['cluster_size'].iloc[0])
+        n_char = len(cluster_df)
+        local_ratio = n_char / cluster_total if cluster_total > 0 else 0.0
+        spatial_specificity = local_ratio / global_ratio if global_ratio > 0 else None
+
         if len(coords) > 1:
             centroid = np.array([centroid_lon, centroid_lat])
             distances_from_centroid = np.linalg.norm(coords - centroid, axis=1) * 111
@@ -260,19 +291,24 @@ def integrate_spatial_tendency(
             'tendency_run_id': tendency_run_id,
             'spatial_run_id': spatial_run_id,
             'character': character,
+            'character_category': char_category,
             'cluster_id': int(cluster_id),
-            'cluster_size': int(cluster_df['cluster_size'].iloc[0]),
-            'n_villages_with_char': len(cluster_df),
+            'cluster_size': cluster_total,
+            'n_villages_with_char': n_char,
             'cluster_tendency_mean': tendency_mean,
             'cluster_tendency_std': None,
+            'global_tendency_mean': global_tendency,
+            'tendency_deviation': tendency_deviation,
             'centroid_lon': centroid_lon,
             'centroid_lat': centroid_lat,
             'avg_distance_km': avg_distance_km,
             'spatial_coherence': coherence,
+            'spatial_specificity': spatial_specificity,
             'dominant_city': dominant_city,
             'dominant_county': dominant_county,
             'is_significant': is_significant,
-            'avg_p_value': p_value
+            'p_value': p_value,
+            'u_statistic': None,
         })
 
     result_df = pd.DataFrame(cluster_stats)
@@ -319,6 +355,16 @@ def run_integration(
         logger.info("Loading tendency results...")
         tendency_df = load_tendency_results(conn, tendency_run_id, region_level)
 
+        # Pre-compute global_tendency_mean per character
+        logger.info("Computing global tendency means...")
+        global_tendency_map = {}
+        if len(tendency_df) > 0:
+            global_means = tendency_df.groupby('char')['lift'].mean()
+            global_tendency_map = global_means.to_dict()
+
+        # Load character→category map
+        char_category_map = _load_char_category_map(conn)
+
         logger.info("Loading spatial features...")
         spatial_df = load_spatial_features(conn)
 
@@ -332,13 +378,18 @@ def run_integration(
             logger.info(f"Processing character: {char}")
             logger.info(f"{'='*60}")
 
+            global_tend = global_tendency_map.get(char)
+            char_cat = char_category_map.get(char)
+
             result_df = integrate_spatial_tendency(
                 tendency_df=tendency_df,
                 spatial_df=spatial_df,
                 villages_df=villages_df,
                 character=char,
                 tendency_run_id=tendency_run_id,
-                spatial_run_id=spatial_run_id
+                spatial_run_id=spatial_run_id,
+                global_tendency=global_tend,
+                char_category=char_cat,
             )
 
             if len(result_df) > 0:

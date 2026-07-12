@@ -17,6 +17,19 @@ import pandas as pd
 logger = logging.getLogger(__name__)
 
 
+def _safe_read_sql(query: str, conn: sqlite3.Connection, params=None, **kwargs) -> pd.DataFrame:
+    """Execute read_sql_query, returning empty DataFrame if table is missing."""
+    try:
+        return pd.read_sql_query(query, conn, params=params, **kwargs)
+    except (sqlite3.OperationalError, pd.io.sql.DatabaseError) as e:
+        if "no such table" in str(e).lower():
+            logger.debug(f"Table not found, returning empty DataFrame: {e}")
+            return pd.DataFrame()
+        raise
+
+logger = logging.getLogger(__name__)
+
+
 def get_latest_run_id(conn: sqlite3.Connection) -> Optional[str]:
     """
     Get the most recent run_id from analysis_runs table.
@@ -60,7 +73,7 @@ def get_global_frequency(conn: sqlite3.Connection, run_id: str,
     if top_n:
         query += f" LIMIT {top_n}"
 
-    return pd.read_sql_query(query, conn, params=(run_id,))
+    return _safe_read_sql(query, conn, params=(run_id,))
 
 
 def get_regional_frequency(conn: sqlite3.Connection, run_id: str,
@@ -99,7 +112,7 @@ def get_regional_frequency(conn: sqlite3.Connection, run_id: str,
     if top_n and region_name:
         query += f" LIMIT {top_n}"
 
-    return pd.read_sql_query(query, conn, params=params)
+    return _safe_read_sql(query, conn, params=params)
 
 
 def get_char_tendency_by_region(conn: sqlite3.Connection, run_id: str,
@@ -124,7 +137,7 @@ def get_char_tendency_by_region(conn: sqlite3.Connection, run_id: str,
         ORDER BY lift DESC
     """
 
-    return pd.read_sql_query(query, conn, params=(run_id, char, region_level))
+    return _safe_read_sql(query, conn, params=(run_id, char, region_level))
 
 
 def get_top_polarized_chars(conn: sqlite3.Connection, run_id: str,
@@ -155,7 +168,7 @@ def get_top_polarized_chars(conn: sqlite3.Connection, run_id: str,
         LIMIT ?
     """
 
-    return pd.read_sql_query(query, conn, params=(run_id, region_level, top_n))
+    return _safe_read_sql(query, conn, params=(run_id, region_level, top_n))
 
 
 def get_region_tendency_profile(conn: sqlite3.Connection, run_id: str,
@@ -187,7 +200,7 @@ def get_region_tendency_profile(conn: sqlite3.Connection, run_id: str,
         LIMIT ?
     """
 
-    return pd.read_sql_query(query, conn, params=(run_id, region_level, region_name, top_n))
+    return _safe_read_sql(query, conn, params=(run_id, region_level, region_name, top_n))
 
 
 def get_all_runs(conn: sqlite3.Connection) -> pd.DataFrame:
@@ -206,7 +219,7 @@ def get_all_runs(conn: sqlite3.Connection) -> pd.DataFrame:
         ORDER BY created_at DESC
     """
 
-    return pd.read_sql_query(query, conn)
+    return _safe_read_sql(query, conn)
 
 
 # ============================================================================
@@ -241,7 +254,7 @@ def get_pattern_frequency_global(
     if top_n:
         query += f" LIMIT {top_n}"
 
-    return pd.read_sql_query(query, conn, params=(run_id, pattern_type))
+    return _safe_read_sql(query, conn, params=(run_id, pattern_type))
 
 
 def get_pattern_frequency_regional(
@@ -286,7 +299,7 @@ def get_pattern_frequency_regional(
     if top_n and region_name:
         query += f" LIMIT {top_n}"
 
-    return pd.read_sql_query(query, conn, params=params)
+    return _safe_read_sql(query, conn, params=params)
 
 
 def get_pattern_tendency_by_region(
@@ -317,7 +330,7 @@ def get_pattern_tendency_by_region(
         ORDER BY lift DESC
     """
 
-    return pd.read_sql_query(query, conn, params=(run_id, pattern_type, pattern, region_level))
+    return _safe_read_sql(query, conn, params=(run_id, pattern_type, pattern, region_level))
 
 
 def get_top_polarized_patterns(
@@ -354,7 +367,7 @@ def get_top_polarized_patterns(
         LIMIT ?
     """
 
-    return pd.read_sql_query(query, conn, params=(run_id, pattern_type, region_level, top_n))
+    return _safe_read_sql(query, conn, params=(run_id, pattern_type, region_level, top_n))
 
 
 def get_region_pattern_profile(
@@ -393,7 +406,7 @@ def get_region_pattern_profile(
         LIMIT ?
     """
 
-    return pd.read_sql_query(query, conn, params=(run_id, pattern_type, region_level, region_name, top_n))
+    return _safe_read_sql(query, conn, params=(run_id, pattern_type, region_level, region_name, top_n))
 
 
 # ============================================================================
@@ -421,7 +434,7 @@ def get_semantic_vtf_global(conn: sqlite3.Connection, run_id: str,
         LIMIT ?
     """
 
-    return pd.read_sql_query(query, conn, params=(run_id, top_n))
+    return _safe_read_sql(query, conn, params=(run_id, top_n))
 
 
 def get_semantic_vtf_regional(conn: sqlite3.Connection, run_id: str,
@@ -470,7 +483,7 @@ def get_semantic_vtf_regional(conn: sqlite3.Connection, run_id: str,
         """
         params = (run_id, level)
 
-    return pd.read_sql_query(query, conn, params=params)
+    return _safe_read_sql(query, conn, params=params)
 
 
 def get_semantic_tendency_by_region(conn: sqlite3.Connection, run_id: str,
@@ -495,7 +508,7 @@ def get_semantic_tendency_by_region(conn: sqlite3.Connection, run_id: str,
         ORDER BY lift DESC
     """
 
-    return pd.read_sql_query(query, conn, params=(run_id, category, level))
+    return _safe_read_sql(query, conn, params=(run_id, category, level))
 
 
 def get_top_polarized_semantic_categories(conn: sqlite3.Connection, run_id: str,
@@ -526,7 +539,7 @@ def get_top_polarized_semantic_categories(conn: sqlite3.Connection, run_id: str,
         LIMIT ?
     """
 
-    return pd.read_sql_query(query, conn, params=(run_id, level, top_n))
+    return _safe_read_sql(query, conn, params=(run_id, level, top_n))
 
 
 def get_region_semantic_profile(conn: sqlite3.Connection, run_id: str,
@@ -558,7 +571,7 @@ def get_region_semantic_profile(conn: sqlite3.Connection, run_id: str,
         LIMIT ?
     """
 
-    return pd.read_sql_query(query, conn, params=(run_id, level, region, top_n))
+    return _safe_read_sql(query, conn, params=(run_id, level, region, top_n))
 
 
 # ============================================================================
@@ -588,7 +601,7 @@ def get_cluster_assignments(conn: sqlite3.Connection, run_id: str,
         ORDER BY cluster_id, distance_to_centroid
     """
 
-    return pd.read_sql_query(query, conn, params=(run_id, algorithm, region_level))
+    return _safe_read_sql(query, conn, params=(run_id, algorithm, region_level))
 
 
 def get_cluster_profile(conn: sqlite3.Connection, run_id: str,
@@ -613,7 +626,7 @@ def get_cluster_profile(conn: sqlite3.Connection, run_id: str,
         WHERE run_id = ? AND algorithm = ? AND cluster_id = ?
     """
 
-    return pd.read_sql_query(query, conn, params=(run_id, algorithm, cluster_id))
+    return _safe_read_sql(query, conn, params=(run_id, algorithm, cluster_id))
 
 
 def get_clustering_metrics(conn: sqlite3.Connection, run_id: str,
@@ -637,7 +650,7 @@ def get_clustering_metrics(conn: sqlite3.Connection, run_id: str,
         ORDER BY k
     """
 
-    return pd.read_sql_query(query, conn, params=(run_id, algorithm))
+    return _safe_read_sql(query, conn, params=(run_id, algorithm))
 
 
 def get_regions_in_cluster(conn: sqlite3.Connection, run_id: str,
@@ -663,7 +676,7 @@ def get_regions_in_cluster(conn: sqlite3.Connection, run_id: str,
         ORDER BY distance_to_centroid
     """
 
-    return pd.read_sql_query(query, conn, params=(run_id, algorithm, cluster_id, region_level))
+    return _safe_read_sql(query, conn, params=(run_id, algorithm, cluster_id, region_level))
 
 
 def get_village_features(conn: sqlite3.Connection, run_id: str,
@@ -708,7 +721,7 @@ def get_village_features(conn: sqlite3.Connection, run_id: str,
     if offset:
         query += f" OFFSET {offset}"
 
-    return pd.read_sql_query(query, conn, params=tuple(params))
+    return _safe_read_sql(query, conn, params=tuple(params))
 
 
 def get_villages_by_semantic_tag(conn: sqlite3.Connection, run_id: str,
@@ -741,7 +754,7 @@ def get_villages_by_semantic_tag(conn: sqlite3.Connection, run_id: str,
     if offset:
         query += f" OFFSET {offset}"
 
-    return pd.read_sql_query(query, conn, params=(run_id,))
+    return _safe_read_sql(query, conn, params=(run_id,))
 
 
 def get_villages_by_suffix(conn: sqlite3.Connection, run_id: str,
@@ -776,7 +789,7 @@ def get_villages_by_suffix(conn: sqlite3.Connection, run_id: str,
     if offset:
         query += f" OFFSET {offset}"
 
-    return pd.read_sql_query(query, conn, params=(run_id, suffix))
+    return _safe_read_sql(query, conn, params=(run_id, suffix))
 
 
 def get_villages_by_cluster(conn: sqlite3.Connection, run_id: str,
@@ -811,7 +824,7 @@ def get_villages_by_cluster(conn: sqlite3.Connection, run_id: str,
     if offset:
         query += f" OFFSET {offset}"
 
-    return pd.read_sql_query(query, conn, params=(run_id, cluster_id))
+    return _safe_read_sql(query, conn, params=(run_id, cluster_id))
 
 
 def get_region_aggregates(conn: sqlite3.Connection, run_id: str,
@@ -830,7 +843,7 @@ def get_region_aggregates(conn: sqlite3.Connection, run_id: str,
     table_name = f"{region_level}_aggregates"
     query = f"SELECT * FROM {table_name} WHERE run_id = ?"
 
-    return pd.read_sql_query(query, conn, params=(run_id,))
+    return _safe_read_sql(query, conn, params=(run_id,))
 
 
 def get_semantic_tag_statistics(conn: sqlite3.Connection, run_id: str) -> pd.DataFrame:
@@ -860,6 +873,6 @@ def get_semantic_tag_statistics(conn: sqlite3.Connection, run_id: str) -> pd.Dat
         WHERE run_id = ?
     """
 
-    return pd.read_sql_query(query, conn, params=(run_id,))
+    return _safe_read_sql(query, conn, params=(run_id,))
 
 

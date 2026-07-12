@@ -111,42 +111,8 @@ def create_semantic_tables(conn: sqlite3.Connection) -> None:
         )
     """)
 
-    # Table 7: semantic_vtf_regional
-    cursor.execute("""
-        CREATE TABLE IF NOT EXISTS semantic_vtf_regional (
-            run_id TEXT NOT NULL,
-            region_level TEXT NOT NULL,
-            region_name TEXT NOT NULL,
-            category TEXT NOT NULL,
-            vtf_count INTEGER NOT NULL,
-            total_villages INTEGER NOT NULL,
-            frequency REAL NOT NULL,
-            rank_within_region INTEGER NOT NULL,
-            PRIMARY KEY (run_id, region_level, region_name, category),
-            FOREIGN KEY (run_id) REFERENCES analysis_runs(run_id)
-        )
-    """)
-
-    # Table 8: semantic_tendency
-    cursor.execute("""
-        CREATE TABLE IF NOT EXISTS semantic_tendency (
-            run_id TEXT NOT NULL,
-            region_level TEXT NOT NULL,
-            region_name TEXT NOT NULL,
-            category TEXT NOT NULL,
-            frequency REAL NOT NULL,
-            global_frequency REAL NOT NULL,
-            lift REAL NOT NULL,
-            log_lift REAL NOT NULL,
-            log_odds REAL NOT NULL,
-            z_score REAL,
-            vtf_count INTEGER NOT NULL,
-            total_villages INTEGER NOT NULL,
-            support_flag INTEGER NOT NULL,
-            PRIMARY KEY (run_id, region_level, region_name, category),
-            FOREIGN KEY (run_id) REFERENCES analysis_runs(run_id)
-        )
-    """)
+    # Table 7: semantic_vtf_regional — DEPRECATED, replaced by semantic_regional_analysis
+    # Table 8: semantic_tendency — DEPRECATED, replaced by semantic_regional_analysis
 
     # Table 9: semantic_regional_analysis (backward compat for external backend)
     cursor.execute("""
@@ -408,6 +374,7 @@ def create_tendency_significance_table(conn: sqlite3.Connection) -> None:
     cursor.execute("CREATE INDEX IF NOT EXISTS idx_tendency_sig_region ON tendency_significance(region_level, region_name)")
     cursor.execute("CREATE INDEX IF NOT EXISTS idx_tendency_sig_city ON tendency_significance(city)")
     cursor.execute("CREATE INDEX IF NOT EXISTS idx_tendency_sig_county ON tendency_significance(county)")
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_tendency_sig_lookup ON tendency_significance(run_id, char, region_level)")
 
     conn.commit()
     logger.info("tendency_significance table created successfully")
@@ -1793,7 +1760,7 @@ def create_spatial_analysis_indexes(conn: sqlite3.Connection) -> None:
 
 def create_spatial_tendency_table(conn: sqlite3.Connection) -> None:
     """
-    Create spatial-tendency integration table.
+    Create spatial-tendency integration table with full 24-column schema.
 
     This table stores the integration of tendency analysis with spatial clustering,
     showing how naming patterns (character preferences) vary across geographic clusters.
@@ -1811,11 +1778,14 @@ def create_spatial_tendency_table(conn: sqlite3.Connection) -> None:
             spatial_run_id TEXT NOT NULL,
 
             character TEXT NOT NULL,
+            character_category TEXT,
             cluster_id INTEGER NOT NULL,
 
             -- Cluster-level tendency statistics
             cluster_tendency_mean REAL,
             cluster_tendency_std REAL,
+            global_tendency_mean REAL,
+            tendency_deviation REAL,
             cluster_size INTEGER NOT NULL,
             n_villages_with_char INTEGER NOT NULL,
 
@@ -1824,6 +1794,7 @@ def create_spatial_tendency_table(conn: sqlite3.Connection) -> None:
             centroid_lat REAL,
             avg_distance_km REAL,
             spatial_coherence REAL,
+            spatial_specificity REAL,
 
             -- Regional information
             dominant_city TEXT,
@@ -1831,7 +1802,8 @@ def create_spatial_tendency_table(conn: sqlite3.Connection) -> None:
 
             -- Significance
             is_significant INTEGER,
-            avg_p_value REAL,
+            p_value REAL,
+            u_statistic REAL,
 
             created_at REAL NOT NULL,
 
@@ -1839,6 +1811,21 @@ def create_spatial_tendency_table(conn: sqlite3.Connection) -> None:
             FOREIGN KEY (spatial_run_id) REFERENCES analysis_runs(run_id)
         )
     """)
+
+    # Migrate existing table: add missing columns if they don't exist
+    migration_columns = [
+        ('character_category', 'TEXT'),
+        ('global_tendency_mean', 'REAL'),
+        ('tendency_deviation', 'REAL'),
+        ('spatial_specificity', 'REAL'),
+        ('p_value', 'REAL'),
+        ('u_statistic', 'REAL'),
+    ]
+    for col_name, col_type in migration_columns:
+        try:
+            cursor.execute(f"ALTER TABLE spatial_tendency_integration ADD COLUMN {col_name} {col_type}")
+        except sqlite3.OperationalError:
+            pass  # Column already exists
 
     conn.commit()
     logger.info("Spatial-tendency integration table created successfully")
@@ -2042,8 +2029,13 @@ def write_spatial_tendency_integration(conn: sqlite3.Connection, run_id: str, in
     integration_df['created_at'] = time.time()
 
     # Handle NaN values
-    for col in ['cluster_tendency_mean', 'cluster_tendency_std', 'centroid_lon', 'centroid_lat',
-                'avg_distance_km', 'spatial_coherence', 'avg_p_value']:
+    nanable_cols = [
+        'cluster_tendency_mean', 'cluster_tendency_std', 'global_tendency_mean',
+        'tendency_deviation', 'centroid_lon', 'centroid_lat',
+        'avg_distance_km', 'spatial_coherence', 'spatial_specificity',
+        'p_value', 'u_statistic', 'character_category',
+    ]
+    for col in nanable_cols:
         if col in integration_df.columns:
             integration_df[col] = integration_df[col].where(pd.notna(integration_df[col]), None)
 
@@ -2051,17 +2043,24 @@ def write_spatial_tendency_integration(conn: sqlite3.Connection, run_id: str, in
     if 'is_significant' in integration_df.columns:
         integration_df['is_significant'] = integration_df['is_significant'].astype(int)
 
-    # Select columns
+    # Select columns (full 24-column schema)
     columns = [
         'run_id', 'tendency_run_id', 'spatial_run_id',
-        'character', 'cluster_id',
+        'character', 'character_category', 'cluster_id',
         'cluster_tendency_mean', 'cluster_tendency_std',
+        'global_tendency_mean', 'tendency_deviation',
         'cluster_size', 'n_villages_with_char',
-        'centroid_lon', 'centroid_lat', 'avg_distance_km', 'spatial_coherence',
+        'centroid_lon', 'centroid_lat', 'avg_distance_km',
+        'spatial_coherence', 'spatial_specificity',
         'dominant_city', 'dominant_county',
-        'is_significant', 'avg_p_value',
+        'is_significant', 'p_value', 'u_statistic',
         'created_at'
     ]
+
+    # Ensure all columns exist (fill missing with None)
+    for col in columns:
+        if col not in integration_df.columns:
+            integration_df[col] = None
 
     # Write to database
     integration_df[columns].to_sql('spatial_tendency_integration', conn, if_exists='append', index=False)
@@ -2245,5 +2244,10 @@ def write_semantic_regional_analysis(conn: sqlite3.Connection, df: pd.DataFrame,
 
     conn.commit()
     logger.info(f"Successfully wrote {len(data)} rows to semantic_regional_analysis")
+
+    # Ensure indexes exist for backend query patterns
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_semantic_ra_level_city ON semantic_regional_analysis(region_level, city)")
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_semantic_ra_level_cat ON semantic_regional_analysis(region_level, category)")
+    conn.commit()
 
 
