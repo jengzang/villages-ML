@@ -159,6 +159,10 @@ def create_semantic_tables(conn: sqlite3.Connection) -> None:
             normalized_index REAL NOT NULL,
             z_score REAL,
             rank_within_province INTEGER NOT NULL,
+            village_count INTEGER,
+            city TEXT,
+            county TEXT,
+            township TEXT,
             PRIMARY KEY (run_id, region_level, region_name, category),
             FOREIGN KEY (run_id) REFERENCES analysis_runs(run_id)
         )
