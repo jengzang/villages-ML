@@ -428,33 +428,45 @@ def get_semantic_vtf_regional(conn: sqlite3.Connection, run_id: str,
                              level: str, region: Optional[str] = None,
                              top_n: int = 20) -> pd.DataFrame:
     """
-    Query regional semantic VTF.
+    Query regional semantic indices (replaces semantic_vtf_regional after DB optimization).
+
+    Reads from semantic_indices table which supersedes the deprecated semantic_vtf_regional.
 
     Args:
         conn: SQLite database connection
-        run_id: Run identifier
+        run_id: Run identifier (from semantic_vtf_global run_id)
         level: Region level ('city', 'county', 'township')
         region: Specific region name (optional)
         top_n: Number of top categories to return
 
     Returns:
-        DataFrame with regional semantic VTF data
+        DataFrame with columns: region_name, category, frequency, lift, ...
     """
     if region:
         query = """
-            SELECT region_name, category, vtf_count, total_villages, frequency, rank_within_region
-            FROM semantic_vtf_regional
+            SELECT region_name, category,
+                   raw_intensity as vtf_count,
+                   village_count as total_villages,
+                   normalized_index as frequency,
+                   z_score as lift,
+                   rank_within_province as rank_within_region
+            FROM semantic_indices
             WHERE run_id = ? AND region_level = ? AND region_name = ?
-            ORDER BY rank_within_region
+            ORDER BY rank_within_province
             LIMIT ?
         """
         params = (run_id, level, region, top_n)
     else:
         query = """
-            SELECT region_name, category, vtf_count, total_villages, frequency, rank_within_region
-            FROM semantic_vtf_regional
+            SELECT region_name, category,
+                   raw_intensity as vtf_count,
+                   village_count as total_villages,
+                   normalized_index as frequency,
+                   z_score as lift,
+                   rank_within_province as rank_within_region
+            FROM semantic_indices
             WHERE run_id = ? AND region_level = ?
-            ORDER BY region_name, rank_within_region
+            ORDER BY region_name, rank_within_province
         """
         params = (run_id, level)
 
