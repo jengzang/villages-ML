@@ -55,14 +55,13 @@ def load_tendency_results(
             log_odds,
             z_score,
             village_count,
-            total_villages,
-            chi_square_statistic as p_value_tmp,
-            p_value,
-            is_significant,
-            effect_size
+            total_villages
         FROM char_regional_analysis
         WHERE region_level = ?
     """
+    # Note: significance columns (chi_square_statistic, p_value, is_significant,
+    # effect_size) are added by Phase 10 ALTER TABLE. They don't exist when
+    # Phase 4 runs first. integrate_spatial_tendency() falls back gracefully.
     # Note: tendency_run_id is kept for API compatibility but char_regional_analysis
     # uses the optimized schema without run_id
 
