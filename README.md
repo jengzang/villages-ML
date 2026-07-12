@@ -116,24 +116,25 @@ python run_all_phases.py --group advanced    # 高级阶段 (11-17)
 
 项目包含 **17 个分析阶段**，分为三组：
 
-**核心阶段 (Phase 0-7)** - 必需的基础分析：
+**核心阶段 (Phase 0-6)** - 必需的基础分析：
 | Phase | 名称 | 说明 | 时间 |
 |-------|------|------|------|
 | 0 | 数据预处理 | ⚠️ **必须首先运行** - 清理村名，去除前缀 | 2-5 min |
 | 1 | 字符嵌入 | Word2Vec 训练（9,209 字符，100 维） | 5-10 min |
-| 2 | 频率分析 | 字符频率与区域倾向性统计 | 3-5 min |
+| 2 | 频率分析 | 字符频率与区域倾向性统计（含 Z-score） | 3-5 min |
 | 3 | 语义分析 | 语义标注与共现网络（9 类别） | 3-5 min |
-| 4 | 空间分析 | 空间分布、k-NN、DBSCAN 聚类 | 5-10 min |
+| 4 | 空间分析 | 多分辨率空间聚类（DBSCAN 0.3/0.5/10/20km + HDBSCAN） | 25-50 min |
 | 5 | 特征工程 | 提取 230+ 特征 | 3-5 min |
-| 6 | 聚类分析 | KMeans 区域聚类 | 3-5 min |
-| 7 | 特征物化 | 预计算特征存储 | 2-3 min |
+| 6 | 聚类分析 | ⚠️ 前端实际已不依赖 因表不大 仍然保留生成 - KMeans 区域聚类（区县级） | 3-5 min |
 
-**统计阶段 (Phase 8-10)** - 统计显著性检验：
+> 注：Phase 7 特征物化 | ⚠️ 已废弃 - 被实时 SQL 替代 | <1 min |
+
+**统计阶段 (Phase 10)** - 统计显著性检验：
 | Phase | 名称 | 说明 | 时间 |
 |-------|------|------|------|
-| 8 | 倾向性分析 | Lift、Log-odds 计算 | 2-3 min |
-| 9 | Z-score 标准化 | 标准化倾向性分数 | 2-3 min |
 | 10 | 显著性检验 | Chi-square、p-value、效应量 | 2-3 min |
+
+> 注：Phase 8（倾向性分析）和 Phase 9（Z-score 标准化）已合并到 Phase 2。
 
 **高级阶段 (Phase 11-17)** - 可选的深度分析：
 | Phase | 名称 | 说明 | 时间 |
@@ -204,19 +205,20 @@ python run_all_phases.py --phases 0
 
 ### 数据库结构 (Database Structure)
 
-项目使用 SQLite 数据库 (`data/villages.db`)，包含 44 个表：
+项目使用 SQLite 数据库 (`data/villages.db`)，包含 37 个表：
 
 **原始数据表**：
 - `广东省自然村`：原始村庄数据（285K+ 记录）
 - `广东省自然村_预处理`：预处理后的数据（Phase 0 生成）
 
 **分析结果表**（部分）：
-- `char_regional_analysis`：字符区域分析（频率+倾向性）
-- `pattern_regional_analysis`：模式区域分析
-- `semantic_regional_analysis`：语义区域分析
-- `village_features`：村庄特征（物化）
-- `spatial_clusters`：空间聚类结果
+- `char_frequency_global` / `char_regional_analysis`：字符频率与区域分析
+- `semantic_vtf_global`：语义虚拟词频
+- `village_features`：村庄级特征（230+ 维）
+- `spatial_clusters`：多分辨率空间聚类结果
+- `cluster_assignments` / `cluster_profiles`：区县聚类结果
 - `ngram_frequency`：N-gram 频率
+- `region_similarity`：区域相似度矩阵
 - 更多表请参考 [docs/reports/DATABASE_STATUS_REPORT.md](docs/reports/DATABASE_STATUS_REPORT.md)
 
 ---
@@ -758,7 +760,6 @@ python scripts/run_clustering_analysis.py \
 
 聚类分析结果持久化到以下数据表：
 
-- `region_vectors`：区域特征向量（语义+形态学+多样性特征）
 - `cluster_assignments`：区域聚类分配结果
 - `cluster_profiles`：聚类画像（区分性特征、代表性区域）
 - `clustering_metrics`：聚类评估指标（轮廓系数、DB指数等）
@@ -828,7 +829,6 @@ python scripts/query_results.py --run-id cluster_001 --type cluster-metrics
 - `src/pipelines/clustering_pipeline.py` - 聚类分析管道
 
 **新增表：**
-- `region_vectors` - 区域特征向量
 - `cluster_assignments` - 聚类分配
 - `cluster_profiles` - 聚类画像
 - `clustering_metrics` - 聚类评估指标
@@ -992,51 +992,15 @@ python scripts/visualize_clusters.py \
 - **内存占用**：< 2GB（符合部署约束）
 - **特征维度**：106维 → PCA降至50维
 
-## 特徵物化管道 (Feature Materialization Pipeline)
+## 特征物化管道 (Feature Materialization Pipeline) - 已废弃
+
+> ⚠️ `city_aggregates`、`county_aggregates`、`town_aggregates` 已废弃，被实时 SQL 查询替代（`广东省自然村` GROUP BY + `semantic_indices` 关联）。
 
 ### 概述 (Overview)
 
-特徵物化管道將村莊級別的語義和形態學特徵預計算並存儲到數據庫中，實現"離線重、在線輕"的部署策略。
+村庄级特征（`village_features` 表）由 Phase 5 生成，包含 230+ 特征。
 
-### 運行管道 (Running Pipeline)
-
-```bash
-# 運行特徵物化管道
-python scripts/run_feature_materialization.py \
-    --run-id feature_001 \
-    --output-dir results/feature_001
-
-# 可選：關聯聚類結果
-python scripts/run_feature_materialization.py \
-    --run-id feature_001 \
-    --clustering-run-id village_cluster_001 \
-    --output-dir results/feature_001
-```
-
-### 物化特徵 (Materialized Features)
-
-**村莊級別特徵**（village_features表）：
-- 基礎信息：city, county, town, village_name, pinyin
-- 形態學特徵：suffix_1/2/3, prefix_1/2/3, name_length
-- 語義標籤（9個二元特徵）：
-  - sem_mountain：山地相關
-  - sem_water：水系相關
-  - sem_settlement：聚落相關
-  - sem_direction：方位相關
-  - sem_clan：姓氏相關
-  - sem_symbolic：象徵相關
-  - sem_agriculture：農業相關
-  - sem_vegetation：植被相關
-  - sem_infrastructure：基礎設施相關
-- 聚類分配：kmeans_cluster_id, dbscan_cluster_id, gmm_cluster_id
-
-**區域聚合統計**（city/county/town_aggregates表）：
-- 村莊總數和平均名稱長度
-- 語義標籤計數和百分比
-- Top N後綴和前綴
-- 聚類分佈
-
-### 查詢特徵 (Querying Features)
+### 查询特征 (Querying Features)
 
 ```python
 import sqlite3
@@ -1077,11 +1041,6 @@ conn.close()
 - **數據規模**：284,764個自然村
 - **運行時間**：約67秒（~1分鐘）
 - **內存占用**：< 1GB
-- **數據庫大小**：
-  - village_features：284,764條記錄
-  - city_aggregates：21條記錄
-  - county_aggregates：121條記錄
-  - town_aggregates：1,579條記錄
 
 ### 語義標籤統計 (Semantic Tag Statistics)
 
