@@ -206,7 +206,7 @@ python run_all_phases.py --phases 0
 
 ### 数据库结构 (Database Structure)
 
-项目使用 SQLite 数据库 (`data/villages.db`)，包含 37 个表：
+项目使用 SQLite 数据库 (`data/villages.db`)，包含 50 个表：
 
 **原始数据表**：
 - `广东省自然村`：原始村庄数据（285K+ 记录）
@@ -232,7 +232,7 @@ python run_all_phases.py --phases 0
 villages-ML/
 ├── data/                   # SQLite 数据库
 ├── scripts/                # 分析脚本
-│   ├── core/              # 核心阶段脚本 (Phase 0-17)
+│   ├── core/              # 核心阶段脚本 (Phase 0-18)
 │   └── experimental/      # 实验性功能
 ├── src/                    # 源代码模块
 │   ├── preprocessing/     # 数据预处理
@@ -411,6 +411,13 @@ pytest tests/test_preprocessing.py
 ---
 
 ## 📝 更新日志
+
+### 2026-07-12
+- ✅ 后端对接修复：补齐 4 张缺失表（semantic_regional_analysis, pattern_frequency_global, pattern_regional_analysis, spatial_tendency_integration）
+- ✅ spatial_tendency_integration 增加 6 列（character_category, global_tendency_mean, tendency_deviation, spatial_specificity, p_value, u_statistic）满足后端 API
+- ✅ 修复 Phase 4 依赖链（新增 Phase 2 依赖）和 Phase 6 表名引用
+- ✅ 删除 6 张已废弃的空表（char_frequency_regional, regional_tendency 等优化前旧表）
+- ✅ 新增 tendency_significance 索引 + semantic_regional_analysis 索引
 
 ### 2026-03-04
 - ✅ 完善 README.md，添加"第一次使用"指南
@@ -618,8 +625,7 @@ python scripts/run_morphology_analysis.py --run-id morph_002 \
 形态学分析结果持久化到以下数据表：
 
 - `pattern_frequency_global`：全局模式频率统计
-- `pattern_frequency_regional`：区域模式频率（市/县/镇三级）
-- `pattern_tendency`：区域模式倾向性分析（lift、log-odds、z-score）
+- `pattern_regional_analysis`：区域模式频率与倾向性分析（合并表，市/县/镇三级）
 
 ### 查询形态学结果 (Querying Morphology Results)
 
