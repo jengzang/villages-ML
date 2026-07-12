@@ -187,8 +187,8 @@ def run_semantic_analysis_pipeline(
         regional_df['global_vtf_count'] = None
         regional_df['global_frequency'] = None
         regional_df['lift'] = regional_df['normalized_index']
-        regional_df['log_lift'] = np.log(regional_df['normalized_index'].where(regional_df['normalized_index'] > 0, np.nan))
-        regional_df['log_odds'] = None
+        regional_df['log_lift'] = np.log(regional_df['normalized_index'].clip(lower=1e-10))
+        regional_df['log_odds'] = 0.0
         regional_df['support_flag'] = 1
         regional_df['rank_within_region'] = regional_df['rank_within_province']
         regional_df['rank_overrepresented'] = None
