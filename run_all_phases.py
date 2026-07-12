@@ -571,20 +571,18 @@ PHASES = {
         "use_run_id": True
     },
     16: {
-        "name": "Semantic Centrality",
-        "name_zh": "语义中心性",
+        "name": "Semantic Centrality (DEPRECATED)",
+        "name_zh": "语义中心性（已废弃）",
         "script": "scripts/core/phase16_semantic_centrality.py",
-        "args": [
-            "--db-path", "data/villages.db"
-        ],
-        "description": "Compute semantic network centrality metrics (degree, betweenness, PageRank)",
-        "description_zh": "计算语义网络中心性指标（度中心性、介数中心性、PageRank）",
+        "args": [],
+        "description": "DEPRECATED: Real-time compute/compute/semantic/network endpoint replaced offline precomputation",
+        "description_zh": "已废弃：实时 /compute/semantic/network 端点替代了离线预计算",
         "group": "advanced",
-        "dependencies": [0, 1, 3],
-        "estimated_time": "2-3 min",
-        "output_tables": ["semantic_network_edges"],
+        "dependencies": [],
+        "estimated_time": "<1 min",
+        "output_tables": [],
         "critical": False,
-        "use_run_id": True
+        "use_run_id": False
     },
     17: {
         "name": "Hybrid Analysis",
