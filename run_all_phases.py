@@ -703,8 +703,8 @@ def run_phase(phase_id, run_id_prefix="run", dry_run=False, db_path="data/villag
             cursor.execute("SELECT DISTINCT run_id FROM semantic_vtf_global ORDER BY run_id DESC LIMIT 1")
             semantic_result = cursor.fetchone()
 
-            # Get morphology run ID from Phase 12 (ngram patterns) - use dummy if not available
-            cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='pattern_frequency_regional'")
+            # Get morphology run ID from Phase 18 (morphology patterns) - use dummy if not available
+            cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='pattern_regional_analysis'")
             pattern_table_exists = cursor.fetchone()
 
             if pattern_table_exists:
