@@ -15,6 +15,7 @@ import sqlite3
 import time
 from pathlib import Path
 from typing import List, Optional
+import numpy as np
 import pandas as pd
 
 from src.semantic.lexicon_loader import SemanticLexicon
@@ -25,6 +26,7 @@ from src.data.db_writer import (
     create_semantic_tables,
     write_semantic_vtf_global,
     write_semantic_indices,
+    write_semantic_regional_analysis,
 )
 
 logger = logging.getLogger(__name__)
@@ -163,6 +165,24 @@ def run_semantic_analysis_pipeline(
         combined_indices = pd.concat(all_indices, ignore_index=True)
         write_semantic_indices(conn, output_run_id, combined_indices)
         logger.info(f"Wrote {len(combined_indices)} semantic indices records")
+
+        # Step 5c: Write semantic_regional_analysis (for backward compat with external backend)
+        logger.info("\\n=== Step 5c: Writing semantic_regional_analysis ===")
+        regional_df = combined_indices.copy()
+        regional_df['vtf_count'] = (regional_df['raw_intensity'] * regional_df['village_count']).round().astype(int)
+        regional_df['total_villages'] = regional_df['village_count']
+        regional_df['frequency'] = regional_df['raw_intensity']
+        regional_df['global_vtf_count'] = None
+        regional_df['global_frequency'] = None
+        regional_df['lift'] = regional_df['normalized_index']
+        regional_df['log_lift'] = np.log(regional_df['normalized_index'].where(regional_df['normalized_index'] > 0, np.nan))
+        regional_df['log_odds'] = None
+        regional_df['support_flag'] = 1
+        regional_df['rank_within_region'] = regional_df['rank_within_province']
+        regional_df['rank_overrepresented'] = None
+        regional_df['rank_underrepresented'] = None
+        write_semantic_regional_analysis(conn, regional_df)
+        logger.info(f"Wrote {len(regional_df)} semantic_regional_analysis records")
 
         # Step 6: Export CSV reports (if output_dir specified)
         if output_dir:

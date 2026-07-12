@@ -126,6 +126,19 @@ Examples:
     )
 
     parser.add_argument(
+        '--integrate-tendency',
+        action='store_true',
+        help='After spatial analysis, run spatial-tendency integration for top characters'
+    )
+
+    parser.add_argument(
+        '--tendency-chars',
+        type=int,
+        default=100,
+        help='Number of top characters to integrate (default: 100)'
+    )
+
+    parser.add_argument(
         '--verbose',
         action='store_true',
         help='Enable verbose logging'
@@ -172,6 +185,32 @@ Examples:
 
         logger.info("\nMulti-resolution spatial analysis complete!")
 
+        # Optional: run spatial-tendency integration after multi-res
+        if args.integrate_tendency:
+            logger.info("\n" + "=" * 60)
+            logger.info("Running spatial-tendency integration...")
+            logger.info("=" * 60)
+
+            from src.pipelines.spatial_tendency_integration import run_integration, get_top_characters
+            import sqlite3
+
+            conn = sqlite3.connect(args.db_path)
+            try:
+                characters = get_top_characters(conn, n=args.tendency_chars)
+                logger.info(f"Integrating top {len(characters)} characters")
+            finally:
+                conn.close()
+
+            output_run_id = "spatial_multi_tendency"
+            run_integration(
+                db_path=args.db_path,
+                tendency_run_id="latest",
+                spatial_run_id=MULTI_RESOLUTION_CONFIGS[-1]['run_id'],
+                output_run_id=output_run_id,
+                characters=characters
+            )
+            logger.info("Spatial-tendency integration complete.")
+
     else:
         logger.info("Starting spatial analysis")
         logger.info(f"Run ID: {args.run_id}")
@@ -205,6 +244,32 @@ Examples:
             logger.info(f"Spatial clusters: {stats['n_clusters']}")
             logger.info(f"Hotspots detected: {stats['n_hotspots']}")
             logger.info(f"Elapsed time: {stats['elapsed_time']:.1f}s")
+
+            # Optional: run spatial-tendency integration
+            if args.integrate_tendency:
+                logger.info("\n" + "=" * 60)
+                logger.info("Running spatial-tendency integration...")
+                logger.info("=" * 60)
+
+                from src.pipelines.spatial_tendency_integration import run_integration, get_top_characters
+                import sqlite3
+
+                conn = sqlite3.connect(args.db_path)
+                try:
+                    characters = get_top_characters(conn, n=args.tendency_chars)
+                    logger.info(f"Integrating top {len(characters)} characters")
+                finally:
+                    conn.close()
+
+                output_run_id = f"{args.run_id}_tendency"
+                run_integration(
+                    db_path=args.db_path,
+                    tendency_run_id="latest",
+                    spatial_run_id=args.run_id,
+                    output_run_id=output_run_id,
+                    characters=characters
+                )
+                logger.info("Spatial-tendency integration complete.")
 
         except Exception as e:
             logger.error(f"Spatial analysis failed: {e}", exc_info=True)

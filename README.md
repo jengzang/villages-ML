@@ -114,7 +114,7 @@ python run_all_phases.py --group advanced    # 高级阶段 (11-17)
 
 ### 分析阶段概览
 
-项目包含 **17 个分析阶段**，分为三组：
+项目包含 **18 个分析阶段**，分为三组：
 
 **核心阶段 (Phase 0-6)** - 必需的基础分析：
 | Phase | 名称 | 说明 | 时间 |
@@ -146,8 +146,9 @@ python run_all_phases.py --group advanced    # 高级阶段 (11-17)
 | 15 | 区域相似度 | 区域命名相似度分析 | 2-3 min |
 | **16** | **语义中心性** | **⚠️ 已废弃 - 被实时 /compute/semantic/network 替代** | **<1 min** |
 | 17 | 混合分析 | 子类别 VTF（76 子类），输出 semantic_subcategory_vtf_global/regional | 3-5 min |
+| 18 | 形态模式分析 | 提取后缀/前缀模式，输出 pattern_frequency_global 和 pattern_regional_analysis | 3-5 min |
 
-**完整运行时间**：约 1-2 小时（全部 17 个阶段）
+**完整运行时间**：约 1-2 小时（全部 18 个阶段）
 
 ---
 

@@ -57,7 +57,7 @@ Statistical Phases (统计阶段 10) - Statistical enhancements:
   Note: Phase 8 (Tendency Analysis) and Phase 9 (Z-score Normalization)
   have been removed as these are now performed by Phase 2.
 
-Advanced Phases (高级阶段 11-17) - Advanced analysis:
+Advanced Phases (高级阶段 11-18) - Advanced analysis:
   Phase 11 : Query Policy Framework (查询策略框架)
   Phase 12 : N-gram Analysis (N-gram分析)
   Phase 13 : Spatial Hotspots (空间热点)
@@ -65,6 +65,7 @@ Advanced Phases (高级阶段 11-17) - Advanced analysis:
   Phase 15 : Region Similarity (区域相似度)
   Phase 16 : Semantic Centrality (语义中心性)
   Phase 17 : Hybrid Analysis (混合分析)
+  Phase 18 : Morphology Patterns (形态模式分析)
 
 ================================================================================
 DEPENDENCIES 依赖关系
@@ -128,7 +129,7 @@ def print_phase_list():
         group_title = {
             "core": "Core Phases (核心阶段 0-7)",
             "statistical": "Statistical Phases (统计阶段 8-10)",
-            "advanced": "Advanced Phases (高级阶段 11-17)"
+            "advanced": "Advanced Phases (高级阶段 11-18)"
         }[group_name]
 
         print(f"\n{group_title}:")
@@ -412,14 +413,15 @@ PHASES = {
         "script": "scripts/core/run_spatial_analysis.py",
         "args": [
             "--db-path", "data/villages.db",
-            "--multi-resolution"
+            "--multi-resolution",
+            "--integrate-tendency"
         ],
         "description": "Multi-resolution spatial clustering: DBSCAN (eps=0.3/0.5/10/20km) + HDBSCAN, KDE hotspots",
         "description_zh": "多分辨率空间聚类：DBSCAN (eps=0.3/0.5/10/20km) + HDBSCAN，KDE热点检测",
         "group": "core",
         "dependencies": [0],
         "estimated_time": "25-50 min",
-        "output_tables": ["village_spatial_features", "spatial_clusters", "spatial_hotspots", "region_spatial_aggregates"],
+        "output_tables": ["village_spatial_features", "spatial_clusters", "spatial_hotspots", "region_spatial_aggregates", "spatial_tendency_integration"],
         "critical": True,
         "use_run_id": False
     },
@@ -492,7 +494,7 @@ PHASES = {
         "use_run_id": True
     },
 
-    # ========== ADVANCED PHASES (11-17) ==========
+    # ========== ADVANCED PHASES (11-18) ==========
     11: {
         "name": "Query Policy Framework",
         "name_zh": "查询策略框架",
@@ -602,6 +604,22 @@ PHASES = {
         "dependencies": [0, 1, 3],
         "estimated_time": "3-5 min",
         "output_tables": ["semantic_subcategory_vtf_global", "semantic_subcategory_vtf_regional"],
+        "critical": False,
+        "use_run_id": True
+    },
+    18: {
+        "name": "Morphology Patterns",
+        "name_zh": "形态模式分析",
+        "script": "scripts/core/run_morphology.py",
+        "args": [
+            "--db-path", "data/villages.db"
+        ],
+        "description": "Extract suffix/prefix patterns, compute frequency and tendency, persist to pattern tables",
+        "description_zh": "提取后缀/前缀模式，计算频率和倾向性，写入 pattern_frequency_global 和 pattern_regional_analysis",
+        "group": "advanced",
+        "dependencies": [0],
+        "estimated_time": "3-5 min",
+        "output_tables": ["pattern_frequency_global", "pattern_regional_analysis"],
         "critical": False,
         "use_run_id": True
     }
@@ -784,7 +802,7 @@ def main():
         "--group",
         type=str,
         choices=["core", "statistical", "advanced"],
-        help="Run all phases in a specific group (core: 0-7, statistical: 8-10, advanced: 11-17)"
+        help="Run all phases in a specific group (core: 0-7, statistical: 8-10, advanced: 11-18)"
     )
 
     # Configuration arguments

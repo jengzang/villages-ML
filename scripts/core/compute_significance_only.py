@@ -23,6 +23,8 @@ from scipy import stats
 # Add project root to path
 sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 
+from src.data.db_writer import create_tendency_significance_table, save_tendency_significance
+
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
 
@@ -104,6 +106,10 @@ def compute_significance_from_regional_analysis(
                 else:
                     raise
         conn.commit()
+
+        # Create tendency_significance table
+        create_tendency_significance_table(conn)
+
         # Load regional analysis data (with hierarchy - 2026-03-01)
         query = """
         SELECT
@@ -227,8 +233,14 @@ def compute_significance_from_regional_analysis(
                     logger.info(f"    {row['char']} in {row['region_name']}: "
                               f"p={row['p_value']:.4f}, effect={row['effect_size']:.3f}")
 
+        # Save to dedicated tendency_significance table
+        logger.info("Saving to tendency_significance table...")
+        df['significance_level'] = significance_level
+        save_tendency_significance(conn, run_id, df)
+
         logger.info(f"\n✓ Significance computation completed successfully")
         logger.info(f"✓ Updated char_regional_analysis table with significance metrics")
+        logger.info(f"✓ Saved to tendency_significance table")
 
     except Exception as e:
         logger.error(f"Error during significance computation: {e}")

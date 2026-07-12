@@ -117,7 +117,7 @@ villages-ML/
 ### Key Directories
 
 - **`data/`**: SQLite database with 44 tables (all populated, optimized 2.3GB)
-- **`api/`**: FastAPI backend with 30+ endpoints (~90% coverage)
+- **`api/`**: ⚠️ DEPRECATED — 此前端 API 已废弃，外部后端为独立系统。此目录仅作列名/表名参考，无需维护
 - **`scripts/`**: Analysis scripts organized by purpose
 - **`docs/`**: All documentation (organized by category)
 - **`tests/`**: Unit tests and test outputs
