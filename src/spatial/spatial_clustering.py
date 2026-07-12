@@ -84,7 +84,7 @@ class SpatialClusterer:
             min_cluster_size=self.min_samples,
             metric='haversine',
             cluster_selection_method='eom',
-            n_jobs=-1
+            core_dist_n_jobs=-1
         )
         self.labels_ = self.model.fit_predict(coords_rad)
         self._log_results()
