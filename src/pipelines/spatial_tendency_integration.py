@@ -76,7 +76,14 @@ def load_tendency_results(
     # Note: tendency_run_id is kept for API compatibility but char_regional_analysis
     # uses the optimized schema without run_id
 
-    df = pd.read_sql_query(query, conn, params=[region_level])
+    try:
+        df = pd.read_sql_query(query, conn, params=[region_level])
+    except (sqlite3.OperationalError, pd.errors.DatabaseError) as e:
+        if "no such table" in str(e).lower():
+            logger.warning("char_regional_analysis not found — run Phase 2 first")
+            return pd.DataFrame()
+        raise
+
     logger.info(f"Loaded {len(df)} tendency records")
 
     return df

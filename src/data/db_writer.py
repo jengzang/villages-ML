@@ -2062,6 +2062,11 @@ def write_spatial_tendency_integration(conn: sqlite3.Connection, run_id: str, in
         if col not in integration_df.columns:
             integration_df[col] = None
 
+    # Clear previous data for this run_id to avoid duplicates on re-run
+    cursor = conn.cursor()
+    cursor.execute("DELETE FROM spatial_tendency_integration WHERE run_id = ?", (run_id,))
+    conn.commit()
+
     # Write to database
     integration_df[columns].to_sql('spatial_tendency_integration', conn, if_exists='append', index=False)
 

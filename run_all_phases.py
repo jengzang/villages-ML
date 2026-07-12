@@ -419,7 +419,7 @@ PHASES = {
         "description": "Multi-resolution spatial clustering: DBSCAN (eps=0.3/0.5/10/20km) + HDBSCAN, KDE hotspots",
         "description_zh": "多分辨率空间聚类：DBSCAN (eps=0.3/0.5/10/20km) + HDBSCAN，KDE热点检测",
         "group": "core",
-        "dependencies": [0],
+        "dependencies": [0, 2],
         "estimated_time": "25-50 min",
         "output_tables": ["village_spatial_features", "spatial_clusters", "spatial_hotspots", "region_spatial_aggregates", "spatial_tendency_integration"],
         "critical": True,
