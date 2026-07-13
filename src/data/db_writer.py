@@ -98,13 +98,17 @@ def create_semantic_tables(conn: sqlite3.Connection) -> None:
     cursor = conn.cursor()
 
     # Table 6: semantic_vtf_global
+    cursor.execute("DROP TABLE IF EXISTS semantic_vtf_global")
     cursor.execute("""
-        CREATE TABLE IF NOT EXISTS semantic_vtf_global (
+        CREATE TABLE semantic_vtf_global (
             run_id TEXT NOT NULL,
             category TEXT NOT NULL,
             vtf_count INTEGER NOT NULL,
+            village_count INTEGER NOT NULL,
             total_villages INTEGER NOT NULL,
             frequency REAL NOT NULL,
+            vtf REAL NOT NULL,
+            char_count INTEGER NOT NULL,
             rank INTEGER NOT NULL,
             PRIMARY KEY (run_id, category),
             FOREIGN KEY (run_id) REFERENCES analysis_runs(run_id)
@@ -935,14 +939,18 @@ def write_semantic_vtf_global(conn: sqlite3.Connection, run_id: str, df: pd.Data
 
     df_copy = df.copy()
     df_copy['run_id'] = run_id
+    df_copy['village_count'] = df_copy['vtf_count']
+    df_copy['vtf'] = df_copy['frequency']
 
-    columns = ['run_id', 'category', 'vtf_count', 'total_villages', 'frequency', 'rank']
+    columns = ['run_id', 'category', 'vtf_count', 'village_count', 'total_villages',
+               'frequency', 'vtf', 'char_count', 'rank']
     data = df_copy[columns].values.tolist()
 
     cursor.executemany("""
         INSERT OR REPLACE INTO semantic_vtf_global
-        (run_id, category, vtf_count, total_villages, frequency, rank)
-        VALUES (?, ?, ?, ?, ?, ?)
+        (run_id, category, vtf_count, village_count, total_villages,
+         frequency, vtf, char_count, rank)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
     """, data)
 
     conn.commit()
