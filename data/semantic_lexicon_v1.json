@@ -1,7 +1,7 @@
 {
-  "version": "1.11.0",
+  "version": "1.13.0",
   "created_at": "2026-07-13",
-  "description": "Flat semantic lexicon for Guangdong village names - 9 parent categories, 483 chars, ~88% frequency coverage. 塆 moved from settlement to terrain.",
+  "description": "Flat semantic lexicon - 9 parent categories, 491 chars, 16 multi-label. +陶磨灶砖礼善顺忠 in culture for craft/virtue subcategories.",
   "multi_label": {
     "兴": ["culture", "modifier"],
     "冲": ["terrain", "water"],
@@ -14,8 +14,6 @@
     "杨": ["clan", "vegetation"],
     "林": ["clan", "vegetation"],
     "根": ["spatial", "vegetation"],
-    "洲": ["terrain", "water"],
-    "滩": ["terrain", "water"],
     "盛": ["culture", "modifier"],
     "金": ["culture", "modifier"],
     "马": ["clan", "culture"],
@@ -48,7 +46,7 @@
       "天", "风", "云", "月", "胜", "庆", "仁", "乐", "成", "建",
       "化", "珠", "太", "蛇", "学", "坟", "铁", "马", "平", "瓦",
       "隆", "清", "狮", "书", "庵", "鹤", "鹿", "群", "碑", "瑶",
-      "同"
+      "同", "陶", "磨", "灶", "砖", "礼", "善", "顺", "忠"
     ],
     "modifier": [
       "新", "大", "小", "老", "古", "长", "短", "白", "红", "青",
@@ -76,7 +74,7 @@
       "峪", "峦", "岩", "石", "崖", "台", "垄", "坝", "坪", "塱",
       "嶂", "峻", "岐", "脊", "塝", "壁", "丘", "坎", "岔", "峡",
       "峤", "岑", "岫", "屿", "屺", "屹", "埔", "沙", "洞", "冲",
-      "墩", "窝", "咀", "滩", "洲", "埇", "凹", "凸", "崀", "坭",
+      "墩", "窝", "咀", "埇", "凹", "凸", "崀", "坭",
       "迳", "塅", "朗", "土", "崩", "布", "径", "岙", "峁", "坞",
       "塬", "垭", "埕", "泥", "垇", "塆"
     ],

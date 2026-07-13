@@ -26,9 +26,11 @@ class SemanticLexicon:
     def _load_lexicon(self):
         """Load lexicon from JSON file.
 
-        Supports two formats:
-        - v1/v2/v3: data['categories'] (9 main categories or subcategories)
-        - v4_hybrid: data['subcategories'] (76 subcategories)
+        Supports three formats:
+        - v1/v2/v3: data['categories'] -> {cat: [chars], ...} (flat)
+        - v4: data['categories'] -> {cat: {subcat: [chars]}, ...} (hierarchical)
+          + data['multi_label'] -> {char: [cats]}
+        - v4_hybrid: data['subcategories'] -> {subcat: [chars], ...} (flat)
         """
         with open(self.lexicon_path, 'r', encoding='utf-8') as f:
             data = json.load(f)
@@ -37,27 +39,46 @@ class SemanticLexicon:
         self.created_at = data.get('created_at', 'unknown')
         self.description = data.get('description', '')
 
-        # Try 'categories' first (v1/v2/v3 format)
-        self.categories = data.get('categories', {})
+        # Load raw categories
+        raw_categories = data.get('categories', {})
+        if not raw_categories:
+            raw_categories = data.get('subcategories', {})
 
-        # Fall back to 'subcategories' (v4_hybrid format)
-        if not self.categories:
-            self.categories = data.get('subcategories', {})
-
-        # Validate categories
-        if not self.categories:
+        if not raw_categories:
             raise ValueError(f"No categories found in lexicon: {self.lexicon_path}")
+
+        # Detect format and normalize
+        first_val = next(iter(raw_categories.values()), None)
+        if isinstance(first_val, dict):
+            # v4 hierarchical: categories -> {parent: {subcat: [chars]}}
+            self.categories = raw_categories  # keep parent -> subcategories mapping
+            self._flat_categories: Dict[str, List[str]] = {}
+            for parent, subcats in raw_categories.items():
+                chars = []
+                for char_list in subcats.values():
+                    chars.extend(char_list)
+                self._flat_categories[parent] = chars
+            self._multi_label = data.get('multi_label', {})
+        else:
+            # v1/v2/v3 or v4_hybrid: categories/subcategories -> {cat: [chars]}
+            self.categories = raw_categories
+            self._flat_categories = self.categories  # same structure
+            self._multi_label = {}
 
     def _build_char_to_category_map(self):
         """Build reverse mapping from character to category for fast lookup."""
         self.char_to_category: Dict[str, str] = {}
 
-        for category, chars in self.categories.items():
+        for category, chars in self._flat_categories.items():
             for char in chars:
-                # Note: A character can belong to multiple categories
-                # We store only the first occurrence for simplicity
                 if char not in self.char_to_category:
                     self.char_to_category[char] = category
+
+        # Apply multi_label overrides (first listed category wins per current convention)
+        if self._multi_label:
+            for char, cats in self._multi_label.items():
+                if char not in self.char_to_category:
+                    self.char_to_category[char] = cats[0]
 
     def get_category(self, char: str) -> Optional[str]:
         """
@@ -102,7 +123,7 @@ class SemanticLexicon:
         Returns:
             List of characters in the category
         """
-        return self.categories.get(category, [])
+        return self._flat_categories.get(category, [])
 
     def list_categories(self) -> List[str]:
         """
@@ -136,7 +157,7 @@ class SemanticLexicon:
         Returns:
             Number of characters
         """
-        return len(self.categories.get(category, []))
+        return len(self._flat_categories.get(category, []))
 
     def __repr__(self) -> str:
         """String representation."""
