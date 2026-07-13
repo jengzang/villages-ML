@@ -1,7 +1,7 @@
 {
-  "version": "1.10.0",
+  "version": "1.11.0",
   "created_at": "2026-07-13",
-  "description": "Flat semantic lexicon for Guangdong village names - 9 parent categories, 485 chars, ~88% frequency coverage. direction renamed to spatial. 栏 moved from settlement to agriculture.",
+  "description": "Flat semantic lexicon for Guangdong village names - 9 parent categories, 483 chars, ~88% frequency coverage. 塆 moved from settlement to terrain.",
   "multi_label": {
     "兴": ["culture", "modifier"],
     "冲": ["terrain", "water"],
@@ -61,7 +61,7 @@
     "settlement": [
       "围", "墟", "圩", "坊", "里", "巷", "街", "寨", "庄", "村",
       "社", "队", "组", "片", "屯", "堡", "屋", "楼", "堂", "祠",
-      "市", "场", "塆", "宅", "寮", "厝", "门", "基", "排", "桥",
+      "市", "场", "宅", "寮", "厝", "门", "基", "排", "桥",
       "路", "家", "城", "厂", "房", "窑", "铺", "营", "乡", "板",
       "车", "步", "居", "军", "店", "塔", "亭", "阁", "甲", "区"
     ],
@@ -78,7 +78,7 @@
       "峤", "岑", "岫", "屿", "屺", "屹", "埔", "沙", "洞", "冲",
       "墩", "窝", "咀", "滩", "洲", "埇", "凹", "凸", "崀", "坭",
       "迳", "塅", "朗", "土", "崩", "布", "径", "岙", "峁", "坞",
-      "塬", "垭", "埕", "泥", "垇"
+      "塬", "垭", "埕", "泥", "垇", "塆"
     ],
     "vegetation": [
       "林", "木", "树", "松", "竹", "梅", "花", "草", "榕", "杉",
