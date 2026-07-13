@@ -857,17 +857,15 @@ def get_semantic_tag_statistics(conn: sqlite3.Connection, run_id: str) -> pd.Dat
     Returns:
         DataFrame with semantic tag counts and percentages
     """
-    query = """
+    from src.semantic.lexicon_loader import SemanticLexicon
+    lexicon = SemanticLexicon('data/semantic_lexicon_v1.json')
+    sum_cols = ',\n            '.join(
+        f"SUM(sem_{cat}) as {cat}_count"
+        for cat in lexicon.list_categories()
+    )
+    query = f"""
         SELECT
-            SUM(sem_mountain) as mountain_count,
-            SUM(sem_water) as water_count,
-            SUM(sem_settlement) as settlement_count,
-            SUM(sem_direction) as direction_count,
-            SUM(sem_clan) as clan_count,
-            SUM(sem_symbolic) as symbolic_count,
-            SUM(sem_agriculture) as agriculture_count,
-            SUM(sem_vegetation) as vegetation_count,
-            SUM(sem_infrastructure) as infrastructure_count,
+            {sum_cols},
             COUNT(*) as total_villages
         FROM village_features
         WHERE run_id = ?

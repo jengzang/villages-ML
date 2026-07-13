@@ -113,6 +113,19 @@ class SemanticLexicon:
         """
         return list(self.categories.keys())
 
+    def get_column_names(self, prefix: str = "sem_", suffix: str = "") -> List[str]:
+        """
+        Get derived column names from category names.
+
+        Args:
+            prefix: Column prefix (default 'sem_').
+            suffix: Column suffix (default ''). Common: '_pct', '_count', '_intensity'.
+
+        Returns:
+            List of column names like ['sem_terrain', 'sem_water', ...].
+        """
+        return [f"{prefix}{cat}{suffix}" for cat in self.list_categories()]
+
     def get_category_size(self, category: str) -> int:
         """
         Get number of characters in a category.

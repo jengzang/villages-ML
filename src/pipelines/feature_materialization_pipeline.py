@@ -160,7 +160,7 @@ def merge_cluster_assignments(villages_df: pd.DataFrame, assignments: Dict[str, 
     return result_df
 
 
-def write_village_features(conn: sqlite3.Connection, run_id: str, df: pd.DataFrame, batch_size: int = 10000):
+def write_village_features(conn: sqlite3.Connection, run_id: str, df: pd.DataFrame, batch_size: int = 10000, lexicon_path: str = 'data/semantic_lexicon_v1.json'):
     """
     Write village features to database.
 
@@ -207,12 +207,15 @@ def write_village_features(conn: sqlite3.Connection, run_id: str, df: pd.DataFra
 
     cursor = conn.cursor()
 
+    # Load lexicon for dynamic column names
+    from src.semantic.lexicon_loader import SemanticLexicon
+    lexicon = SemanticLexicon(lexicon_path)
+
     # Prepare data for insertion (now includes village_id, no run_id/created_at)
     columns = [
         'village_id', 'city', 'county', 'town', 'village_committee', 'village_name', 'pinyin',
         'name_length', 'suffix_1', 'suffix_2', 'suffix_3', 'prefix_1', 'prefix_2', 'prefix_3',
-        'sem_mountain', 'sem_water', 'sem_settlement', 'sem_direction', 'sem_clan',
-        'sem_symbolic', 'sem_agriculture', 'sem_vegetation', 'sem_infrastructure',
+        *lexicon.get_column_names(),
         'kmeans_cluster_id', 'dbscan_cluster_id', 'gmm_cluster_id',
         'has_valid_chars'
     ]
@@ -292,7 +295,7 @@ def run_feature_materialization_pipeline(
             result_df = merge_cluster_assignments(result_df, assignments)
 
         # Write to database
-        write_village_features(conn, run_id, result_df)
+        write_village_features(conn, run_id, result_df, lexicon_path=lexicon_path)
 
         # Compute and write region aggregates
         logger.info("Computing region aggregates")
@@ -313,15 +316,8 @@ def run_feature_materialization_pipeline(
             'total_villages': int(len(result_df)),
             'avg_name_length': float(result_df['name_length'].mean()),
             'semantic_tag_counts': {
-                'mountain': int(result_df['sem_mountain'].sum()),
-                'water': int(result_df['sem_water'].sum()),
-                'settlement': int(result_df['sem_settlement'].sum()),
-                'direction': int(result_df['sem_direction'].sum()),
-                'clan': int(result_df['sem_clan'].sum()),
-                'symbolic': int(result_df['sem_symbolic'].sum()),
-                'agriculture': int(result_df['sem_agriculture'].sum()),
-                'vegetation': int(result_df['sem_vegetation'].sum()),
-                'infrastructure': int(result_df['sem_infrastructure'].sum())
+                cat: int(result_df[f'sem_{cat}'].sum())
+                for cat in lexicon.list_categories()
             },
             'runtime_seconds': float(time.time() - start_time)
         }

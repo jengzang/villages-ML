@@ -885,7 +885,11 @@ def persist_morphology_results_to_db(
                     'rank_underrepresented': merged_df['rank_underrepresented']
                 })
 
-                # Write to pattern_regional_analysis
+                # Drop low-support rows (village_count < 5) to keep table lean
+                total_before = len(final_df)
+                final_df = final_df[final_df['support_flag'] == 1]
+                logger.info(f"Filtered pattern_regional_analysis: {total_before} → {len(final_df)} rows (support_flag=1 only)")
+
                 cursor = conn.cursor()
                 data = final_df.values.tolist()
 
@@ -1397,8 +1401,16 @@ def create_feature_materialization_tables(conn: sqlite3.Connection) -> None:
     """
     cursor = conn.cursor()
 
+    # Load lexicon for dynamic column generation
+    from src.semantic.lexicon_loader import SemanticLexicon
+    lexicon = SemanticLexicon('data/semantic_lexicon_v1.json')
+    sem_col_defs = ',\n            '.join(
+        f'sem_{cat} INTEGER NOT NULL DEFAULT 0'
+        for cat in lexicon.list_categories()
+    )
+
     # Table 1: village_features
-    cursor.execute("""
+    cursor.execute(f"""
         CREATE TABLE IF NOT EXISTS village_features (
             village_id TEXT PRIMARY KEY,
             run_id TEXT,
@@ -1415,15 +1427,7 @@ def create_feature_materialization_tables(conn: sqlite3.Connection) -> None:
             prefix_1 TEXT,
             prefix_2 TEXT,
             prefix_3 TEXT,
-            sem_mountain INTEGER NOT NULL DEFAULT 0,
-            sem_water INTEGER NOT NULL DEFAULT 0,
-            sem_settlement INTEGER NOT NULL DEFAULT 0,
-            sem_direction INTEGER NOT NULL DEFAULT 0,
-            sem_clan INTEGER NOT NULL DEFAULT 0,
-            sem_symbolic INTEGER NOT NULL DEFAULT 0,
-            sem_agriculture INTEGER NOT NULL DEFAULT 0,
-            sem_vegetation INTEGER NOT NULL DEFAULT 0,
-            sem_infrastructure INTEGER NOT NULL DEFAULT 0,
+            {sem_col_defs},
             kmeans_cluster_id INTEGER,
             dbscan_cluster_id INTEGER,
             gmm_cluster_id INTEGER,
@@ -1460,9 +1464,14 @@ def create_feature_materialization_indexes(conn: sqlite3.Connection) -> None:
     cursor.execute("CREATE INDEX IF NOT EXISTS idx_village_features_town ON village_features(town)")
     cursor.execute("CREATE INDEX IF NOT EXISTS idx_village_features_suffix_2 ON village_features(suffix_2)")
     cursor.execute("CREATE INDEX IF NOT EXISTS idx_village_features_suffix_3 ON village_features(suffix_3)")
-    cursor.execute("CREATE INDEX IF NOT EXISTS idx_village_features_sem_mountain ON village_features(sem_mountain)")
-    cursor.execute("CREATE INDEX IF NOT EXISTS idx_village_features_sem_water ON village_features(sem_water)")
-    cursor.execute("CREATE INDEX IF NOT EXISTS idx_village_features_sem_settlement ON village_features(sem_settlement)")
+
+    # Semantic category indexes (dynamic from lexicon)
+    from src.semantic.lexicon_loader import SemanticLexicon
+    lexicon = SemanticLexicon('data/semantic_lexicon_v1.json')
+    for cat in lexicon.list_categories():
+        col_name = f'sem_{cat}'
+        cursor.execute(f"CREATE INDEX IF NOT EXISTS idx_village_features_{col_name} ON village_features({col_name})")
+
     cursor.execute("CREATE INDEX IF NOT EXISTS idx_village_features_kmeans_cluster ON village_features(kmeans_cluster_id)")
     cursor.execute("CREATE INDEX IF NOT EXISTS idx_village_features_dbscan_cluster ON village_features(dbscan_cluster_id)")
     cursor.execute("CREATE INDEX IF NOT EXISTS idx_village_features_gmm_cluster ON village_features(gmm_cluster_id)")
@@ -1994,6 +2003,12 @@ def write_pattern_regional_analysis(conn: sqlite3.Connection, df: pd.DataFrame, 
 
     # Prepare data for insertion
     df_copy = df.copy()
+
+    # Drop low-support rows (village_count < 5)
+    if 'support_flag' in df_copy.columns:
+        total_before = len(df_copy)
+        df_copy = df_copy[df_copy['support_flag'] == 1]
+        logger.info(f"Filtered pattern_regional_analysis: {total_before} → {len(df_copy)} rows (support_flag=1 only)")
 
     # Handle NaN values for optional columns
     for col in ['z_score', 'rank_overrepresented', 'rank_underrepresented', 'city', 'county', 'township']:

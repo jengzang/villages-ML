@@ -25,13 +25,19 @@ def compute_village_clustering(conn):
     """
     Compute clustering for villages based on their features.
     """
+    from src.semantic.lexicon_loader import SemanticLexicon
+
+    lexicon_path = project_root / 'data' / 'semantic_lexicon_v1.json'
+    lexicon = SemanticLexicon(str(lexicon_path))
+    sem_cols = lexicon.get_column_names()
+    sem_select = ', '.join(sem_cols)
+
     print("Loading village features...")
-    query = """
+    query = f"""
         SELECT
             village_id,
             name_length,
-            sem_mountain, sem_water, sem_settlement, sem_direction,
-            sem_clan, sem_symbolic, sem_agriculture, sem_vegetation, sem_infrastructure
+            {sem_select}
         FROM village_features
         WHERE has_valid_chars = 1
     """
@@ -39,11 +45,7 @@ def compute_village_clustering(conn):
     print(f"  Loaded {len(df)} villages with valid features")
 
     # Prepare feature matrix
-    feature_cols = [
-        'name_length',
-        'sem_mountain', 'sem_water', 'sem_settlement', 'sem_direction',
-        'sem_clan', 'sem_symbolic', 'sem_agriculture', 'sem_vegetation', 'sem_infrastructure'
-    ]
+    feature_cols = ['name_length'] + sem_cols
     X = df[feature_cols].values
 
     # Standardize features

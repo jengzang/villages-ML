@@ -23,12 +23,6 @@ logger = logging.getLogger(__name__)
 class RegionFeatureBuilder:
     """Build region feature vectors from database."""
 
-    # Semantic categories (9 categories)
-    SEMANTIC_CATEGORIES = [
-        'mountain', 'water', 'direction', 'settlement',
-        'clan', 'infrastructure', 'symbolic', 'nature', 'other'
-    ]
-
     def __init__(self, conn: sqlite3.Connection):
         """
         Initialize feature builder.
@@ -37,6 +31,8 @@ class RegionFeatureBuilder:
             conn: Database connection
         """
         self.conn = conn
+        from src.semantic.lexicon_loader import SemanticLexicon
+        self._lexicon = SemanticLexicon('data/semantic_lexicon_v1.json')
 
     def build_semantic_features(
         self,
@@ -69,7 +65,7 @@ class RegionFeatureBuilder:
         # Pivot to wide format
         features = []
 
-        for category in self.SEMANTIC_CATEGORIES:
+        for category in self._lexicon.list_categories():
             cat_data = vtf_df[vtf_df['category'] == category].copy()
 
             if cat_data.empty:
@@ -197,11 +193,15 @@ class RegionFeatureBuilder:
         else:
             result['meta_suffix2_entropy'] = 0
 
-        # Calculate mountain-water balance
-        if 'sem_mountain_intensity' in semantic_df.columns and 'sem_water_intensity' in semantic_df.columns:
-            mountain = semantic_df.set_index('region_name')['sem_mountain_intensity']
-            water = semantic_df.set_index('region_name')['sem_water_intensity']
-            balance = (mountain - water).abs() / (mountain + water + 1e-6)
+        # Calculate terrain-water balance
+        terrain_cat = 'terrain'
+        water_cat = 'water'
+        terrain_col = f'sem_{terrain_cat}_intensity'
+        water_col = f'sem_{water_cat}_intensity'
+        if terrain_col in semantic_df.columns and water_col in semantic_df.columns:
+            terrain = semantic_df.set_index('region_name')[terrain_col]
+            water = semantic_df.set_index('region_name')[water_col]
+            balance = (terrain - water).abs() / (terrain + water + 1e-6)
             result['meta_mw_balance'] = result['region_name'].map(balance).fillna(0)
         else:
             result['meta_mw_balance'] = 0

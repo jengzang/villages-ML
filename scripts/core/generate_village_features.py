@@ -119,8 +119,7 @@ def main():
         columns_to_write = [
             'village_id', 'run_id', 'city', 'county', 'town', 'village_committee', 'village_name', 'pinyin',
             'name_length', 'suffix_1', 'suffix_2', 'suffix_3', 'prefix_1', 'prefix_2', 'prefix_3',
-            'sem_mountain', 'sem_water', 'sem_settlement', 'sem_direction', 'sem_clan',
-            'sem_symbolic', 'sem_agriculture', 'sem_vegetation', 'sem_infrastructure',
+            *extractor.lexicon.get_column_names(),
             'has_valid_chars'
         ]
 

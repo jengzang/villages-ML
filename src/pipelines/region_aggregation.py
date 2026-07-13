@@ -73,10 +73,10 @@ def compute_region_aggregates(
         agg['avg_name_length'] = group['name_length'].mean()
 
         # Semantic tag counts and percentages
-        semantic_categories = ['mountain', 'water', 'settlement', 'direction', 'clan',
-                              'symbolic', 'agriculture', 'vegetation', 'infrastructure']
+        from src.semantic.lexicon_loader import SemanticLexicon
+        lexicon = SemanticLexicon('data/semantic_lexicon_v1.json')
 
-        for cat in semantic_categories:
+        for cat in lexicon.list_categories():
             col_name = f'sem_{cat}'
             agg[f'{col_name}_count'] = group[col_name].sum()
             agg[f'{col_name}_pct'] = (group[col_name].sum() / len(group)) * 100

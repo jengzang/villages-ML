@@ -160,7 +160,7 @@ def main():
         has_numeral, base_name, numeral_suffix = detect_trailing_numeral(
             row['自然村_去前缀']
         )
-        normalized = normalize_numbered_village(row['自然村_去前缀'])
+        normalized = row['自然村_去前缀']
 
         normalization_results.append({
             '自然村_规范化': normalized,
