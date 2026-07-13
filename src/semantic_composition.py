@@ -61,18 +61,16 @@ class SemanticCompositionAnalyzer:
             self.conn.close()
 
     def get_character_labels(self) -> Dict[str, str]:
-        """
-        Load character semantic labels from lexicon file.
+        """Load character semantic labels from lexicon file.
 
-        Supports two formats:
-        - v1/v2/v3: lexicon['categories'] (9 main categories or subcategories)
-        - v4_hybrid: lexicon['subcategories'] (76 subcategories)
-
-        When a character appears in multiple categories, the **last** one wins.
-        For multi-label awareness, use :meth:`get_character_labels_multi`.
+        Supports three formats:
+        - v1/v2/v3: ``lexicon['categories']`` → flat ``{parent: [chars]}``
+        - v4: ``lexicon['categories']`` → nested ``{parent: {sub: [chars]}}``
+          Characters get ``parent_sub`` labels (e.g. ``water_ditch``).
+        - v4_hybrid: ``lexicon['subcategories']`` → flat ``{parent_sub: [chars]}``
 
         Returns:
-            Dictionary mapping character -> category (single label per char)
+            Dictionary mapping character → category label
         """
         import json
 
@@ -81,51 +79,57 @@ class SemanticCompositionAnalyzer:
 
         labels = {}
 
-        # Try 'categories' first (v1/v2/v3 format)
         categories = lexicon.get('categories', {})
         if not categories:
-            # Fall back to 'subcategories' (v4_hybrid format)
             categories = lexicon.get('subcategories', {})
 
-        for category, characters in categories.items():
-            for char in characters:
-                labels[char] = category
+        for parent, children in categories.items():
+            if isinstance(children, dict):
+                # v4 nested format: {parent: {sub: [chars]}}
+                for sub, chars in children.items():
+                    label = f'{parent}_{sub}'
+                    for char in chars:
+                        labels[char] = label
+            else:
+                # v1/v2/v3/v4_hybrid flat format: {category: [chars]}
+                for char in children:
+                    labels[char] = parent
 
         return labels
 
     def get_character_labels_multi(self) -> Dict[str, List[str]]:
-        """
-        Load multi-label character mappings from lexicon.
+        """Load multi-label character mappings from lexicon.
 
-        Reads ``multi_label`` field (v1.3+) and falls back to scanning
-        ``categories`` for characters that appear in more than one category.
-        Characters with only one category are NOT included in the result —
-        callers should fall back to :meth:`get_character_labels` for those.
-
-        Returns:
-            Dictionary mapping character -> list of categories
-            e.g. {"林": ["vegetation", "clan"], ...}
+        Reads ``multi_label`` field (v1.3+).  Characters with only one
+        category are NOT included — callers fall back to
+        :meth:`get_character_labels`.
         """
         import json
+        from collections import defaultdict
 
         with open(self.lexicon_path, 'r', encoding='utf-8') as f:
             lexicon = json.load(f)
 
-        # Prefer explicit multi_label field (v1.3+)
         multi = lexicon.get('multi_label')
         if multi is not None:
             return {ch: list(cats) for ch, cats in multi.items()}
 
-        # Fallback: scan categories for cross-category duplicates
-        from collections import defaultdict
+        # Fallback: scan for cross-category duplicates
         char_cats: Dict[str, List[str]] = defaultdict(list)
+
         categories = lexicon.get('categories', {})
         if not categories:
             categories = lexicon.get('subcategories', {})
 
-        for category, characters in categories.items():
-            for char in characters:
-                char_cats[char].append(category)
+        for parent, children in categories.items():
+            if isinstance(children, dict):
+                for sub, chars in children.items():
+                    label = f'{parent}_{sub}'
+                    for char in chars:
+                        char_cats[char].append(label)
+            else:
+                for char in children:
+                    char_cats[char].append(parent)
 
         return {ch: cats for ch, cats in char_cats.items() if len(cats) > 1}
 

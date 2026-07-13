@@ -25,36 +25,41 @@ from typing import Set, List, Tuple
 # Categories that typically appear **first** in a bigram, modifying the head.
 # ---------------------------------------------------------------------------
 MODIFIER_CATEGORIES: Set[str] = {
-    # v1 lexicon names (2026-07)
-    "direction",
-    "clan",
-    "culture",   # was "symbolic" in older lexicons
-    "modifier",  # v1 catch-all: size + number + color + shape + a few old-infra chars
+    # v4 lexicon (2026-07-13): 9 parents, 53 subcategories
+    "spatial",      # v4: direction + elevation + position etc.
+    "clan",         # v4: general / cantonese / hakka / teochew
+    "culture",      # v4: religion / auspicious / virtue / animal / community
+    "modifier",     # v4: number / size / color / time / quality / suffix
+
+    # v1 lexicon names
+    "direction",    # renamed to "spatial" in v4
 
     # v4_hybrid / legacy lexicon names
-    "symbolic",  # renamed to "culture" in v1
-    "size",
-    "number",
-    "color",
-    "time",
-    "shape",
+    "symbolic",     # renamed to "culture" in v1/v4
+    "size",         # merged into "modifier" in v1/v4
+    "number",       # merged into "modifier" in v1/v4
+    "color",        # merged into "modifier" in v1/v4
+    "time",         # merged into "modifier" in v1/v4
+    "shape",        # removed in v4
 }
 
 # ---------------------------------------------------------------------------
 # Categories that form the **semantic core** — the "what" of a place name.
 # ---------------------------------------------------------------------------
 HEAD_CATEGORIES: Set[str] = {
-    # v1 lexicon names (2026-07)
-    "terrain",      # was "mountain" + "landform" in older lexicons
-    "water",
-    "settlement",
-    "agriculture",
-    "vegetation",
+    # v4 lexicon (2026-07-13): 9 parents, 53 subcategories
+    "terrain",          # v4: peak_ridge / slope / valley / rock / flatland / surface
+    "water",            # v4: river / stream / ditch / pond_lake / bay_port / ...
+    "settlement",       # v4: village / dwelling / building / fortification / ...
+    "agriculture",      # v4: field / crop / livestock / farming_infra
+    "vegetation",       # v4: tree / bamboo / fruit / herb
+
+    # v1 lexicon names — same as v4 for heads (no rename)
 
     # v4_hybrid / legacy lexicon names
-    "mountain",     # merged into "terrain" in v1
-    "landform",     # merged into "terrain" in v1
-    "infrastructure",  # merged into "modifier" in v1, but linguistically a head
+    "mountain",         # merged into "terrain" in v1/v4
+    "landform",         # merged into "terrain" in v1/v4
+    "infrastructure",   # merged into "settlement" in v4, into "modifier" in v1
 }
 
 # ---------------------------------------------------------------------------

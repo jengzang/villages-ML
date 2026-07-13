@@ -9,10 +9,10 @@ This script analyzes how semantic categories combine in village names:
 4. Identify semantic conflicts
 5. Calculate PMI scores
 
-LEXICON VERSION: v3_expanded (78 subcategories)
+LEXICON VERSION: v4 (53 subcategories)
 - Provides fine-grained semantic analysis
 - Matches semantic_bigrams table structure
-- Path: data/semantic_lexicon_v3_expanded.json
+- Path: data/semantic_lexicon_v4.json
 
 Approach: Offline-heavy, maximum accuracy, leverages Phase 2 semantic labels
 """
@@ -99,8 +99,8 @@ def step2_analyze_compositions(db_path: str):
         print(f"[OK] Extracted {len(bigrams):,} unique semantic bigrams (basic)")
         print(f"[OK] Extracted {len(trigrams):,} unique semantic trigrams (basic)")
 
-    # ========== Part 2: Generate DETAILED tables (76 subcategories, v4_hybrid) ==========
-    print("\n[Part 2] Generating DETAILED tables (76 subcategories, v4_hybrid)...")
+    # ========== Part 2: Generate DETAILED tables (53 subcategories, v4) ==========
+    print("\n[Part 2] Generating DETAILED tables (53 subcategories, v4)...")
 
     # Create detailed tables if not exist
     cursor.execute("""
@@ -130,10 +130,10 @@ def step2_analyze_compositions(db_path: str):
     cursor.execute("DELETE FROM semantic_trigrams_detailed")
     conn.commit()
 
-    lexicon_v4 = project_root / 'data' / 'semantic_lexicon_v4_hybrid.json'
+    lexicon_v4 = project_root / 'data' / 'semantic_lexicon_v4.json'
 
     with SemanticCompositionAnalyzer(db_path, lexicon_path=str(lexicon_v4)) as analyzer:
-        print("Extracting semantic compositions (v4_hybrid)...")
+        print("Extracting semantic compositions (v4)...")
         compositions = analyzer.analyze_all_compositions()
 
         # Store bigrams (detailed)
@@ -163,8 +163,8 @@ def step2_analyze_compositions(db_path: str):
             """, (cat1, cat2, cat3, freq, percentage))
 
         conn.commit()
-        print(f"[OK] Extracted {len(bigrams):,} unique semantic bigrams (detailed)")
-        print(f"[OK] Extracted {len(trigrams):,} unique semantic trigrams (detailed)")
+        print(f"[OK] Extracted {len(bigrams):,} unique semantic bigrams (detailed, v4)")
+        print(f"[OK] Extracted {len(trigrams):,} unique semantic trigrams (detailed, v4)")
 
     conn.close()
 
@@ -480,7 +480,7 @@ def step6_extract_village_structures(db_path: str):
 
 
 def step7_generate_semantic_indices_detailed(db_path: str):
-    """Step 7: Generate semantic_indices_detailed using v4_hybrid lexicon (76 subcategories)."""
+    """Step 7: Generate semantic_indices_detailed using v4 lexicon (53 subcategories)."""
     print("\n" + "="*60)
     print("Step 7: Generating semantic_indices_detailed (76 subcategories)")
     print("="*60)
@@ -512,10 +512,10 @@ def step7_generate_semantic_indices_detailed(db_path: str):
     cursor.execute("DELETE FROM semantic_indices_detailed")
     conn.commit()
 
-    # Load v4_hybrid lexicon
-    lexicon_v4 = str(project_root / 'data' / 'semantic_lexicon_v4_hybrid.json')
+    # Load v4 lexicon
+    lexicon_v4 = str(project_root / 'data' / 'semantic_lexicon_v4.json')
     lexicon = SemanticLexicon(lexicon_v4)
-    print(f"Loaded v4_hybrid lexicon: {len(lexicon.list_categories())} categories")
+    print(f"Loaded v4 lexicon: {len(lexicon.list_categories())} categories")
 
     # Load villages
     villages_df = pd.read_sql_query("""
