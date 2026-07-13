@@ -33,6 +33,7 @@ from src.semantic_composition import SemanticCompositionAnalyzer
 from src.semantic_composition_schema import create_semantic_composition_tables
 from src.semantic.lexicon_loader import SemanticLexicon
 from src.semantic.semantic_index import SemanticIndexCalculator
+from src.config.semantic_roles import MODIFIER_CATEGORIES, HEAD_CATEGORIES
 
 
 def step1_create_tables(db_path: str):
@@ -450,10 +451,11 @@ def step6_extract_village_structures(db_path: str):
             sequence_str = json.dumps(sequence)
             sequence_length = len(sequence)
 
-            # Check for specific categories (tokens are "category_detail" format)
-            has_modifier = 1 if any(cat.split('_')[0] in ('size', 'direction', 'number') for cat in sequence) else 0
-            has_head = 1 if any(cat.split('_')[0] in ('water', 'mountain', 'landform', 'vegetation') for cat in sequence) else 0
-            has_settlement = 1 if any(cat.startswith('settlement') for cat in sequence) else 0
+            # Derive flags from shared role config (not hardcoded names)
+            parents = {cat.split('_', 1)[0] for cat in sequence}
+            has_modifier = 1 if parents & MODIFIER_CATEGORIES else 0
+            has_head = 1 if parents & HEAD_CATEGORIES else 0
+            has_settlement = 1 if 'settlement' in parents else 0
 
             insert_cursor.execute("""
                 INSERT OR REPLACE INTO village_semantic_structure
