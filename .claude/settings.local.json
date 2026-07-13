@@ -73,7 +73,13 @@
       "Bash(.venv/bin/python -c \"import py_compile; py_compile.compile\\('run_all_phases.py', doraise=True\\); print\\('OK'\\)\")",
       "Bash(.venv/bin/python *)",
       "Bash(.venv/bin/pip list *)",
-      "Bash(awk '{print $2}')"
+      "Bash(awk '{print $2}')",
+      "Bash(python *)",
+      "Bash(venv/bin/python -c ' *)",
+      "Bash(git checkout *)",
+      "Bash(git *)",
+      "Bash(/Users/jengzang/.local/bin/python3.11 *)",
+      "Bash(python3.11 -c \"import json; d=json.load\\(open\\('data/semantic_lexicon_v1.json'\\)\\); print\\(list\\(d['categories'].keys\\(\\)\\)\\)\")"
     ]
   }
 }
