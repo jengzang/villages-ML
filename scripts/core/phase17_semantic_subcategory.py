@@ -128,10 +128,14 @@ def create_subcategory_tables(conn: sqlite3.Connection):
     print("[OK] 创建表：semantic_subcategory_vtf_global")
 
     # 3. semantic_subcategory_vtf_regional - 区域子类别 VTF
+    cursor.execute("DROP TABLE IF EXISTS semantic_subcategory_vtf_regional")
     cursor.execute("""
-        CREATE TABLE IF NOT EXISTS semantic_subcategory_vtf_regional (
+        CREATE TABLE semantic_subcategory_vtf_regional (
             region_level TEXT NOT NULL,
             region_name TEXT NOT NULL,
+            city TEXT,
+            county TEXT,
+            township TEXT,
             subcategory TEXT NOT NULL,
             parent_category TEXT NOT NULL,
             char_count INTEGER NOT NULL,
@@ -259,11 +263,15 @@ def calculate_subcategory_vtf_regional(conn: sqlite3.Connection):
     print("计算市级/区县级/乡镇级区域...")
     cursor.execute("""
         INSERT INTO semantic_subcategory_vtf_regional
-        (region_level, region_name, subcategory, parent_category,
-         char_count, village_count, vtf, percentage, tendency)
+        (region_level, region_name, city, county, township,
+         subcategory, parent_category, char_count, village_count,
+         vtf, percentage, tendency)
         SELECT
             cra.region_level,
             cra.region_name,
+            MAX(cra.city) as city,
+            MAX(cra.county) as county,
+            MAX(cra.township) as township,
             sl.subcategory,
             sl.parent_category,
             COUNT(DISTINCT sl.char) as char_count,
