@@ -201,39 +201,21 @@ def calculate_subcategory_vtf_global(conn: sqlite3.Connection):
     cursor.execute("DELETE FROM semantic_subcategory_vtf_global")
 
     # 计算每个子类别的 VTF
-    # VTF = 包含该子类别任一字符的村庄数
+    # VTF = 子类别各字符 village_count 之和（与父类 VTF 同口径）
     cursor.execute("""
-        WITH subcategory_chars AS (
-            SELECT subcategory, parent_category, GROUP_CONCAT(char, '') as chars
-            FROM semantic_subcategory_labels
-            GROUP BY subcategory, parent_category
-        ),
-        village_subcategory AS (
-            SELECT
-                sc.subcategory,
-                sc.parent_category,
-                COUNT(DISTINCT v.自然村_规范名) as village_count,
-                COUNT(DISTINCT sl.char) as char_count
-            FROM subcategory_chars sc
-            CROSS JOIN 广东省自然村_预处理 v
-            JOIN semantic_subcategory_labels sl ON sc.subcategory = sl.subcategory
-            WHERE INSTR(v.字符集, sl.char) > 0
-            GROUP BY sc.subcategory, sc.parent_category
-        ),
-        total_villages AS (
-            SELECT COUNT(*) as total FROM 广东省自然村_预处理
-        )
         INSERT INTO semantic_subcategory_vtf_global
         (subcategory, parent_category, char_count, village_count, vtf, percentage)
         SELECT
-            vs.subcategory,
-            vs.parent_category,
-            vs.char_count,
-            vs.village_count,
-            CAST(vs.village_count AS REAL) as vtf,
-            CAST(vs.village_count AS REAL) / tv.total * 100 as percentage
-        FROM village_subcategory vs
-        CROSS JOIN total_villages tv
+            sl.subcategory,
+            sl.parent_category,
+            COUNT(DISTINCT sl.char) as char_count,
+            SUM(cf.village_count) as village_count,
+            CAST(SUM(cf.village_count) AS REAL) as vtf,
+            CAST(SUM(cf.village_count) AS REAL) /
+                (SELECT COUNT(*) FROM 广东省自然村_预处理) * 100 as percentage
+        FROM semantic_subcategory_labels sl
+        JOIN char_frequency_global cf ON sl.char = cf.char
+        GROUP BY sl.subcategory, sl.parent_category
     """)
 
     conn.commit()
@@ -271,143 +253,32 @@ def calculate_subcategory_vtf_regional(conn: sqlite3.Connection):
     # 清空旧数据
     cursor.execute("DELETE FROM semantic_subcategory_vtf_regional")
 
-    # 计算市级区域的子类别 VTF
-    print("计算市级区域...")
+    # 基于 char_regional_analysis 统一计算三级区域子类别 VTF
+    # 与父类 VTF 同口径：SUM(per-char village_count) 而非 COUNT(DISTINCT village)
+    print("计算市级/区县级/乡镇级区域...")
     cursor.execute("""
-        WITH subcategory_chars AS (
-            SELECT subcategory, parent_category, GROUP_CONCAT(char, '') as chars
-            FROM semantic_subcategory_labels
-            GROUP BY subcategory, parent_category
-        ),
-        regional_subcategory AS (
-            SELECT
-                '市级' as region_level,
-                v.市级 as region_name,
-                sc.subcategory,
-                sc.parent_category,
-                COUNT(DISTINCT sl.char) as char_count,
-                COUNT(DISTINCT v.自然村_规范名) as village_count
-            FROM subcategory_chars sc
-            CROSS JOIN 广东省自然村_预处理 v
-            JOIN semantic_subcategory_labels sl ON sc.subcategory = sl.subcategory
-            WHERE INSTR(v.字符集, sl.char) > 0
-            GROUP BY v.市级, sc.subcategory, sc.parent_category
-        ),
-        regional_total AS (
-            SELECT 市级 as region_name, COUNT(*) as total
-            FROM 广东省自然村_预处理
-            GROUP BY 市级
-        ),
-        global_vtf AS (
-            SELECT subcategory, vtf as global_vtf, percentage as global_pct
-            FROM semantic_subcategory_vtf_global
-        )
         INSERT INTO semantic_subcategory_vtf_regional
         (region_level, region_name, subcategory, parent_category,
          char_count, village_count, vtf, percentage, tendency)
         SELECT
-            rs.region_level,
-            rs.region_name,
-            rs.subcategory,
-            rs.parent_category,
-            rs.char_count,
-            rs.village_count,
-            CAST(rs.village_count AS REAL) as vtf,
-            CAST(rs.village_count AS REAL) / rt.total * 100 as percentage,
-            (CAST(rs.village_count AS REAL) / rt.total * 100) - gv.global_pct as tendency
-        FROM regional_subcategory rs
-        JOIN regional_total rt ON rs.region_name = rt.region_name
-        JOIN global_vtf gv ON rs.subcategory = gv.subcategory
-    """)
-
-    conn.commit()
-
-    # 计算区县级区域的子类别 VTF
-    print("计算区县级区域...")
-    cursor.execute("""
-        WITH regional_subcategory AS (
-            SELECT
-                '区县级' as region_level,
-                v.区县级 as region_name,
-                sl.subcategory,
-                sl.parent_category,
-                COUNT(DISTINCT sl.char) as char_count,
-                COUNT(DISTINCT v.自然村_规范名) as village_count
-            FROM 广东省自然村_预处理 v
-            JOIN semantic_subcategory_labels sl
-            WHERE INSTR(v.字符集, sl.char) > 0
-            GROUP BY v.区县级, sl.subcategory, sl.parent_category
-        ),
-        regional_total AS (
-            SELECT 区县级 as region_name, COUNT(*) as total
-            FROM 广东省自然村_预处理
-            GROUP BY 区县级
-        ),
-        global_vtf AS (
+            cra.region_level,
+            cra.region_name,
+            sl.subcategory,
+            sl.parent_category,
+            COUNT(DISTINCT sl.char) as char_count,
+            SUM(cra.village_count) as village_count,
+            CAST(SUM(cra.village_count) AS REAL) as vtf,
+            CAST(SUM(cra.village_count) AS REAL) / MAX(cra.total_villages) * 100 as percentage,
+            (CAST(SUM(cra.village_count) AS REAL) / MAX(cra.total_villages) * 100) - gv.global_pct as tendency
+        FROM semantic_subcategory_labels sl
+        JOIN char_regional_analysis cra ON sl.char = cra.char
+        JOIN (
             SELECT subcategory, percentage as global_pct
             FROM semantic_subcategory_vtf_global
-        )
-        INSERT INTO semantic_subcategory_vtf_regional
-        (region_level, region_name, subcategory, parent_category,
-         char_count, village_count, vtf, percentage, tendency)
-        SELECT
-            rs.region_level,
-            rs.region_name,
-            rs.subcategory,
-            rs.parent_category,
-            rs.char_count,
-            rs.village_count,
-            CAST(rs.village_count AS REAL) as vtf,
-            CAST(rs.village_count AS REAL) / rt.total * 100 as percentage,
-            (CAST(rs.village_count AS REAL) / rt.total * 100) - gv.global_pct as tendency
-        FROM regional_subcategory rs
-        JOIN regional_total rt ON rs.region_name = rt.region_name
-        JOIN global_vtf gv ON rs.subcategory = gv.subcategory
+        ) gv ON sl.subcategory = gv.subcategory
+        GROUP BY cra.region_level, cra.region_name, sl.subcategory, sl.parent_category
     """)
-    conn.commit()
 
-    # 计算乡镇级区域的子类别 VTF
-    print("计算乡镇级区域...")
-    cursor.execute("""
-        WITH regional_subcategory AS (
-            SELECT
-                '乡镇级' as region_level,
-                v.乡镇级 as region_name,
-                sl.subcategory,
-                sl.parent_category,
-                COUNT(DISTINCT sl.char) as char_count,
-                COUNT(DISTINCT v.自然村_规范名) as village_count
-            FROM 广东省自然村_预处理 v
-            JOIN semantic_subcategory_labels sl
-            WHERE INSTR(v.字符集, sl.char) > 0
-            GROUP BY v.乡镇级, sl.subcategory, sl.parent_category
-        ),
-        regional_total AS (
-            SELECT 乡镇级 as region_name, COUNT(*) as total
-            FROM 广东省自然村_预处理
-            GROUP BY 乡镇级
-        ),
-        global_vtf AS (
-            SELECT subcategory, percentage as global_pct
-            FROM semantic_subcategory_vtf_global
-        )
-        INSERT INTO semantic_subcategory_vtf_regional
-        (region_level, region_name, subcategory, parent_category,
-         char_count, village_count, vtf, percentage, tendency)
-        SELECT
-            rs.region_level,
-            rs.region_name,
-            rs.subcategory,
-            rs.parent_category,
-            rs.char_count,
-            rs.village_count,
-            CAST(rs.village_count AS REAL) as vtf,
-            CAST(rs.village_count AS REAL) / rt.total * 100 as percentage,
-            (CAST(rs.village_count AS REAL) / rt.total * 100) - gv.global_pct as tendency
-        FROM regional_subcategory rs
-        JOIN regional_total rt ON rs.region_name = rt.region_name
-        JOIN global_vtf gv ON rs.subcategory = gv.subcategory
-    """)
     conn.commit()
 
     # 统计结果
