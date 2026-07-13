@@ -41,24 +41,52 @@ def load_lexicon(path: Path) -> Dict:
 def flatten_v4_subcategories(v4: Dict) -> List[Tuple[str, str, str]]:
     """Flatten nested v4 format {parent: {sub: [chars]}} into (parent_sub, parent, char) tuples.
 
-    Chars appearing in multiple subcategories are deduplicated (first-wins).
+    Within a parent, a char in multiple subcategories gets ALL entries
+    (e.g. 关 → both clan_cantonese and clan_teochew).
+    Cross-parent duplicates: first parent wins, then multi_label entries
+    add secondary parent subcategory mappings (e.g. 坑 → terrain_valley + water_stream).
     """
-    seen: set = set()
+    seen_parent: set = set()
+    char_first_parent: dict = {}
     result = []
     categories = v4.get("categories", {})
+
     for parent, children in categories.items():
         if isinstance(children, dict):
+            char_subs: dict = {}
             for sub, chars in children.items():
-                label = f'{parent}_{sub}'
                 for char in chars:
-                    if char not in seen:
-                        seen.add(char)
-                        result.append((label, parent, char))
+                    char_subs.setdefault(char, []).append(sub)
+            for char, subs in char_subs.items():
+                if char in seen_parent:
+                    continue
+                seen_parent.add(char)
+                char_first_parent[char] = parent
+                for sub in subs:
+                    result.append((f'{parent}_{sub}', parent, char))
         else:
             for char in children:
-                if char not in seen:
-                    seen.add(char)
-                    result.append((parent, parent, char))
+                if char in seen_parent:
+                    continue
+                seen_parent.add(char)
+                char_first_parent[char] = parent
+                result.append((parent, parent, char))
+
+    # Add secondary parent entries from multi_label
+    multi = v4.get('multi_label', {})
+    for char, parents in multi.items():
+        first = char_first_parent.get(char)
+        if first is None:
+            continue
+        for parent in parents:
+            if parent == first:
+                continue
+            children = categories.get(parent, {})
+            if isinstance(children, dict):
+                for sub, chars in children.items():
+                    if char in chars:
+                        result.append((f'{parent}_{sub}', parent, char))
+
     return result
 
 
@@ -71,14 +99,16 @@ def create_subcategory_tables(conn: sqlite3.Connection):
     cursor = conn.cursor()
 
     # 1. semantic_subcategory_labels - 字符到子类别映射
+    cursor.execute("DROP TABLE IF EXISTS semantic_subcategory_labels")
     cursor.execute("""
-        CREATE TABLE IF NOT EXISTS semantic_subcategory_labels (
-            char TEXT PRIMARY KEY,
+        CREATE TABLE semantic_subcategory_labels (
+            char TEXT NOT NULL,
             parent_category TEXT NOT NULL,
             subcategory TEXT NOT NULL,
             confidence REAL DEFAULT 1.0,
             labeling_method TEXT DEFAULT 'manual',
-            created_at REAL DEFAULT (julianday('now'))
+            created_at REAL DEFAULT (julianday('now')),
+            PRIMARY KEY (char, subcategory)
         )
     """)
     print("[OK] 创建表：semantic_subcategory_labels")
