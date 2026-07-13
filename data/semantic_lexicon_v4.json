@@ -1,7 +1,7 @@
 {
-  "version": "4.6.0",
+  "version": "4.8.0",
   "created_at": "2026-07-13",
-  "description": "Hierarchical semantic lexicon - 9 parents, 51 subcategories, 491 chars. +陶磨灶砖(craft) +礼善顺忠(virtue). Derived from v1.13.0.",
+  "description": "Hierarchical semantic lexicon - 9 parents, 53 subcategories, 498 chars. +岸泮(shore_island) +闸涵(ditch) +埂垅埒(farming_infra). Derived from v1.14.0.",
   "multi_label": {
     "兴": ["culture", "modifier"],
     "冲": ["terrain", "water"],
@@ -46,19 +46,24 @@
       ]
     },
     "water": {
-      "river_stream": [
-          "江", "河", "溪", "涌", "沥", "沟", "圳", "涧", "洪", "流",
-          "坑", "冲", "渠"
+      "river": [
+          "江", "河", "洪", "流"
+      ],
+      "stream": [
+          "溪", "涧", "坑", "冲", "涌", "滘"
+      ],
+      "ditch": [
+          "沥", "沟", "圳", "渠", "闸", "涵"
       ],
       "pond_lake": [
           "塘", "湖", "潭", "池", "泊", "淀", "淤"
       ],
       "bay_port": [
-          "港", "湾", "浦", "滘", "濠", "津", "渡", "潮", "浪", "澳",
+          "港", "湾", "浦", "濠", "津", "渡", "潮", "浪", "澳",
           "海", "洋"
       ],
       "shore_island": [
-          "洲", "滩", "滨", "汀", "渚", "沿"
+          "洲", "滩", "滨", "汀", "渚", "沿", "岸", "泮"
       ],
       "water_source": [
           "泉", "井", "水", "源"
@@ -173,7 +178,7 @@
           "畜", "牧", "蜂", "蚕", "栏"
       ],
       "farming_infra": [
-          "农", "耕", "仓", "堤", "陂", "那", "垄", "基", "斗"
+          "农", "耕", "仓", "堤", "陂", "那", "垄", "基", "斗", "埂", "垅", "埒"
       ]
     },
     "vegetation": {

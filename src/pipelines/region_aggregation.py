@@ -55,6 +55,9 @@ def compute_region_aggregates(
 
     logger.info(f"Loaded {len(df)} village features")
 
+    from src.semantic.lexicon_loader import SemanticLexicon
+    lexicon = SemanticLexicon('data/semantic_lexicon_v1.json')
+
     # Group by region
     aggregates = []
 
@@ -73,9 +76,6 @@ def compute_region_aggregates(
         agg['avg_name_length'] = group['name_length'].mean()
 
         # Semantic tag counts and percentages
-        from src.semantic.lexicon_loader import SemanticLexicon
-        lexicon = SemanticLexicon('data/semantic_lexicon_v1.json')
-
         for cat in lexicon.list_categories():
             col_name = f'sem_{cat}'
             agg[f'{col_name}_count'] = group[col_name].sum()
