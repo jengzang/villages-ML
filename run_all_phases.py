@@ -421,7 +421,7 @@ PHASES = {
         "group": "core",
         "dependencies": [0, 2],
         "estimated_time": "25-50 min",
-        "output_tables": ["village_spatial_features", "spatial_clusters", "spatial_hotspots", "region_spatial_aggregates", "spatial_tendency_integration"],
+        "output_tables": ["village_spatial_features", "spatial_clusters", "village_cluster_assignments", "spatial_hotspots", "region_spatial_aggregates", "spatial_tendency_integration"],
         "critical": True,
         "use_run_id": False
     },
@@ -534,7 +534,12 @@ PHASES = {
         "script": "scripts/core/generate_spatial_features.py",
         "args": [
             "--db-path", "data/villages.db",
-            "--mode", "hotspots"
+            "--mode", "hotspots",
+            "--hotspot-bandwidth-km", "6.0",
+            "--hotspot-threshold-percentile", "80.0",
+            "--hotspot-cluster-eps-km", "1.0",
+            "--hotspot-cluster-min-samples", "10",
+            "--hotspot-sample-size", "0"
         ],
         "description": "KDE-based hotspot detection (8 hotspot regions)",
         "description_zh": "基于KDE的热点检测（8个热点区域）",
@@ -645,7 +650,7 @@ def _sync_active_run_ids(db_path, phase_id, run_id, output_run_id):
         elif phase_id == 3 and output_run_id:
             upsert_active_run_id(conn, 'semantic_indices', output_run_id, 'semantic_indices')
         elif phase_id == 4:
-            upsert_active_run_id(conn, 'spatial_clusters', 'spatial_eps_20', 'spatial_clusters')
+            upsert_active_run_id(conn, 'spatial_clusters', 'spatial_eps_25', 'spatial_clusters')
             upsert_active_run_id(conn, 'spatial_integration', 'spatial_multi_tendency', 'spatial_tendency_integration')
         elif phase_id == 5 and run_id:
             upsert_active_run_id(conn, 'village_features', run_id, 'village_features')

@@ -181,6 +181,21 @@ def write_results_to_db(
     # 2. 写入村庄聚类分配到 village_cluster_assignments 表
     logger.info(f"  写入村庄聚类分配...")
 
+    # 确保表存在
+    conn.execute('''
+        CREATE TABLE IF NOT EXISTS village_cluster_assignments (
+            run_id TEXT NOT NULL,
+            village_id TEXT NOT NULL,
+            cluster_id INTEGER NOT NULL,
+            cluster_size INTEGER,
+            cluster_probability REAL,
+            created_at REAL NOT NULL,
+            PRIMARY KEY (run_id, village_id)
+        )
+    ''')
+    conn.execute('CREATE INDEX IF NOT EXISTS idx_vca_run_id ON village_cluster_assignments(run_id)')
+    conn.execute('CREATE INDEX IF NOT EXISTS idx_vca_cluster_id ON village_cluster_assignments(run_id, cluster_id)')
+
     # 准备数据
     village_assignments = []
     created_at = time.time()

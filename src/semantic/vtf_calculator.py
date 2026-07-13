@@ -36,6 +36,7 @@ class VTFCalculator:
               - vtf_count (sum of village_count for chars in category)
               - total_villages
               - frequency (vtf_count / total_villages)
+              - char_count (number of distinct chars in category)
               - rank
         """
         # Get total villages (should be same for all rows)
@@ -61,7 +62,8 @@ class VTFCalculator:
                 'category': category,
                 'vtf_count': int(vtf_count),
                 'total_villages': int(total_villages),
-                'frequency': float(frequency)
+                'frequency': float(frequency),
+                'char_count': len(category_chars)
             })
 
         # Create DataFrame

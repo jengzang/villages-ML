@@ -27,8 +27,8 @@ from src.pipelines.spatial_pipeline import run_spatial_analysis_pipeline
 MULTI_RESOLUTION_CONFIGS = [
     {"run_id": "spatial_eps_05",      "eps_km": 0.5,  "min_samples": 15, "method": "dbscan"},
     {"run_id": "spatial_eps_15",      "eps_km": 1.5,  "min_samples": 25, "method": "dbscan"},
-    {"run_id": "spatial_eps_30",      "eps_km": 3.0,  "min_samples": 35, "method": "dbscan"},
-    {"run_id": "spatial_eps_50",      "eps_km": 5.0,  "min_samples": 50, "method": "dbscan"},
+    {"run_id": "spatial_eps_25",      "eps_km": 2.5,  "min_samples": 60, "method": "dbscan"},
+    {"run_id": "spatial_eps_45",      "eps_km": 4.5,  "min_samples": 100, "method": "dbscan"},
     {"run_id": "spatial_hdbscan_v2",  "eps_km": 0.0,  "min_samples": 35, "method": "hdbscan"},
 ]
 
@@ -177,7 +177,6 @@ Examples:
                 )
                 logger.info(f"Config {cfg['run_id']} complete: "
                            f"{stats['n_clusters']} clusters, "
-                           f"{stats['n_hotspots']} hotspots, "
                            f"{stats['elapsed_time']:.1f}s")
             except Exception as e:
                 logger.error(f"Config {cfg['run_id']} failed: {e}", exc_info=True)
@@ -242,7 +241,6 @@ Examples:
             logger.info(f"Results saved with run_id: {args.run_id}")
             logger.info(f"Villages analyzed: {stats['n_villages']}")
             logger.info(f"Spatial clusters: {stats['n_clusters']}")
-            logger.info(f"Hotspots detected: {stats['n_hotspots']}")
             logger.info(f"Elapsed time: {stats['elapsed_time']:.1f}s")
 
             # Optional: run spatial-tendency integration

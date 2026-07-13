@@ -222,6 +222,7 @@ python run_all_phases.py --phases 0
 - `semantic_vtf_global`：语义虚拟词频
 - `village_features`：村庄级特征（230+ 维）
 - `spatial_clusters`：多分辨率空间聚类结果
+- `village_cluster_assignments`：每村聚类分配（Phase 4 产出，后端 /village/complete 依赖）
 - `cluster_assignments` / `cluster_profiles`：区县聚类结果
 - `ngram_frequency`：N-gram 频率
 - `region_similarity`：区域相似度矩阵
