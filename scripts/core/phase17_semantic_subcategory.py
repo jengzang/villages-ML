@@ -212,7 +212,7 @@ def calculate_subcategory_vtf_global(conn: sqlite3.Connection):
             SUM(cf.village_count) as village_count,
             CAST(SUM(cf.village_count) AS REAL) as vtf,
             CAST(SUM(cf.village_count) AS REAL) /
-                (SELECT COUNT(*) FROM 广东省自然村_预处理) * 100 as percentage
+                (SELECT COUNT(*) FROM 广东省自然村_预处理) as percentage
         FROM semantic_subcategory_labels sl
         JOIN char_frequency_global cf ON sl.char = cf.char
         GROUP BY sl.subcategory, sl.parent_category
@@ -229,12 +229,12 @@ def calculate_subcategory_vtf_global(conn: sqlite3.Connection):
     """)
 
     print("\n全局子类别 VTF 统计：")
-    print(f"{'子类别':<25} {'父类别':<12} {'字符数':<8} {'村庄数':<10} {'VTF':<10} {'占比%':<8}")
+    print(f"{'子类别':<25} {'父类别':<12} {'字符数':<8} {'村庄数':<10} {'VTF':<10} {'频率':<10}")
     print("-" * 85)
 
     for row in cursor.fetchall():
         subcat, parent, char_count, village_count, vtf, pct = row
-        print(f"{subcat:<25} {parent:<12} {char_count:<8} {village_count:<10} {vtf:<10.0f} {pct:<8.2f}")
+        print(f"{subcat:<25} {parent:<12} {char_count:<8} {village_count:<10} {vtf:<10.0f} {pct:<10.4f}")
 
     # 统计总数
     cursor.execute("SELECT COUNT(*) FROM semantic_subcategory_vtf_global")
@@ -268,8 +268,8 @@ def calculate_subcategory_vtf_regional(conn: sqlite3.Connection):
             COUNT(DISTINCT sl.char) as char_count,
             SUM(cra.village_count) as village_count,
             CAST(SUM(cra.village_count) AS REAL) as vtf,
-            CAST(SUM(cra.village_count) AS REAL) / MAX(cra.total_villages) * 100 as percentage,
-            (CAST(SUM(cra.village_count) AS REAL) / MAX(cra.total_villages) * 100) - gv.global_pct as tendency
+            CAST(SUM(cra.village_count) AS REAL) / MAX(cra.total_villages) as percentage,
+            (CAST(SUM(cra.village_count) AS REAL) / MAX(cra.total_villages)) - gv.global_pct as tendency
         FROM semantic_subcategory_labels sl
         JOIN char_regional_analysis cra ON sl.char = cra.char
         JOIN (
