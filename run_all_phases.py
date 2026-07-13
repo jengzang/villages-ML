@@ -534,7 +534,11 @@ PHASES = {
         "script": "scripts/core/generate_spatial_features.py",
         "args": [
             "--db-path", "data/villages.db",
-            "--mode", "hotspots"
+            "--mode", "hotspots",
+            "--hotspot-bandwidth-km", "10.0",
+            "--hotspot-threshold-percentile", "75.0",
+            "--hotspot-cluster-eps-km", "5.0",
+            "--hotspot-cluster-min-samples", "10"
         ],
         "description": "KDE-based hotspot detection (8 hotspot regions)",
         "description_zh": "基于KDE的热点检测（8个热点区域）",
