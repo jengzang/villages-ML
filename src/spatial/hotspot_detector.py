@@ -164,13 +164,12 @@ class HotspotDetector:
             core_radius_km = radius_deg * 111  # Rough conversion
 
             if full_coords is not None:
-                count_radius_deg = self.full_count_radius_km / 111.0
                 full_distances = np.sqrt(
                     (full_coords[:, 0] - center_lat)**2 +
                     (full_coords[:, 1] - center_lon)**2
                 )
-                village_count = int((full_distances <= count_radius_deg).sum())
-                radius_km = self.full_count_radius_km
+                village_count = int((full_distances <= radius_deg).sum())
+                radius_km = core_radius_km
             else:
                 village_count = len(cluster_df)
                 radius_km = core_radius_km
