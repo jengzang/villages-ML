@@ -113,16 +113,25 @@ class SemanticLexicon:
 
         return result
 
+    def _is_hierarchical(self) -> bool:
+        """Check if lexicon uses nested {parent: {sub: [chars]}} format."""
+        return isinstance(next(iter(self.categories.values()), None), dict)
+
     def get_lexicon(self, category: str) -> List[str]:
         """
-        Get all characters in a category.
+        Get all characters in a category. Supports parent_sub format for v4.
 
         Args:
-            category: Category name
+            category: Category name (e.g. 'terrain' or 'terrain_peak_ridge')
 
         Returns:
             List of characters in the category
         """
+        if self._is_hierarchical() and '_' in category:
+            parent, sub = category.split('_', 1)
+            parent_data = self.categories.get(parent, {})
+            if isinstance(parent_data, dict):
+                return parent_data.get(sub, [])
         return self._flat_categories.get(category, [])
 
     def list_categories(self) -> List[str]:
@@ -132,6 +141,25 @@ class SemanticLexicon:
         Returns:
             List of category names
         """
+        return list(self.categories.keys())
+
+    def list_subcategories(self) -> List[str]:
+        """
+        List all subcategories in parent_sub format.
+
+        For v4 hierarchical lexicons, returns names like
+        'terrain_peak_ridge', 'water_river', etc.
+        For flat lexicons (v1/v3), returns same as list_categories().
+
+        Returns:
+            List of category/subcategory names
+        """
+        if self._is_hierarchical():
+            result = []
+            for parent, subcats in self.categories.items():
+                for sub in subcats:
+                    result.append(f'{parent}_{sub}')
+            return result
         return list(self.categories.keys())
 
     def get_column_names(self, prefix: str = "sem_", suffix: str = "") -> List[str]:
@@ -149,7 +177,7 @@ class SemanticLexicon:
 
     def get_category_size(self, category: str) -> int:
         """
-        Get number of characters in a category.
+        Get number of characters in a category. Supports parent_sub format.
 
         Args:
             category: Category name
@@ -157,6 +185,11 @@ class SemanticLexicon:
         Returns:
             Number of characters
         """
+        if self._is_hierarchical() and '_' in category:
+            parent, sub = category.split('_', 1)
+            parent_data = self.categories.get(parent, {})
+            if isinstance(parent_data, dict):
+                return len(parent_data.get(sub, []))
         return len(self._flat_categories.get(category, []))
 
     def __repr__(self) -> str:

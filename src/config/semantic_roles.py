@@ -67,7 +67,6 @@ HEAD_CATEGORIES: Set[str] = {
 # ---------------------------------------------------------------------------
 INCOMPATIBLE_PAIRS: List[Tuple[str, str]] = [
     ("water", "terrain"),
-    ("water", "mountain"),
 ]
 
 

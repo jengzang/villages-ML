@@ -362,25 +362,31 @@ def step4_detect_patterns(db_path: str):
 
 
 def step5_detect_conflicts(db_path: str):
-    """Step 5: Detect semantic conflicts."""
+    """Step 5: Detect semantic conflicts — basic (v1) and detailed (v4)."""
     print("\n" + "="*60)
-    print("Step 5: Detecting Semantic Conflicts")
+    print("Step 5: Detecting Semantic Conflicts (Dual Version)")
     print("="*60)
 
     conn = sqlite3.connect(db_path)
     cursor = conn.cursor()
 
-    with SemanticCompositionAnalyzer(db_path) as analyzer:
-        # Get all sequences
+    # ========== Part 1: BASIC conflicts (v1, 9 parent categories) ==========
+    print("\n[Part 1] Detecting BASIC conflicts (v1, 9 categories)...")
+
+    cursor.execute("DELETE FROM semantic_conflicts")
+    conn.commit()
+
+    lexicon_v1 = str(project_root / 'data' / 'semantic_lexicon_v1.json')
+
+    with SemanticCompositionAnalyzer(db_path, lexicon_path=lexicon_v1) as analyzer:
         compositions = analyzer.analyze_all_compositions()
         sequences = compositions['sequences']
 
-        print("\nDetecting unusual combinations...")
+        print("Detecting unusual combinations (v1)...")
         conflicts = analyzer.detect_semantic_conflicts(sequences, threshold=5)
 
         for conflict in conflicts:
             sequence_str = json.dumps(conflict['sequence'])
-
             cursor.execute("""
                 INSERT OR REPLACE INTO semantic_conflicts
                 (sequence, frequency, conflict_type, description)
@@ -393,7 +399,49 @@ def step5_detect_conflicts(db_path: str):
             ))
 
         conn.commit()
-        print(f"[OK] Found {len(conflicts):,} unusual combinations")
+        print(f"[OK] Found {len(conflicts):,} unusual combinations (basic)")
+
+    # ========== Part 2: DETAILED conflicts (v4, 53 subcategories) ==========
+    print("\n[Part 2] Detecting DETAILED conflicts (v4, 53 subcategories)...")
+
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS semantic_conflicts_detailed (
+            sequence TEXT NOT NULL,
+            frequency INTEGER NOT NULL,
+            conflict_type TEXT NOT NULL,
+            description TEXT,
+            PRIMARY KEY (sequence, conflict_type)
+        )
+    """)
+    conn.commit()
+
+    cursor.execute("DELETE FROM semantic_conflicts_detailed")
+    conn.commit()
+
+    lexicon_v4 = str(project_root / 'data' / 'semantic_lexicon_v4.json')
+
+    with SemanticCompositionAnalyzer(db_path, lexicon_path=lexicon_v4) as analyzer:
+        compositions = analyzer.analyze_all_compositions()
+        sequences = compositions['sequences']
+
+        print("Detecting unusual combinations (v4)...")
+        conflicts = analyzer.detect_semantic_conflicts(sequences, threshold=5)
+
+        for conflict in conflicts:
+            sequence_str = json.dumps(conflict['sequence'])
+            cursor.execute("""
+                INSERT OR REPLACE INTO semantic_conflicts_detailed
+                (sequence, frequency, conflict_type, description)
+                VALUES (?, ?, ?, ?)
+            """, (
+                sequence_str,
+                conflict['frequency'],
+                conflict['conflict_type'],
+                conflict['description']
+            ))
+
+        conn.commit()
+        print(f"[OK] Found {len(conflicts):,} unusual combinations (detailed, v4)")
 
     conn.close()
 
@@ -407,11 +455,11 @@ def step6_extract_village_structures(db_path: str):
     conn = sqlite3.connect(db_path)
     cursor = conn.cursor()
 
-    with SemanticCompositionAnalyzer(db_path) as analyzer:
+    lexicon_v1 = str(project_root / 'data' / 'semantic_lexicon_v1.json')
+
+    with SemanticCompositionAnalyzer(db_path, lexicon_path=lexicon_v1) as analyzer:
         char_labels = analyzer.get_character_labels()
 
-        # Query from preprocessed table to get village_id
-        # Fetch all rows first to avoid cursor issues
         cursor.execute("""
             SELECT village_id, 村委会, 自然村_去前缀
             FROM 广东省自然村_预处理

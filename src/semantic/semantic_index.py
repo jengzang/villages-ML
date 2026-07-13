@@ -29,7 +29,11 @@ class SemanticIndexCalculator:
         For village i:
         semantic_score_i(C) = |S_i ∩ Lexicon_C|
 
-        Where S_i = set of unique characters in village name
+        Where S_i = set of unique characters in village name.
+
+        For hierarchical lexicons (v4), iterates subcategories
+        (e.g. 'water_river', 'water_ditch').  For flat lexicons
+        (v1/v3), iterates parent categories.
 
         Args:
             villages_df: DataFrame with columns: 自然村, 市级 (or 县区级, 乡镇)
@@ -37,34 +41,22 @@ class SemanticIndexCalculator:
                          Or: city, county, township (English names)
 
         Returns:
-            DataFrame with columns:
-              - village_name
-              - region_name
-              - city (if available)
-              - county (if available)
-              - township (if available)
-              - mountain_score
-              - water_score
-              - settlement_score
-              - direction_score
-              - clan_score
-              - symbolic_score
-              - agriculture_score
-              - vegetation_score
-              - infrastructure_score
+            DataFrame with semantic scores per category
         """
         results = []
 
+        # Choose category iteration: subcategories for v4, parents for flat
+        if self.lexicon._is_hierarchical():
+            categories = self.lexicon.list_subcategories()
+        else:
+            categories = self.lexicon.list_categories()
+
         for _, row in villages_df.iterrows():
             village_name = row['自然村']
-
-            # Get unique characters in village name
             unique_chars = set(village_name)
 
-            # Calculate score for each category
             scores = {'village_name': village_name}
 
-            # Preserve full hierarchy if available (support both Chinese and English column names)
             if 'city' in row:
                 scores['city'] = row['city']
             elif '市级' in row:
@@ -80,7 +72,7 @@ class SemanticIndexCalculator:
             elif '乡镇级' in row:
                 scores['township'] = row['乡镇级']
 
-            # Determine region_name (for backward compatibility)
+            # Determine region_name
             if 'city' in scores:
                 scores['region_name'] = scores['city']
             elif 'county' in scores:
@@ -96,10 +88,8 @@ class SemanticIndexCalculator:
             else:
                 scores['region_name'] = 'unknown'
 
-            # Calculate scores for each category
-            for category in self.lexicon.list_categories():
+            for category in categories:
                 category_chars = set(self.lexicon.get_lexicon(category))
-                # Count intersection
                 score = len(unique_chars & category_chars)
                 scores[f'{category}_score'] = score
 

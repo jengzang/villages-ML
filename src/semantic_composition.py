@@ -37,12 +37,11 @@ class SemanticCompositionAnalyzer:
     When you change a lexicon, update the config; no code changes needed.
     """
 
-    def __init__(self, db_path: str = 'data/villages.db', lexicon_path: str = 'data/semantic_lexicon_v3_expanded.json'):
+    def __init__(self, db_path: str = 'data/villages.db', lexicon_path: str = 'data/semantic_lexicon_v4.json'):
         """
         Initialize SemanticCompositionAnalyzer.
 
-        HARDCODED: Uses v3_expanded lexicon (78 subcategories) for fine-grained analysis.
-        This matches the semantic_bigrams table structure.
+        Defaults to v4 lexicon (53 subcategories) for fine-grained analysis.
         """
         self.db_path = db_path
         self.lexicon_path = lexicon_path
