@@ -535,9 +535,9 @@ PHASES = {
         "args": [
             "--db-path", "data/villages.db",
             "--mode", "hotspots",
-            "--hotspot-bandwidth-km", "20.0",
-            "--hotspot-threshold-percentile", "65.0",
-            "--hotspot-cluster-eps-km", "3.0",
+            "--hotspot-bandwidth-km", "8.0",
+            "--hotspot-threshold-percentile", "80.0",
+            "--hotspot-cluster-eps-km", "1.5",
             "--hotspot-cluster-min-samples", "10",
             "--hotspot-sample-size", "0"
         ],
