@@ -538,7 +538,9 @@ PHASES = {
             "--hotspot-bandwidth-km", "20.0",
             "--hotspot-threshold-percentile", "50.0",
             "--hotspot-cluster-eps-km", "15.0",
-            "--hotspot-cluster-min-samples", "5"
+            "--hotspot-cluster-min-samples", "5",
+            "--hotspot-sample-size", "0",
+            "--hotspot-full-count-radius-km", "20.0"
         ],
         "description": "KDE-based hotspot detection (8 hotspot regions)",
         "description_zh": "基于KDE的热点检测（8个热点区域）",
