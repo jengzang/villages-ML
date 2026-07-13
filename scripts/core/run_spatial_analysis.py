@@ -177,7 +177,6 @@ Examples:
                 )
                 logger.info(f"Config {cfg['run_id']} complete: "
                            f"{stats['n_clusters']} clusters, "
-                           f"{stats['n_hotspots']} hotspots, "
                            f"{stats['elapsed_time']:.1f}s")
             except Exception as e:
                 logger.error(f"Config {cfg['run_id']} failed: {e}", exc_info=True)
@@ -242,7 +241,6 @@ Examples:
             logger.info(f"Results saved with run_id: {args.run_id}")
             logger.info(f"Villages analyzed: {stats['n_villages']}")
             logger.info(f"Spatial clusters: {stats['n_clusters']}")
-            logger.info(f"Hotspots detected: {stats['n_hotspots']}")
             logger.info(f"Elapsed time: {stats['elapsed_time']:.1f}s")
 
             # Optional: run spatial-tendency integration
