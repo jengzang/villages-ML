@@ -25,11 +25,11 @@ from src.pipelines.spatial_pipeline import run_spatial_analysis_pipeline
 
 # Predefined multi-resolution configurations
 MULTI_RESOLUTION_CONFIGS = [
-    {"run_id": "spatial_eps_03",     "eps_km": 0.3,  "min_samples": 5, "method": "dbscan"},
-    {"run_id": "spatial_eps_10",     "eps_km": 10.0, "min_samples": 5, "method": "dbscan"},
-    {"run_id": "spatial_eps_20",     "eps_km": 20.0, "min_samples": 5, "method": "dbscan"},
-    {"run_id": "spatial_hdbscan_v1", "eps_km": 0.0,  "min_samples": 5, "method": "hdbscan"},
-    {"run_id": "spatial_v2",         "eps_km": 0.5,  "min_samples": 5, "method": "dbscan"},
+    {"run_id": "spatial_eps_05",      "eps_km": 0.5,  "min_samples": 15, "method": "dbscan"},
+    {"run_id": "spatial_eps_15",      "eps_km": 1.5,  "min_samples": 25, "method": "dbscan"},
+    {"run_id": "spatial_eps_30",      "eps_km": 3.0,  "min_samples": 35, "method": "dbscan"},
+    {"run_id": "spatial_eps_50",      "eps_km": 5.0,  "min_samples": 50, "method": "dbscan"},
+    {"run_id": "spatial_hdbscan_v2",  "eps_km": 0.0,  "min_samples": 35, "method": "hdbscan"},
 ]
 
 
