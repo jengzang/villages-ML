@@ -23,6 +23,7 @@ from src.data.db_writer import (
     create_spatial_analysis_indexes,
     write_spatial_features,
     write_spatial_clusters,
+    write_village_cluster_assignments,
     write_region_spatial_aggregates
 )
 
@@ -155,6 +156,11 @@ def run_spatial_analysis_pipeline(
 
         write_spatial_features(conn, run_id, features_df)
         write_spatial_clusters(conn, run_id, clusters_df)
+
+        # Build village cluster assignments from labels
+        probabilities = getattr(clusterer.model, 'probabilities_', None)
+        write_village_cluster_assignments(conn, run_id, coords_df, labels, probabilities, clusters_df)
+
         write_region_spatial_aggregates(conn, run_id, aggregates_df)
 
         conn.commit()

@@ -1484,9 +1484,10 @@ def create_spatial_analysis_tables(conn: sqlite3.Connection) -> None:
     """
     Create spatial analysis tables if they don't exist.
 
-    Creates 4 tables:
+    Creates 5 tables:
     - village_spatial_features: Per-village spatial features
     - spatial_clusters: Spatial cluster profiles
+    - village_cluster_assignments: Per-village cluster assignments
     - spatial_hotspots: Detected spatial hotspots
     - region_spatial_aggregates: Regional spatial aggregates
 
@@ -1536,7 +1537,20 @@ def create_spatial_analysis_tables(conn: sqlite3.Connection) -> None:
         )
     """)
 
-    # Table 3: spatial_hotspots
+    # Table 3: village_cluster_assignments
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS village_cluster_assignments (
+            run_id TEXT NOT NULL,
+            village_id TEXT NOT NULL,
+            cluster_id INTEGER NOT NULL,
+            cluster_size INTEGER,
+            cluster_probability REAL,
+            created_at REAL NOT NULL,
+            PRIMARY KEY (run_id, village_id)
+        )
+    """)
+
+    # Table 4: spatial_hotspots
     cursor.execute("""
         CREATE TABLE IF NOT EXISTS spatial_hotspots (
             run_id TEXT NOT NULL,
@@ -1596,6 +1610,10 @@ def create_spatial_analysis_indexes(conn: sqlite3.Connection) -> None:
 
     # Indexes for spatial_clusters
     cursor.execute("CREATE INDEX IF NOT EXISTS idx_spatial_clusters_run_id ON spatial_clusters(run_id)")
+
+    # Indexes for village_cluster_assignments
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_vca_run_id ON village_cluster_assignments(run_id)")
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_vca_cluster_id ON village_cluster_assignments(run_id, cluster_id)")
 
     # Indexes for spatial_hotspots
     cursor.execute("CREATE INDEX IF NOT EXISTS idx_spatial_hotspots_run_id ON spatial_hotspots(run_id)")
@@ -1779,6 +1797,65 @@ def write_spatial_clusters(conn: sqlite3.Connection, run_id: str, clusters_df: p
     clusters_df[columns].to_sql('spatial_clusters', conn, if_exists='append', index=False)
 
     logger.info("Spatial clusters written successfully")
+
+
+def write_village_cluster_assignments(
+    conn: sqlite3.Connection,
+    run_id: str,
+    coords_df: pd.DataFrame,
+    labels: np.ndarray,
+    probabilities: np.ndarray,
+    cluster_profiles: pd.DataFrame
+) -> None:
+    """
+    Write per-village cluster assignments to village_cluster_assignments table.
+
+    Args:
+        conn: SQLite database connection
+        run_id: Unique run identifier
+        coords_df: DataFrame with village_id column
+        labels: Cluster labels array (n_villages,)
+        probabilities: Cluster probabilities array (n_villages,) or None
+        cluster_profiles: DataFrame with cluster_id and cluster_size columns
+    """
+    import time
+
+    logger.info(f"Writing village cluster assignments to database")
+
+    cursor = conn.cursor()
+    cursor.execute("DELETE FROM village_cluster_assignments WHERE run_id = ?", (run_id,))
+    conn.commit()
+
+    village_assignments = []
+    created_at = time.time()
+
+    cluster_size_map = {}
+    if 'cluster_id' in cluster_profiles.columns and 'cluster_size' in cluster_profiles.columns:
+        for _, row in cluster_profiles.iterrows():
+            cluster_size_map[int(row['cluster_id'])] = int(row['cluster_size'])
+
+    for idx, (_, row) in enumerate(coords_df.iterrows()):
+        cluster_id = int(labels[idx])
+        if cluster_id < 0:
+            continue
+
+        prob = float(probabilities[idx]) if probabilities is not None else 1.0
+
+        village_assignments.append({
+            'run_id': run_id,
+            'village_id': str(row['village_id']),
+            'cluster_id': cluster_id,
+            'cluster_size': cluster_size_map.get(cluster_id),
+            'cluster_probability': prob,
+            'created_at': created_at
+        })
+
+    if village_assignments:
+        assignments_df = pd.DataFrame(village_assignments)
+        assignments_df.to_sql('village_cluster_assignments', conn, if_exists='append', index=False)
+        logger.info(f"  Wrote {len(village_assignments)} village cluster assignments")
+
+    conn.commit()
 
 
 def write_spatial_hotspots(conn: sqlite3.Connection, run_id: str, hotspots_df: pd.DataFrame) -> None:

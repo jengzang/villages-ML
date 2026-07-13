@@ -421,7 +421,7 @@ PHASES = {
         "group": "core",
         "dependencies": [0, 2],
         "estimated_time": "25-50 min",
-        "output_tables": ["village_spatial_features", "spatial_clusters", "spatial_hotspots", "region_spatial_aggregates", "spatial_tendency_integration"],
+        "output_tables": ["village_spatial_features", "spatial_clusters", "village_cluster_assignments", "spatial_hotspots", "region_spatial_aggregates", "spatial_tendency_integration"],
         "critical": True,
         "use_run_id": False
     },
