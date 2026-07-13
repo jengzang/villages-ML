@@ -18,9 +18,24 @@ from collections import Counter, defaultdict
 import numpy as np
 from scipy import stats
 
+from src.config.semantic_roles import (
+    MODIFIER_CATEGORIES,
+    HEAD_CATEGORIES,
+    INCOMPATIBLE_PAIRS,
+)
+
 
 class SemanticCompositionAnalyzer:
-    """Analyze semantic composition patterns in village names."""
+    """Analyze semantic composition patterns in village names.
+
+    Pattern-detection role classification is defined in the shared config
+    ``src/config/semantic_roles.py`` — the single source of truth for
+    :attr:`MODIFIER_CATEGORIES`, :attr:`HEAD_CATEGORIES`, and
+    :attr:`INCOMPATIBLE_PAIRS`.  Both this module and any other worker
+    that needs semantic role knowledge import from that file.
+
+    When you change a lexicon, update the config; no code changes needed.
+    """
 
     def __init__(self, db_path: str = 'data/villages.db', lexicon_path: str = 'data/semantic_lexicon_v3_expanded.json'):
         """
@@ -53,8 +68,11 @@ class SemanticCompositionAnalyzer:
         - v1/v2/v3: lexicon['categories'] (9 main categories or subcategories)
         - v4_hybrid: lexicon['subcategories'] (76 subcategories)
 
+        When a character appears in multiple categories, the **last** one wins.
+        For multi-label awareness, use :meth:`get_character_labels_multi`.
+
         Returns:
-            Dictionary mapping character -> category
+            Dictionary mapping character -> category (single label per char)
         """
         import json
 
@@ -74,6 +92,42 @@ class SemanticCompositionAnalyzer:
                 labels[char] = category
 
         return labels
+
+    def get_character_labels_multi(self) -> Dict[str, List[str]]:
+        """
+        Load multi-label character mappings from lexicon.
+
+        Reads ``multi_label`` field (v1.3+) and falls back to scanning
+        ``categories`` for characters that appear in more than one category.
+        Characters with only one category are NOT included in the result —
+        callers should fall back to :meth:`get_character_labels` for those.
+
+        Returns:
+            Dictionary mapping character -> list of categories
+            e.g. {"林": ["vegetation", "clan"], ...}
+        """
+        import json
+
+        with open(self.lexicon_path, 'r', encoding='utf-8') as f:
+            lexicon = json.load(f)
+
+        # Prefer explicit multi_label field (v1.3+)
+        multi = lexicon.get('multi_label')
+        if multi is not None:
+            return {ch: list(cats) for ch, cats in multi.items()}
+
+        # Fallback: scan categories for cross-category duplicates
+        from collections import defaultdict
+        char_cats: Dict[str, List[str]] = defaultdict(list)
+        categories = lexicon.get('categories', {})
+        if not categories:
+            categories = lexicon.get('subcategories', {})
+
+        for category, characters in categories.items():
+            for char in characters:
+                char_cats[char].append(category)
+
+        return {ch: cats for ch, cats in char_cats.items() if len(cats) > 1}
 
     def extract_semantic_sequence(self, village_name: str, char_labels: Dict[str, str]) -> List[str]:
         """
@@ -155,110 +209,106 @@ class SemanticCompositionAnalyzer:
             'sequences': sequence_counter
         }
 
+    @staticmethod
+    def _parent_of(cat: str) -> str:
+        """Extract parent category from subcategory name.
+
+        For 'water_river' returns 'water', for plain 'water' returns 'water'.
+        """
+        return cat.split('_', 1)[0]
+
     def detect_modifier_head_patterns(self, bigrams: Counter) -> List[Dict]:
+        """Detect modifier-head patterns in semantic bigrams.
+
+        Uses :attr:`MODIFIER_CATEGORIES` and :attr:`HEAD_CATEGORIES` for role
+        classification, with :meth:`_parent_of` to resolve subcategory names.
+        Works unchanged for both 9-category and 76-subcategory lexicons.
+
+        When adding a new parent category to the lexicon, assign it to
+        ``MODIFIER_CATEGORIES`` or ``HEAD_CATEGORIES`` — no code changes needed.
         """
-        Detect modifier-head patterns in semantic bigrams (Enhanced Version).
-
-        Pattern types:
-        1. Modifier + Head (e.g., 东村, 大山)
-        2. Head + Settlement (e.g., 水村, 山村)
-        3. Clan + Settlement (e.g., 陈村, 李屋) - Cultural pattern
-        4. Symbolic + X (e.g., 福田, 吉水) - Auspicious meanings
-        5. Head + Direction (e.g., 山东, 水南) - Bidirectional pattern
-        6. Agriculture + Settlement (e.g., 田村, 禾村)
-
-        Args:
-            bigrams: Counter of semantic bigrams
-
-        Returns:
-            List of modifier-head patterns
-        """
-        # Category definitions
-        basic_modifiers = ['size', 'direction', 'number']  # Basic modifiers (not symbolic)
-        head_categories = ['water', 'mountain', 'landform', 'vegetation',
-                          'settlement', 'agriculture']
-
-        patterns = []
-        processed = set()  # Track processed patterns to avoid duplicates
+        patterns: List[Dict] = []
+        seen_keys: Set[Tuple[str, str]] = set()
 
         for (cat1, cat2), count in bigrams.most_common():
-            # Skip 'other' category to reduce noise
-            if cat1 == 'other' or cat2 == 'other':
+            p1 = self._parent_of(cat1)
+            p2 = self._parent_of(cat2)
+
+            if p1 == 'other' or p2 == 'other':
                 continue
 
-            pattern_key = (cat1, cat2)
-            if pattern_key in processed:
+            key = (cat1, cat2)
+            if key in seen_keys:
                 continue
 
-            # Priority 1: Clan + Settlement (most important cultural pattern)
-            if cat1 == 'clan' and cat2 == 'settlement':
+            is_mod1 = p1 in MODIFIER_CATEGORIES
+            is_head2 = p2 in HEAD_CATEGORIES
+            is_head1 = p1 in HEAD_CATEGORIES
+
+            # Priority 1: Clan + Settlement (culturally significant in Guangdong)
+            if p1 == 'clan' and p2 == 'settlement':
                 patterns.append({
-                    'pattern': 'clan + settlement',
+                    'pattern': f'{cat1} + {cat2}',
                     'type': 'clan_settlement',
-                    'modifier': 'clan',
-                    'head': 'settlement',
-                    'frequency': count
+                    'modifier': cat1, 'head': cat2,
+                    'frequency': count,
                 })
-                processed.add(pattern_key)
+                seen_keys.add(key)
                 continue
 
-            # Priority 2: Clan + Other heads
-            if cat1 == 'clan' and cat2 in head_categories:
+            # Priority 2: Clan + Head
+            if p1 == 'clan' and is_head2:
                 patterns.append({
-                    'pattern': f'clan + {cat2}',
+                    'pattern': f'{cat1} + {cat2}',
                     'type': 'clan_head',
-                    'modifier': 'clan',
-                    'head': cat2,
-                    'frequency': count
+                    'modifier': cat1, 'head': cat2,
+                    'frequency': count,
                 })
-                processed.add(pattern_key)
+                seen_keys.add(key)
                 continue
 
-            # Priority 3: Symbolic + X (auspicious meanings)
-            if cat1 == 'symbolic' and cat2 in head_categories:
+            # Priority 3: Symbolic + Head
+            if p1 == 'symbolic' and is_head2:
                 patterns.append({
-                    'pattern': f'symbolic + {cat2}',
+                    'pattern': f'{cat1} + {cat2}',
                     'type': 'symbolic_head',
-                    'modifier': 'symbolic',
-                    'head': cat2,
-                    'frequency': count
+                    'modifier': cat1, 'head': cat2,
+                    'frequency': count,
                 })
-                processed.add(pattern_key)
+                seen_keys.add(key)
                 continue
 
-            # Priority 4: Basic Modifier + Head
-            if cat1 in basic_modifiers and cat2 in head_categories:
+            # Priority 4: Generic Modifier + Head
+            if is_mod1 and is_head2:
                 patterns.append({
                     'pattern': f'{cat1} + {cat2}',
                     'type': 'modifier_head',
-                    'modifier': cat1,
-                    'head': cat2,
-                    'frequency': count
+                    'modifier': cat1, 'head': cat2,
+                    'frequency': count,
                 })
-                processed.add(pattern_key)
+                seen_keys.add(key)
                 continue
 
             # Priority 5: Head + Settlement
-            if cat1 in head_categories and cat2 == 'settlement':
+            if is_head1 and p2 == 'settlement':
                 patterns.append({
-                    'pattern': f'{cat1} + settlement',
+                    'pattern': f'{cat1} + {cat2}',
                     'type': 'head_settlement',
-                    'head': cat1,
-                    'frequency': count
+                    'head': cat1, 'modifier': cat2,
+                    'frequency': count,
                 })
-                processed.add(pattern_key)
+                seen_keys.add(key)
                 continue
 
-            # Priority 6: Head + Direction (bidirectional pattern)
-            if cat1 in head_categories and cat2 == 'direction':
+            # Priority 6: Head + Direction
+            if is_head1 and p2 == 'direction':
                 patterns.append({
-                    'pattern': f'{cat1} + direction',
+                    'pattern': f'{cat1} + {cat2}',
                     'type': 'head_direction',
-                    'head': cat1,
-                    'modifier': 'direction',
-                    'frequency': count
+                    'head': cat1, 'modifier': cat2,
+                    'frequency': count,
                 })
-                processed.add(pattern_key)
+                seen_keys.add(key)
                 continue
 
         return patterns
@@ -280,19 +330,14 @@ class SemanticCompositionAnalyzer:
         """
         conflicts = []
 
-        # Incompatible pairs (heuristic)
-        incompatible_pairs = [
-            ('water', 'mountain'),  # Water and mountain together is unusual
-            ('size', 'number'),     # Size and number together is redundant
-        ]
-
         for sequence, count in sequences.items():
             if count >= threshold:
-                continue  # Not unusual
+                continue
 
-            # Check for incompatible pairs
-            for cat1, cat2 in incompatible_pairs:
-                if cat1 in sequence and cat2 in sequence:
+            parents = {self._parent_of(cat) for cat in sequence}
+
+            for cat1, cat2 in INCOMPATIBLE_PAIRS:
+                if cat1 in parents and cat2 in parents:
                     conflicts.append({
                         'sequence': sequence,
                         'frequency': count,
