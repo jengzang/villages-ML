@@ -9,6 +9,8 @@ import numpy as np
 from typing import Optional
 import logging
 
+from src.schema import VillageTableSchema, DEFAULT_SCHEMA
+
 logger = logging.getLogger(__name__)
 
 # Guangdong Province coordinate bounds
@@ -33,12 +35,14 @@ class CoordinateLoader:
         """
         self.bounds = bounds or GUANGDONG_BOUNDS
 
-    def load_coordinates(self, conn) -> pd.DataFrame:
+    def load_coordinates(self, conn,
+                         schema: VillageTableSchema = DEFAULT_SCHEMA) -> pd.DataFrame:
         """
         Load villages with valid coordinates from database.
 
         Args:
             conn: Database connection
+            schema: Table schema definition
 
         Returns:
             DataFrame with columns:
@@ -51,21 +55,20 @@ class CoordinateLoader:
         """
         logger.info("Loading coordinates from database")
 
-        # Query from preprocessed table with cleaned village names
-        # Use village_id for uniqueness (optimized table)
-        query = """
+        S = schema
+        query = f"""
         SELECT
-            village_id,
-            市级 as city,
-            区县级 as county,
-            乡镇级 as town,
-            村委会 as village_committee,
-            自然村_规范名 as village_name_original,
-            自然村_去前缀 as village_name,
-            语言分布 as language_distribution,
-            longitude,
-            latitude
-        FROM 广东省自然村_预处理
+            {S.village_id_col},
+            {S.city_col} as city,
+            {S.county_col} as county,
+            {S.township_col} as town,
+            {S.committee_col_preprocessed} as village_committee,
+            {S.village_name_col_normalized} as village_name_original,
+            {S.village_name_col_prefix_removed} as village_name,
+            {S.language_col_preprocessed} as language_distribution,
+            {S.longitude_col},
+            {S.latitude_col}
+        FROM {S.preprocessed_table}
         """
         df = pd.read_sql_query(query, conn)
 

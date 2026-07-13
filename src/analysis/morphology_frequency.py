@@ -4,6 +4,8 @@ import logging
 import pandas as pd
 import numpy as np
 
+from src.schema import VillageTableSchema, DEFAULT_SCHEMA
+
 logger = logging.getLogger(__name__)
 
 
@@ -72,7 +74,8 @@ def compute_pattern_frequency_global(
 def compute_pattern_frequency_by_region(
     villages_df: pd.DataFrame,
     region_level: str,
-    pattern_col: str
+    pattern_col: str,
+    schema: VillageTableSchema = DEFAULT_SCHEMA,
 ) -> pd.DataFrame:
     """
     Compute pattern frequencies by region with hierarchical grouping.
@@ -81,30 +84,25 @@ def compute_pattern_frequency_by_region(
         villages_df: DataFrame with region columns, pattern column, and is_valid
         region_level: 'city', 'county', or 'township'
         pattern_col: Column name (e.g., 'suffix_1', 'prefix_2')
+        schema: Table schema definition
 
     Returns:
         DataFrame with columns:
         - region_level: Level name
-        - city: City name (市级)
-        - county: County name (区县级)
-        - township: Township name (乡镇级)
-        - region_name: Region name (for display/backward compatibility)
+        - city: City name
+        - county: County name
+        - township: Township name
+        - region_name: Region name (for display)
         - pattern: Pattern string
         - village_count: Villages in region with this pattern
         - total_villages: Total valid villages in region
         - frequency: Proportion
         - rank_within_region: Rank within this region
     """
-    level_map = {
-        'city': '市级',
-        'county': '区县级',
-        'township': '乡镇级'
-    }
-
-    if region_level not in level_map:
+    if region_level not in schema.level_map:
         raise ValueError(f"Invalid region_level: {region_level}")
 
-    region_col = level_map[region_level]
+    region_col = schema.level_map[region_level]
 
     # Filter to valid villages with non-null patterns
     valid_df = villages_df[
@@ -116,15 +114,12 @@ def compute_pattern_frequency_by_region(
     results = []
 
     # Group by hierarchical key to separate duplicate place names
-    # For city level: group by 市级
-    # For county level: group by (市级, 区县级)
-    # For township level: group by (市级, 区县级, 乡镇级)
     if region_level == 'city':
-        group_cols = ['市级']
+        group_cols = [schema.city_col]
     elif region_level == 'county':
-        group_cols = ['市级', '区县级']
+        group_cols = [schema.city_col, schema.county_col]
     else:  # township
-        group_cols = ['市级', '区县级', '乡镇级']
+        group_cols = [schema.city_col, schema.county_col, schema.township_col]
 
     # Group by hierarchical key
     for group_key, group in valid_df.groupby(group_cols):

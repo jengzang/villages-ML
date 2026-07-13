@@ -13,10 +13,12 @@ Approach: Offline-heavy, accuracy-focused, full dataset
 
 import sqlite3
 import json
-from typing import List, Dict, Tuple, Set
+from typing import List, Dict, Tuple, Set, Optional
 from collections import Counter, defaultdict
 import numpy as np
 from scipy import stats
+
+from src.schema import VillageTableSchema, DEFAULT_SCHEMA
 
 from src.config.semantic_roles import (
     MODIFIER_CATEGORIES,
@@ -37,7 +39,9 @@ class SemanticCompositionAnalyzer:
     When you change a lexicon, update the config; no code changes needed.
     """
 
-    def __init__(self, db_path: str = 'data/villages.db', lexicon_path: str = 'data/semantic_lexicon_v3_expanded.json'):
+    def __init__(self, db_path: str = 'data/villages.db',
+                 lexicon_path: str = 'data/semantic_lexicon_v3_expanded.json',
+                 schema: VillageTableSchema = DEFAULT_SCHEMA):
         """
         Initialize SemanticCompositionAnalyzer.
 
@@ -46,6 +50,7 @@ class SemanticCompositionAnalyzer:
         """
         self.db_path = db_path
         self.lexicon_path = lexicon_path
+        self.schema = schema
         self.conn = None
 
         # Note: categories will be loaded from lexicon file
@@ -181,7 +186,7 @@ class SemanticCompositionAnalyzer:
         char_labels = self.get_character_labels()
 
         cursor = self.conn.cursor()
-        cursor.execute("SELECT 自然村 FROM 广东省自然村")
+        cursor.execute(f"SELECT {self.schema.village_name_col_raw} FROM {self.schema.raw_table}")
 
         bigram_counter = Counter()
         trigram_counter = Counter()

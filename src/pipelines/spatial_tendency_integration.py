@@ -17,6 +17,7 @@ from typing import Dict, List, Optional
 import numpy as np
 import pandas as pd
 
+from src.schema import DEFAULT_SCHEMA
 from src.data.db_writer import (
     create_spatial_tendency_table,
     create_spatial_tendency_indexes,
@@ -137,15 +138,16 @@ def load_villages_with_chars(conn: sqlite3.Connection) -> pd.DataFrame:
     """
     logger.info("Loading village data with character sets")
 
-    query = """
+    S = DEFAULT_SCHEMA
+    query = f"""
         SELECT
             ROWID as row_id,
-            自然村_去前缀 as village_name,
-            市级 as city,
-            区县级 as county,
-            乡镇级 as town
-        FROM 广东省自然村_预处理
-        WHERE 字符数量 > 0
+            {S.village_name_col_prefix_removed} as village_name,
+            {S.city_col} as city,
+            {S.county_col} as county,
+            {S.township_col} as town
+        FROM {S.preprocessed_table}
+        WHERE {S.char_count_col} > 0
     """
 
     df = pd.read_sql_query(query, conn)

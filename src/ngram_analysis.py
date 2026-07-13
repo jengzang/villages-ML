@@ -16,17 +16,21 @@ All analysis follows the offline-heavy, accuracy-focused approach:
 
 import sqlite3
 import re
-from typing import List, Tuple, Dict, Set
+from typing import List, Tuple, Dict, Set, Optional
 from collections import Counter, defaultdict
 import numpy as np
 from scipy import stats
+
+from src.schema import VillageTableSchema, DEFAULT_SCHEMA
 
 
 class NgramExtractor:
     """Extract n-grams from village names with position awareness."""
 
-    def __init__(self, db_path: str = 'data/villages.db'):
+    def __init__(self, db_path: str = 'data/villages.db',
+                 schema: VillageTableSchema = DEFAULT_SCHEMA):
         self.db_path = db_path
+        self.schema = schema
         self.conn = None
 
     def __enter__(self):
@@ -101,7 +105,9 @@ class NgramExtractor:
             Dictionary with counters for different positions
         """
         cursor = self.conn.cursor()
-        cursor.execute("SELECT 自然村_去前缀 FROM 广东省自然村_预处理")
+        cursor.execute(
+            f"SELECT {self.schema.village_name_col_prefix_removed} FROM {self.schema.preprocessed_table}"
+        )
 
         all_counter = Counter()
         prefix_counter = Counter()
@@ -126,31 +132,26 @@ class NgramExtractor:
             'middle': middle_counter
         }
 
-    def extract_regional_ngrams(self, n: int = 2, level: str = '市级') -> Dict[Tuple, Dict[str, Counter]]:
+    def extract_regional_ngrams(self, n: int = 2, level: str = 'city') -> Dict[Tuple, Dict[str, Counter]]:
         """
         Extract n-grams by region with hierarchical grouping.
 
         Args:
             n: N-gram size
-            level: Regional level ('市级', '县区级', '乡镇')
+            level: Regional level ('city', 'county', 'township')
 
         Returns:
             Dictionary mapping (city, county, township) tuple -> position -> Counter
             The tuple contains hierarchical information to separate duplicate place names.
         """
         cursor = self.conn.cursor()
-
-        # Map level to column indices
-        level_to_index = {
-            '市级': 0,
-            '县区级': 1,
-            '乡镇': 2
-        }
-
-        col_index = level_to_index.get(level, 0)
+        S = self.schema
 
         # Query all columns we need for hierarchical grouping (use preprocessed table)
-        cursor.execute("SELECT 市级, 区县级, 乡镇级, 自然村_去前缀 FROM 广东省自然村_预处理")
+        cursor.execute(
+            f"SELECT {S.city_col}, {S.county_col}, {S.township_col}, "
+            f"{S.village_name_col_prefix_removed} FROM {S.preprocessed_table}"
+        )
 
         regional_data = defaultdict(lambda: {
             'all': Counter(),
@@ -160,24 +161,24 @@ class NgramExtractor:
         })
 
         for row in cursor:
-            city = row[0]        # 市级
-            county = row[1]      # 区县级
-            township = row[2]    # 乡镇级
-            village_name = row[3]  # 自然村_去前缀
+            city = row[0]
+            county = row[1]
+            township = row[2]
+            village_name = row[3]
 
             if not village_name:
                 continue
 
             # Create hierarchical key based on level
-            if level == '市级':
+            if level == 'city':
                 if not city:
                     continue
                 hierarchical_key = (city, None, None)
-            elif level == '县区级':
+            elif level == 'county':
                 if not city or not county:
                     continue
                 hierarchical_key = (city, county, None)
-            else:  # 乡镇级
+            else:  # township
                 if not city or not county or not township:
                     continue
                 hierarchical_key = (city, county, township)

@@ -12,6 +12,12 @@ This script creates a detailed audit log table that records:
 import sqlite3
 import logging
 from pathlib import Path
+import sys
+
+project_root = Path(__file__).parent.parent.parent
+sys.path.insert(0, str(project_root))
+
+from src.schema import DEFAULT_SCHEMA as S
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -25,14 +31,14 @@ def create_audit_log_table(conn: sqlite3.Connection):
     cursor.execute("DROP TABLE IF EXISTS prefix_cleaning_audit_log")
 
     # Create table
-    cursor.execute("""
+    cursor.execute(f"""
     CREATE TABLE prefix_cleaning_audit_log (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
 
         -- Geographic hierarchy (complete)
-        市级 TEXT,
-        区县级 TEXT,
-        乡镇级 TEXT,
+        {S.city_col} TEXT,
+        {S.county_col} TEXT,
+        {S.township_col} TEXT,
         行政村 TEXT,
 
         -- Cleaning information
@@ -52,54 +58,49 @@ def create_audit_log_table(conn: sqlite3.Connection):
         规则置信度 REAL,
         最终置信度 REAL,
 
-        -- Decision information
+        -- Decision
         是否去除 INTEGER NOT NULL,
         需要人工审核 INTEGER NOT NULL,
 
         -- Timestamp
-        处理时间 TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        created_at TEXT DEFAULT (datetime('now'))
     )
     """)
-
-    # Create indexes
-    cursor.execute("CREATE INDEX idx_audit_city ON prefix_cleaning_audit_log(市级)")
-    cursor.execute("CREATE INDEX idx_audit_removed ON prefix_cleaning_audit_log(是否去除)")
-    cursor.execute("CREATE INDEX idx_audit_review ON prefix_cleaning_audit_log(需要人工审核)")
-    cursor.execute("CREATE INDEX idx_audit_confidence ON prefix_cleaning_audit_log(最终置信度)")
 
     conn.commit()
     logger.info("Created prefix_cleaning_audit_log table")
 
 
 def populate_audit_log(conn: sqlite3.Connection):
-    """Populate audit log from preprocessed table."""
+    """Populate audit log from preprocessed table data."""
     cursor = conn.cursor()
 
-    logger.info("Populating audit log from preprocessed table...")
+    # Clear existing data
+    cursor.execute("DELETE FROM prefix_cleaning_audit_log")
 
-    query = """
+    query = f"""
     INSERT INTO prefix_cleaning_audit_log (
-        市级, 区县级, 乡镇级, 行政村,
+        {S.city_col}, {S.county_col}, {S.township_col}, 行政村,
         自然村_原始, 自然村_基础清洗, 自然村_去前缀,
         检测到前缀, 前缀候选, 去除的前缀, 剩余部分,
         匹配来源, 匹配的行政村, 规则置信度, 最终置信度,
         是否去除, 需要人工审核
     )
     SELECT
-        市级, 区县级, 乡镇级, 行政村,
-        自然村, 自然村_基础清洗, 自然村_去前缀,
+        {S.city_col}, {S.county_col}, {S.township_col}, {S.committee_col_raw},
+        {S.village_name_col_raw}, 自然村_基础清洗, {S.village_name_col_prefix_removed},
         有前缀,
         CASE WHEN 有前缀=1 THEN 去除的前缀 ELSE NULL END,
         去除的前缀,
-        CASE WHEN 有前缀=1 THEN 自然村_去前缀 ELSE NULL END,
+        CASE WHEN 有前缀=1 THEN {S.village_name_col_prefix_removed} ELSE NULL END,
         前缀匹配来源,
-        行政村,
+        {S.committee_col_raw},
         前缀置信度,
         前缀置信度,
         有前缀,
         需要审核
-    FROM 广东省自然村_预处理
-    WHERE 字符数量 > 0
+    FROM {S.preprocessed_table}
+    WHERE {S.char_count_col} > 0
     """
 
     cursor.execute(query)
@@ -123,7 +124,7 @@ def populate_audit_log(conn: sqlite3.Connection):
 
 def main():
     """Create and populate audit log table."""
-    db_path = Path(__file__).parent.parent / "data" / "villages.db"
+    db_path = Path(__file__).parent.parent.parent / "data" / "villages.db"
 
     if not db_path.exists():
         logger.error(f"Database not found: {db_path}")
@@ -138,7 +139,7 @@ def main():
     # Check if preprocessed table exists
     cursor = conn.cursor()
     cursor.execute(
-        "SELECT name FROM sqlite_master WHERE type='table' AND name='广东省自然村_预处理'"
+        f"SELECT name FROM sqlite_master WHERE type='table' AND name='{S.preprocessed_table}'"
     )
     if not cursor.fetchone():
         logger.error("Preprocessed table not found. Run create_preprocessed_table.py first.")

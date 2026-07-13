@@ -25,6 +25,7 @@ import pandas as pd
 project_root = Path(__file__).parent.parent.parent
 sys.path.insert(0, str(project_root))
 
+from src.schema import DEFAULT_SCHEMA as S
 from src.semantic.lexicon_loader import SemanticLexicon
 from src.semantic.semantic_index import SemanticIndexCalculator
 from src.data.db_writer import write_semantic_indices
@@ -43,9 +44,10 @@ logger = logging.getLogger(__name__)
 def load_villages(conn: sqlite3.Connection) -> pd.DataFrame:
     """Load preprocessed village data from database."""
     logger.info("Loading village data from database...")
-    query = """
-        SELECT 市级, 区县级, 乡镇级, 自然村_去前缀 as 自然村
-        FROM 广东省自然村_预处理
+    query = f"""
+        SELECT {S.city_col}, {S.county_col}, {S.township_col},
+               {S.village_name_col_prefix_removed} as 自然村
+        FROM {S.preprocessed_table}
     """
     df = pd.read_sql_query(query, conn)
     logger.info(f"Loaded {len(df)} villages")
@@ -116,32 +118,23 @@ def main():
             logger.info(f"\n=== Step 3: Processing {level} level ===")
 
             # Map level to column name
-            level_column_map = {
-                'city': '市级',
-                'county': '区县级',
-                'township': '乡镇级'
-            }
-
-            if level not in level_column_map:
+            if level not in S.level_map:
                 logger.warning(f"Unknown region level: {level}, skipping")
                 continue
 
-            level_column = level_column_map[level]
+            level_column = S.level_map[level]
 
-            # Prepare data for this level - include hierarchy based on level (NEW: 2026-03-01)
+            # Prepare data for this level - include hierarchy based on level
             if level == 'city':
-                # City level: only include city
-                level_df = villages_df[['市级', '自然村']].copy()
-                level_df = level_df.rename(columns={'市级': 'city'})
+                level_df = villages_df[[S.city_col, '自然村']].copy()
+                level_df = level_df.rename(columns={S.city_col: 'city'})
                 level_df['自然村'] = villages_df['自然村']
             elif level == 'county':
-                # County level: include city and county
-                level_df = villages_df[['市级', '区县级', '自然村']].copy()
-                level_df = level_df.rename(columns={'市级': 'city', '区县级': 'county'})
+                level_df = villages_df[[S.city_col, S.county_col, '自然村']].copy()
+                level_df = level_df.rename(columns={S.city_col: 'city', S.county_col: 'county'})
             elif level == 'township':
-                # Township level: include all three
-                level_df = villages_df[['市级', '区县级', '乡镇级', '自然村']].copy()
-                level_df = level_df.rename(columns={'市级': 'city', '区县级': 'county', '乡镇级': 'township'})
+                level_df = villages_df[[S.city_col, S.county_col, S.township_col, '自然村']].copy()
+                level_df = level_df.rename(columns={S.city_col: 'city', S.county_col: 'county', S.township_col: 'township'})
 
             # Filter out NULL region names for the current level
             if level == 'city':

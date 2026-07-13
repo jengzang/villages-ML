@@ -12,9 +12,11 @@ import sqlite3
 import json
 import logging
 from pathlib import Path
-from typing import Dict, Any
+from typing import Dict, Any, Optional
 import pandas as pd
 import numpy as np
+
+from src.schema import VillageTableSchema, DEFAULT_SCHEMA
 
 logger = logging.getLogger(__name__)
 
@@ -1011,7 +1013,12 @@ def write_semantic_tendency(conn: sqlite3.Connection, run_id: str, df: pd.DataFr
     logger.info(f"Saved {len(data)} semantic tendency records for run_id={run_id}")
 
 
-def write_semantic_indices(conn: sqlite3.Connection, run_id: str, df: pd.DataFrame) -> None:
+def write_semantic_indices(
+    conn: sqlite3.Connection,
+    run_id: str,
+    df: pd.DataFrame,
+    schema: VillageTableSchema = DEFAULT_SCHEMA,
+) -> None:
     """
     Write semantic indices to database.
 
@@ -1019,6 +1026,7 @@ def write_semantic_indices(conn: sqlite3.Connection, run_id: str, df: pd.DataFra
         conn: SQLite database connection
         run_id: Run identifier
         df: DataFrame with index columns (including optional city, county, township)
+        schema: Table schema definition
 
     Note (2026-02-25):
         Automatically calculates and adds village_count for each region.
@@ -1049,15 +1057,11 @@ def write_semantic_indices(conn: sqlite3.Connection, run_id: str, df: pd.DataFra
     logger.info("Calculating village_count for each region...")
 
     # Get column indices for the preprocessed table
-    cursor.execute("PRAGMA table_info(广东省自然村_预处理)")
+    cursor.execute(f"PRAGMA table_info({schema.preprocessed_table})")
     columns_info = cursor.fetchall()
 
-    # Map region_level to column index (0=市级, 1=区县级, 2=乡镇级)
-    level_column_index = {
-        'city': 0,
-        'county': 1,
-        'township': 2
-    }
+    # Map region_level to column index using schema
+    _level_to_pragma_index = {level: idx for idx, level in enumerate(schema.level_order)}
 
     # Calculate village_count for each unique region
     village_counts = {}
@@ -1072,24 +1076,24 @@ def write_semantic_indices(conn: sqlite3.Connection, run_id: str, df: pd.DataFra
 
             # Build WHERE clause based on region level
             if region_level == 'city' and city:
-                query = """
-                    SELECT COUNT(DISTINCT village_id)
-                    FROM 广东省自然村_预处理
-                    WHERE 市级 = ?
+                query = f"""
+                    SELECT COUNT(DISTINCT {schema.village_id_col})
+                    FROM {schema.preprocessed_table}
+                    WHERE {schema.city_col} = ?
                 """
                 cursor.execute(query, (city,))
             elif region_level == 'county' and city and county:
-                query = """
-                    SELECT COUNT(DISTINCT village_id)
-                    FROM 广东省自然村_预处理
-                    WHERE 市级 = ? AND 区县级 = ?
+                query = f"""
+                    SELECT COUNT(DISTINCT {schema.village_id_col})
+                    FROM {schema.preprocessed_table}
+                    WHERE {schema.city_col} = ? AND {schema.county_col} = ?
                 """
                 cursor.execute(query, (city, county))
             elif region_level == 'township' and city and county and township:
-                query = """
-                    SELECT COUNT(DISTINCT village_id)
-                    FROM 广东省自然村_预处理
-                    WHERE 市级 = ? AND 区县级 = ? AND 乡镇级 = ?
+                query = f"""
+                    SELECT COUNT(DISTINCT {schema.village_id_col})
+                    FROM {schema.preprocessed_table}
+                    WHERE {schema.city_col} = ? AND {schema.county_col} = ? AND {schema.township_col} = ?
                 """
                 cursor.execute(query, (city, county, township))
             else:
@@ -1116,7 +1120,7 @@ def write_semantic_indices(conn: sqlite3.Connection, run_id: str, df: pd.DataFra
             region_level = row['region_level']
             region_name = row['region_name']
 
-            col_idx = level_column_index.get(region_level)
+            col_idx = _level_to_pragma_index.get(region_level)
             if col_idx is None:
                 logger.warning(f"Unknown region_level: {region_level}")
                 village_counts[(region_level, region_name)] = 0
@@ -1126,8 +1130,8 @@ def write_semantic_indices(conn: sqlite3.Connection, run_id: str, df: pd.DataFra
 
             # Count villages using village_id
             query = f"""
-                SELECT COUNT(DISTINCT village_id)
-                FROM 广东省自然村_预处理
+                SELECT COUNT(DISTINCT {schema.village_id_col})
+                FROM {schema.preprocessed_table}
                 WHERE "{col_name}" = ?
             """
             cursor.execute(query, (region_name,))

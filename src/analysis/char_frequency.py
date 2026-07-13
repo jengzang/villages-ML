@@ -2,14 +2,19 @@
 
 import json
 import logging
-from typing import Dict
+from typing import Dict, Optional
 import pandas as pd
 import numpy as np
+
+from src.schema import VillageTableSchema, DEFAULT_SCHEMA
 
 logger = logging.getLogger(__name__)
 
 
-def compute_char_frequency_global(villages_df: pd.DataFrame) -> pd.DataFrame:
+def compute_char_frequency_global(
+    villages_df: pd.DataFrame,
+    schema: VillageTableSchema = DEFAULT_SCHEMA,
+) -> pd.DataFrame:
     """
     Compute global character frequencies across all villages.
 
@@ -19,7 +24,8 @@ def compute_char_frequency_global(villages_df: pd.DataFrame) -> pd.DataFrame:
     - p_c = n_c / N (frequency)
 
     Args:
-        villages_df: DataFrame with columns [char_set_json] or [字符集]
+        villages_df: DataFrame with columns [char_set_json] or [{schema.char_set_col}]
+        schema: Table schema definition
 
     Returns:
         DataFrame with columns:
@@ -29,8 +35,7 @@ def compute_char_frequency_global(villages_df: pd.DataFrame) -> pd.DataFrame:
         - frequency: Proportion (village_count / total_villages)
         - rank: Rank by frequency (1 = most common)
     """
-    # Handle both column names (English and Chinese)
-    char_set_col = 'char_set_json' if 'char_set_json' in villages_df.columns else '字符集'
+    char_set_col = 'char_set_json' if 'char_set_json' in villages_df.columns else schema.char_set_col
 
     # Filter to valid villages only (if is_valid column exists, otherwise use all)
     if 'is_valid' in villages_df.columns:
@@ -78,41 +83,36 @@ def compute_char_frequency_global(villages_df: pd.DataFrame) -> pd.DataFrame:
 
 def compute_char_frequency_by_region(
     villages_df: pd.DataFrame,
-    region_level: str
+    region_level: str,
+    schema: VillageTableSchema = DEFAULT_SCHEMA,
 ) -> pd.DataFrame:
     """
     Compute character frequencies by region with hierarchical grouping.
 
     Args:
-        villages_df: DataFrame with columns [市级, 区县级, 乡镇级, 字符集 or char_set_json]
+        villages_df: DataFrame with columns [{schema.city_col}, {schema.county_col}, {schema.township_col}, char_set]
         region_level: 'city', 'county', or 'township'
+        schema: Table schema definition
 
     Returns:
         DataFrame with columns:
         - region_level: Level name
-        - city: City name (市级)
-        - county: County name (区县级)
-        - township: Township name (乡镇级)
-        - region_name: Region name (for display/backward compatibility)
+        - city: City name
+        - county: County name
+        - township: Township name
+        - region_name: Region name (for display)
         - char: Character
         - village_count: Villages in region containing char
         - total_villages: Total valid villages in region
         - frequency: Proportion
         - rank_within_region: Rank within this region
     """
-    level_map = {
-        'city': '市级',
-        'county': '区县级',
-        'township': '乡镇级'
-    }
-
-    if region_level not in level_map:
+    if region_level not in schema.level_map:
         raise ValueError(f"Invalid region_level: {region_level}")
 
-    region_col = level_map[region_level]
+    region_col = schema.level_map[region_level]
 
-    # Handle both column names (English and Chinese)
-    char_set_col = 'char_set_json' if 'char_set_json' in villages_df.columns else '字符集'
+    char_set_col = 'char_set_json' if 'char_set_json' in villages_df.columns else schema.char_set_col
 
     # Filter to valid villages (if is_valid column exists, otherwise use all)
     if 'is_valid' in villages_df.columns:
@@ -125,15 +125,12 @@ def compute_char_frequency_by_region(
     results = []
 
     # Group by hierarchical key to separate duplicate place names
-    # For city level: group by 市级
-    # For county level: group by (市级, 区县级)
-    # For township level: group by (市级, 区县级, 乡镇级)
     if region_level == 'city':
-        group_cols = ['市级']
+        group_cols = [schema.city_col]
     elif region_level == 'county':
-        group_cols = ['市级', '区县级']
+        group_cols = [schema.city_col, schema.county_col]
     else:  # township
-        group_cols = ['市级', '区县级', '乡镇级']
+        group_cols = [schema.city_col, schema.county_col, schema.township_col]
 
     # Group by hierarchical key
     for group_key, group in valid_df.groupby(group_cols):
@@ -252,7 +249,8 @@ def compute_char_frequency(
     villages_df: pd.DataFrame,
     region_levels: list = None,
     min_global_support: int = 20,
-    min_regional_support: int = 5
+    min_regional_support: int = 5,
+    schema: VillageTableSchema = DEFAULT_SCHEMA,
 ) -> dict:
     """
     Compute character frequencies at global and regional levels.
@@ -262,9 +260,10 @@ def compute_char_frequency(
 
     Args:
         villages_df: DataFrame with village data
-        region_levels: List of region levels to analyze (e.g., ['市级', '县区级', '乡镇'])
+        region_levels: List of region levels to analyze (logical keys: ['city', 'county', 'township'])
         min_global_support: Minimum global village count (for filtering)
         min_regional_support: Minimum regional village count (for filtering)
+        schema: Table schema definition
 
     Returns:
         Dictionary with keys:
@@ -272,12 +271,12 @@ def compute_char_frequency(
         - 'regional': Dict mapping region_level to regional frequency DataFrame
     """
     if region_levels is None:
-        region_levels = ['市级', '县区级', '乡镇']
+        region_levels = schema.level_order
 
     logger.info(f"Computing character frequencies for region levels: {region_levels}")
 
     # Compute global frequencies
-    global_freq = compute_char_frequency_global(villages_df)
+    global_freq = compute_char_frequency_global(villages_df, schema=schema)
 
     # Filter by minimum support
     global_freq_filtered = global_freq[
@@ -287,23 +286,15 @@ def compute_char_frequency(
     logger.info(f"Global: {len(global_freq)} chars total, "
                 f"{len(global_freq_filtered)} meet min_global_support={min_global_support}")
 
-    # Compute regional frequencies
-    level_map = {
-        '市级': 'city',
-        '县区级': 'county',
-        '乡镇': 'township'
-    }
-
     regional_freqs = {}
     for level in region_levels:
-        if level not in level_map:
+        if level not in schema.level_map:
             logger.warning(f"Unknown region level: {level}, skipping")
             continue
 
-        level_key = level_map[level]
         logger.info(f"Computing frequencies for {level}...")
 
-        regional_df = compute_char_frequency_by_region(villages_df, level_key)
+        regional_df = compute_char_frequency_by_region(villages_df, level, schema=schema)
 
         # Add global stats and compute lift
         regional_df = calculate_lift(regional_df, global_freq)

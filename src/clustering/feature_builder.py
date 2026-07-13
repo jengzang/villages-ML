@@ -11,6 +11,7 @@ import numpy as np
 from typing import Dict, List, Optional, Tuple
 import json
 
+from src.schema import VillageTableSchema, DEFAULT_SCHEMA
 from ..data.db_query import (
     get_semantic_vtf_regional,
     get_pattern_frequency_regional,
@@ -308,19 +309,14 @@ class RegionFeatureBuilder:
 
         return result, feature_names
 
-    def _count_villages_in_region(self, region_name: str, region_level: str) -> int:
+    def _count_villages_in_region(self, region_name: str, region_level: str,
+                                  schema: VillageTableSchema = DEFAULT_SCHEMA) -> int:
         """Count number of villages in a region."""
-        level_col_map = {
-            'city': '市级',
-            'county': '县区级',
-            'town': '乡镇'
-        }
-
-        col_name = level_col_map.get(region_level)
-        if not col_name:
+        if region_level not in schema.level_map:
             return 0
 
-        query = f"SELECT COUNT(*) FROM 广东省自然村 WHERE `{col_name}` = ?"
+        col_name = schema.level_map[region_level]
+        query = f"SELECT COUNT(*) FROM {schema.raw_table} WHERE `{col_name}` = ?"
         cursor = self.conn.execute(query, (region_name,))
         return cursor.fetchone()[0]
 

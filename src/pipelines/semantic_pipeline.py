@@ -18,6 +18,7 @@ from typing import List, Optional
 import numpy as np
 import pandas as pd
 
+from src.schema import DEFAULT_SCHEMA
 from src.semantic.lexicon_loader import SemanticLexicon
 from src.semantic.vtf_calculator import VTFCalculator
 from src.semantic.semantic_index import SemanticIndexCalculator
@@ -128,38 +129,40 @@ def run_semantic_analysis_pipeline(
         logger.info("\\n=== Step 5b: Calculating semantic indices ===")
         index_calculator = SemanticIndexCalculator(lexicon)
 
-        villages_df = pd.read_sql_query("""
-            SELECT 市级, 区县级, 乡镇级, 自然村_去前缀 as 自然村
-            FROM 广东省自然村_预处理
+        S = DEFAULT_SCHEMA
+        villages_df = pd.read_sql_query(f"""
+            SELECT {S.city_col}, {S.county_col}, {S.township_col},
+                   {S.village_name_col_prefix_removed} as 自然村
+            FROM {S.preprocessed_table}
         """, conn)
         logger.info(f"Loaded {len(villages_df)} villages for index calculation")
 
         all_indices = []
         level_config = [
-            ('city', '市级', 'city'),
-            ('county', '区县级', 'county'),
-            ('township', '乡镇级', 'township'),
+            ('city', S.city_col, 'city'),
+            ('county', S.county_col, 'county'),
+            ('township', S.township_col, 'township'),
         ]
         for level, col_name, group_col in level_config:
             logger.info(f"Processing {level} level...")
             if level == 'city':
-                level_df = villages_df[['市级', '自然村']].copy()
-                level_df = level_df.rename(columns={'市级': 'city'})
-                count_df = villages_df.groupby('市级').size().reset_index(name='village_count')
-                count_df = count_df.rename(columns={'市级': 'region_name'})
+                level_df = villages_df[[S.city_col, '自然村']].copy()
+                level_df = level_df.rename(columns={S.city_col: 'city'})
+                count_df = villages_df.groupby(S.city_col).size().reset_index(name='village_count')
+                count_df = count_df.rename(columns={S.city_col: 'region_name'})
                 merge_keys = ['region_name']
             elif level == 'county':
-                level_df = villages_df[['市级', '区县级', '自然村']].copy()
-                level_df = level_df.rename(columns={'市级': 'city', '区县级': 'county'})
-                count_df = villages_df.groupby('区县级').size().reset_index(name='village_count')
-                count_df = count_df.rename(columns={'区县级': 'region_name'})
+                level_df = villages_df[[S.city_col, S.county_col, '自然村']].copy()
+                level_df = level_df.rename(columns={S.city_col: 'city', S.county_col: 'county'})
+                count_df = villages_df.groupby(S.county_col).size().reset_index(name='village_count')
+                count_df = count_df.rename(columns={S.county_col: 'region_name'})
                 merge_keys = ['region_name']
             else:
-                level_df = villages_df[['市级', '区县级', '乡镇级', '自然村']].copy()
-                level_df = level_df.rename(columns={'市级': 'city', '区县级': 'county', '乡镇级': 'township'})
+                level_df = villages_df[[S.city_col, S.county_col, S.township_col, '自然村']].copy()
+                level_df = level_df.rename(columns={S.city_col: 'city', S.county_col: 'county', S.township_col: 'township'})
                 # Township names can be duplicates across counties — use full hierarchy
-                count_df = villages_df.groupby(['市级', '区县级', '乡镇级']).size().reset_index(name='village_count')
-                count_df = count_df.rename(columns={'市级': 'city', '区县级': 'county', '乡镇级': 'region_name'})
+                count_df = villages_df.groupby([S.city_col, S.county_col, S.township_col]).size().reset_index(name='village_count')
+                count_df = count_df.rename(columns={S.city_col: 'city', S.county_col: 'county', S.township_col: 'region_name'})
                 merge_keys = ['city', 'county', 'region_name']
 
             level_df = level_df[level_df[group_col].notna()]

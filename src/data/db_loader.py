@@ -5,6 +5,8 @@ import logging
 from typing import Iterator, Dict, List, Optional, Tuple
 import pandas as pd
 
+from src.schema import VillageTableSchema, DEFAULT_SCHEMA
+
 logger = logging.getLogger(__name__)
 
 
@@ -23,23 +25,26 @@ def get_db_connection(db_path: str) -> sqlite3.Connection:
     return conn
 
 
-def validate_database_schema(conn: sqlite3.Connection, use_preprocessed: bool = True) -> bool:
+def validate_database_schema(
+    conn: sqlite3.Connection,
+    use_preprocessed: bool = True,
+    schema: VillageTableSchema = DEFAULT_SCHEMA,
+) -> bool:
     """
     Validate that the database has the expected schema.
 
     Args:
         conn: Database connection
         use_preprocessed: If True, validate preprocessed table; otherwise validate original table
+        schema: Table schema definition
 
     Returns:
         True if schema is valid
     """
     cursor = conn.cursor()
 
-    # Determine table name
-    table_name = '广东省自然村_预处理' if use_preprocessed else '广东省自然村'
+    table_name = schema.preprocessed_table if use_preprocessed else schema.raw_table
 
-    # Check if table exists
     cursor.execute(
         f"SELECT name FROM sqlite_master WHERE type='table' AND name='{table_name}'"
     )
@@ -47,15 +52,12 @@ def validate_database_schema(conn: sqlite3.Connection, use_preprocessed: bool = 
         logger.error(f"Table '{table_name}' not found")
         return False
 
-    # Check required columns
     cursor.execute(f"PRAGMA table_info({table_name})")
     columns = {row[1] for row in cursor.fetchall()}
 
-    # Required columns depend on table type
-    if use_preprocessed:
-        required_columns = {'市级', '区县级', '乡镇级', '自然村_去前缀'}
-    else:
-        required_columns = {'市级', '区县级', '乡镇级', '自然村'}
+    required_columns = set(schema.admin_columns) | {
+        schema.village_name_col(use_preprocessed),
+    }
 
     missing = required_columns - columns
 
@@ -67,26 +69,28 @@ def validate_database_schema(conn: sqlite3.Connection, use_preprocessed: bool = 
     return True
 
 
-def get_total_village_count(conn: sqlite3.Connection, use_preprocessed: bool = True) -> int:
+def get_total_village_count(
+    conn: sqlite3.Connection,
+    use_preprocessed: bool = True,
+    schema: VillageTableSchema = DEFAULT_SCHEMA,
+) -> int:
     """
     Get total number of villages in database.
 
     Args:
         conn: Database connection
         use_preprocessed: If True, use preprocessed table; otherwise use original table
+        schema: Table schema definition
 
     Returns:
         Total village count
     """
     cursor = conn.cursor()
+    table_name = schema.preprocessed_table if use_preprocessed else schema.raw_table
 
-    if use_preprocessed:
-        cursor.execute("SELECT COUNT(*) FROM 广东省自然村_预处理")
-    else:
-        cursor.execute("SELECT COUNT(*) FROM 广东省自然村")
+    cursor.execute(f"SELECT COUNT(*) FROM {table_name}")
 
     count = cursor.fetchone()[0]
-    table_name = '广东省自然村_预处理' if use_preprocessed else '广东省自然村'
     logger.info(f"Total villages in {table_name}: {count:,}")
     return count
 
@@ -97,7 +101,8 @@ def load_villages(
     county: Optional[str] = None,
     township: Optional[str] = None,
     chunk_size: int = 10000,
-    use_preprocessed: bool = True
+    use_preprocessed: bool = True,
+    schema: VillageTableSchema = DEFAULT_SCHEMA,
 ) -> Iterator[pd.DataFrame]:
     """
     Load villages from database in chunks.
@@ -109,34 +114,29 @@ def load_villages(
         township: Filter by township (optional)
         chunk_size: Number of rows per chunk
         use_preprocessed: If True, use preprocessed table with prefix-cleaned names
+        schema: Table schema definition
 
     Yields:
         DataFrame chunks with columns: 市级, 区县级, 乡镇级, 自然村
     """
-    # Determine table and column names
-    if use_preprocessed:
-        table_name = '广东省自然村_预处理'
-        village_col = '自然村_去前缀'
-        base_conditions = []  # No filtering needed for preprocessed table
-    else:
-        table_name = '广东省自然村'
-        village_col = '自然村'
-        base_conditions = []
+    table_name = schema.preprocessed_table if use_preprocessed else schema.raw_table
+    village_col = schema.village_name_col(use_preprocessed)
 
-    # Build query - use actual column names from database
-    # Include 字符集 column for character frequency analysis
-    query = f"SELECT 市级, 区县级, 乡镇级, {village_col} as 自然村, 字符集 FROM {table_name}"
-    conditions = base_conditions.copy()
+    query = (
+        f"SELECT {schema.city_col}, {schema.county_col}, {schema.township_col}, "
+        f"{village_col} as 自然村, {schema.char_set_col} FROM {table_name}"
+    )
+    conditions = []
     params = []
 
     if city:
-        conditions.append("市级 = ?")
+        conditions.append(f"{schema.city_col} = ?")
         params.append(city)
     if county:
-        conditions.append("区县级 = ?")
+        conditions.append(f"{schema.county_col} = ?")
         params.append(county)
     if township:
-        conditions.append("乡镇级 = ?")
+        conditions.append(f"{schema.township_col} = ?")
         params.append(township)
 
     if conditions:
@@ -146,54 +146,68 @@ def load_villages(
     if params:
         logger.info(f"Parameters: {params}")
 
-    # Load in chunks
     for chunk in pd.read_sql_query(query, conn, params=params, chunksize=chunk_size):
         yield chunk
 
 
-def get_regional_hierarchy(conn: sqlite3.Connection, use_preprocessed: bool = True) -> Dict[str, List[str]]:
+def get_regional_hierarchy(
+    conn: sqlite3.Connection,
+    use_preprocessed: bool = True,
+    schema: VillageTableSchema = DEFAULT_SCHEMA,
+) -> Dict[str, List[str]]:
     """
     Get the administrative hierarchy.
 
     Args:
         conn: Database connection
         use_preprocessed: If True, use preprocessed table; otherwise use original table
+        schema: Table schema definition
 
     Returns:
         Dictionary with keys 'cities', 'counties', 'townships'
     """
     cursor = conn.cursor()
 
-    # Determine table name and filter
+    table_name = schema.preprocessed_table if use_preprocessed else schema.raw_table
+
     if use_preprocessed:
-        table_name = '广东省自然村_预处理'
-        where_clause = 'WHERE 字符数量 > 0 AND'
+        where_clause = f'WHERE {schema.char_count_col} > 0 AND'
     else:
-        table_name = '广东省自然村'
         where_clause = 'WHERE'
 
-    # Get unique cities
-    cursor.execute(f"SELECT DISTINCT 市级 FROM {table_name} {where_clause} 市级 IS NOT NULL ORDER BY 市级")
-    cities = [row[0] for row in cursor.fetchall()]
+    cities = []
+    counties = []
+    townships = []
 
-    # Get unique counties
-    cursor.execute(f"SELECT DISTINCT 区县级 FROM {table_name} {where_clause} 区县级 IS NOT NULL ORDER BY 区县级")
-    counties = [row[0] for row in cursor.fetchall()]
+    for key, col in [('cities', schema.city_col), ('counties', schema.county_col), ('townships', schema.township_col)]:
+        cursor.execute(
+            f"SELECT DISTINCT {col} FROM {table_name} {where_clause} {col} IS NOT NULL ORDER BY {col}"
+        )
+        if key == 'cities':
+            cities = [row[0] for row in cursor.fetchall()]
+        elif key == 'counties':
+            counties = [row[0] for row in cursor.fetchall()]
+        else:
+            townships = [row[0] for row in cursor.fetchall()]
 
-    # Get unique townships
-    cursor.execute(f"SELECT DISTINCT 乡镇级 FROM {table_name} {where_clause} 乡镇级 IS NOT NULL ORDER BY 乡镇级")
-    townships = [row[0] for row in cursor.fetchall()]
-
-    logger.info(f"Regional hierarchy from {table_name}: {len(cities)} cities, {len(counties)} counties, {len(townships)} townships")
+    logger.info(
+        f"Regional hierarchy from {table_name}: "
+        f"{len(cities)} cities, {len(counties)} counties, {len(townships)} townships"
+    )
 
     return {
         'cities': cities,
         'counties': counties,
-        'townships': townships
+        'townships': townships,
     }
 
 
-def get_region_village_counts(conn: sqlite3.Connection, level: str, use_preprocessed: bool = True) -> pd.DataFrame:
+def get_region_village_counts(
+    conn: sqlite3.Connection,
+    level: str,
+    use_preprocessed: bool = True,
+    schema: VillageTableSchema = DEFAULT_SCHEMA,
+) -> pd.DataFrame:
     """
     Get village counts by region.
 
@@ -201,27 +215,20 @@ def get_region_village_counts(conn: sqlite3.Connection, level: str, use_preproce
         conn: Database connection
         level: 'city', 'county', or 'township'
         use_preprocessed: If True, use preprocessed table; otherwise use original table
+        schema: Table schema definition
 
     Returns:
         DataFrame with columns: region_name, village_count
     """
-    level_map = {
-        'city': '市级',
-        'county': '区县级',
-        'township': '乡镇级'
-    }
+    if level not in schema.level_map:
+        raise ValueError(f"Invalid level: {level}. Must be one of: {list(schema.level_map.keys())}")
 
-    if level not in level_map:
-        raise ValueError(f"Invalid level: {level}")
+    column = schema.level_map[level]
+    table_name = schema.preprocessed_table if use_preprocessed else schema.raw_table
 
-    column = level_map[level]
-
-    # Determine table name and filter
     if use_preprocessed:
-        table_name = '广东省自然村_预处理'
-        where_clause = f'WHERE 字符数量 > 0 AND {column} IS NOT NULL'
+        where_clause = f'WHERE {schema.char_count_col} > 0 AND {column} IS NOT NULL'
     else:
-        table_name = '广东省自然村'
         where_clause = f'WHERE {column} IS NOT NULL'
 
     query = f"""
@@ -235,4 +242,3 @@ def get_region_village_counts(conn: sqlite3.Connection, level: str, use_preproce
     df = pd.read_sql_query(query, conn)
     logger.info(f"Loaded village counts for {len(df)} {level} regions from {table_name}")
     return df
-

@@ -10,6 +10,8 @@ from typing import Dict, Any, Optional
 from datetime import datetime
 from pathlib import Path
 
+from src.schema import VillageTableSchema, DEFAULT_SCHEMA
+
 
 class RunSnapshot:
     """Capture and store complete run configuration for reproducibility."""
@@ -100,10 +102,10 @@ class RunSnapshot:
         except Exception:
             return None
 
-    def _calculate_data_hash(self) -> str:
+    def _calculate_data_hash(self, schema: VillageTableSchema = DEFAULT_SCHEMA) -> str:
         """Calculate MD5 hash of the database."""
         cursor = self.conn.cursor()
-        cursor.execute("SELECT COUNT(*) FROM 广东省自然村")
+        cursor.execute(f"SELECT COUNT(*) FROM {schema.raw_table}")
         count = cursor.fetchone()[0]
         
         # Use count as a simple hash (for performance)

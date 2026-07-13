@@ -6,7 +6,7 @@ This script:
 3. Applies administrative prefix removal
 4. Applies numbered village normalization
 5. Extracts character sets
-6. Stores results in 广东省自然村_预处理 table
+6. Stores results in preprocessed table
 """
 
 import sqlite3
@@ -20,6 +20,7 @@ import sys
 project_root = Path(__file__).parent.parent.parent
 sys.path.insert(0, str(project_root))
 
+from src.schema import DEFAULT_SCHEMA as S
 from src.preprocessing.text_cleaner import normalize_village_name
 from src.preprocessing.prefix_cleaner import batch_clean_prefixes
 from src.preprocessing.numbered_village_normalizer import (
@@ -40,35 +41,35 @@ def create_preprocessed_table(conn: sqlite3.Connection):
     cursor = conn.cursor()
 
     # Drop if exists
-    cursor.execute("DROP TABLE IF EXISTS 广东省自然村_预处理")
+    cursor.execute(f"DROP TABLE IF EXISTS {S.preprocessed_table}")
 
     # Create table with only essential columns (space-optimized)
-    cursor.execute("""
-    CREATE TABLE 广东省自然村_预处理 (
-        市级 TEXT,
-        区县级 TEXT,
-        乡镇级 TEXT,
-        村委会 TEXT,
-        自然村_规范名 TEXT,
-        自然村_去前缀 TEXT,
-        longitude REAL,
-        latitude REAL,
-        语言分布 TEXT,
-        字符集 TEXT,
-        字符数量 INTEGER,
-        village_id TEXT
+    cursor.execute(f"""
+    CREATE TABLE {S.preprocessed_table} (
+        {S.city_col} TEXT,
+        {S.county_col} TEXT,
+        {S.township_col} TEXT,
+        {S.committee_col_preprocessed} TEXT,
+        {S.village_name_col_normalized} TEXT,
+        {S.village_name_col_prefix_removed} TEXT,
+        {S.longitude_col} REAL,
+        {S.latitude_col} REAL,
+        {S.language_col_preprocessed} TEXT,
+        {S.char_set_col} TEXT,
+        {S.char_count_col} INTEGER,
+        {S.village_id_col} TEXT
     )
     """)
 
     # Create indexes
-    cursor.execute("CREATE INDEX idx_prep_city ON 广东省自然村_预处理(市级)")
-    cursor.execute("CREATE INDEX idx_prep_county ON 广东省自然村_预处理(区县级)")
-    cursor.execute("CREATE INDEX idx_prep_township ON 广东省自然村_预处理(乡镇级)")
-    cursor.execute("CREATE INDEX idx_prep_admin ON 广东省自然村_预处理(村委会)")
-    cursor.execute("CREATE INDEX idx_prep_village_id ON 广东省自然村_预处理(village_id)")
+    cursor.execute(f"CREATE INDEX idx_prep_city ON {S.preprocessed_table}({S.city_col})")
+    cursor.execute(f"CREATE INDEX idx_prep_county ON {S.preprocessed_table}({S.county_col})")
+    cursor.execute(f"CREATE INDEX idx_prep_township ON {S.preprocessed_table}({S.township_col})")
+    cursor.execute(f"CREATE INDEX idx_prep_admin ON {S.preprocessed_table}({S.committee_col_preprocessed})")
+    cursor.execute(f"CREATE INDEX idx_prep_village_id ON {S.preprocessed_table}({S.village_id_col})")
 
     conn.commit()
-    logger.info("Created optimized preprocessed table schema (12 columns)")
+    logger.info(f"Created optimized preprocessed table schema (12 columns)")
 
 
 def main():
@@ -87,26 +88,28 @@ def main():
 
     # Load raw data
     logger.info("Loading raw village data...")
-    # Use SELECT * to avoid encoding issues with column names
-    query = "SELECT * FROM 广东省自然村"
+    query = f"SELECT * FROM {S.raw_table}"
     df = pd.read_sql(query, conn)
     logger.info(f"Loaded {len(df)} villages")
 
-    # Rename columns to avoid encoding issues
-    df.columns = ['市级', '区县级', '乡镇级', '村委会', '自然村', '拼音', '语言分布',
-                  'longitude', 'latitude', '备注', '更新时间', '数据来源']
+    # Rename columns to match known raw table column order
+    df.columns = [
+        S.city_col, S.county_col, S.township_col, S.committee_col_raw,
+        S.village_name_col_raw, S.pinyin_col, S.language_col_raw,
+        S.longitude_col, S.latitude_col, '备注', '更新时间', '数据来源'
+    ]
 
     # Convert longitude and latitude to numeric (REAL type)
     logger.info("Converting longitude and latitude to numeric...")
-    df['longitude'] = pd.to_numeric(df['longitude'], errors='coerce')
-    df['latitude'] = pd.to_numeric(df['latitude'], errors='coerce')
+    df[S.longitude_col] = pd.to_numeric(df[S.longitude_col], errors='coerce')
+    df[S.latitude_col] = pd.to_numeric(df[S.latitude_col], errors='coerce')
 
     # Fill county for cities without county-level divisions (Dongguan, Zhongshan)
     logger.info("Filling county for cities without county-level divisions...")
-    null_county_mask = df['区县级'].isna()
-    df.loc[null_county_mask, '区县级'] = df.loc[null_county_mask, '市级']
+    null_county_mask = df[S.county_col].isna()
+    df.loc[null_county_mask, S.county_col] = df.loc[null_county_mask, S.city_col]
     filled_count = null_county_mask.sum()
-    logger.info(f"  Filled {filled_count} records (Dongguan: {(df['市级'] == '东莞市').sum()}, Zhongshan: {(df['市级'] == '中山市').sum()})")
+    logger.info(f"  Filled {filled_count} records")
 
     # Step 1: Basic text cleaning
     logger.info("Step 1: Basic text cleaning...")
@@ -115,7 +118,7 @@ def main():
         if idx % 10000 == 0:
             logger.info(f"  Progress: {idx}/{len(df)}")
 
-        cleaned = normalize_village_name(row['自然村'])
+        cleaned = normalize_village_name(row[S.village_name_col_raw])
         cleaning_results.append({
             '自然村_基础清洗': cleaned.clean_name,
             '有括号': 1 if cleaned.had_brackets else 0,
@@ -126,13 +129,12 @@ def main():
 
     # Step 2: Administrative prefix removal
     logger.info("Step 2: Administrative prefix removal...")
-    # Process ALL villages (removed invalid filtering)
 
     # Prepare input dataframe with required columns
     # batch_clean_prefixes expects columns: 自然村, 村委会
     input_df = pd.DataFrame({
         '自然村': df_clean['自然村_基础清洗'].values,
-        '村委会': df_clean['村委会'].values
+        '村委会': df_clean[S.committee_col_raw].values
     })
 
     df_prefix_results = batch_clean_prefixes(
@@ -143,7 +145,7 @@ def main():
 
     # Merge results back
     df_combined = df_clean.copy()
-    df_combined['自然村_去前缀'] = df_prefix_results['自然村_去前缀'].values
+    df_combined[S.village_name_col_prefix_removed] = df_prefix_results['自然村_去前缀'].values
     df_combined['有前缀'] = df_prefix_results['有前缀'].values
     df_combined['去除的前缀'] = df_prefix_results['去除的前缀'].values
     df_combined['前缀匹配来源'] = df_prefix_results['前缀匹配来源'].values
@@ -158,9 +160,9 @@ def main():
             logger.info(f"  Progress: {idx}/{len(df_combined)}")
 
         has_numeral, base_name, numeral_suffix = detect_trailing_numeral(
-            row['自然村_去前缀']
+            row[S.village_name_col_prefix_removed]
         )
-        normalized = row['自然村_去前缀']
+        normalized = row[S.village_name_col_prefix_removed]
 
         normalization_results.append({
             '自然村_规范化': normalized,
@@ -177,11 +179,10 @@ def main():
         if idx % 10000 == 0:
             logger.info(f"  Progress: {idx}/{len(df_final)}")
 
-        # Extract character set for all villages
         char_set = extract_char_set(row['自然村_规范化'])
         char_sets.append({
-            '字符集': json.dumps(list(char_set), ensure_ascii=False),
-            '字符数量': len(char_set)
+            S.char_set_col: json.dumps(list(char_set), ensure_ascii=False),
+            S.char_count_col: len(char_set)
         })
 
     df_final = pd.concat([df_final, pd.DataFrame(char_sets)], axis=1)
@@ -189,46 +190,48 @@ def main():
     # Select only the 12 essential columns for the optimized table
     logger.info("Selecting essential columns for optimized table...")
     df_optimized = df_final[[
-        '市级', '区县级', '乡镇级', '村委会',
-        '自然村_规范化', '自然村_去前缀',
-        'longitude', 'latitude', '语言分布',
-        '字符集', '字符数量'
+        S.city_col, S.county_col, S.township_col, S.committee_col_raw,
+        '自然村_规范化', S.village_name_col_prefix_removed,
+        S.longitude_col, S.latitude_col, S.language_col_raw,
+        S.char_set_col, S.char_count_col
     ]].copy()
 
-    # Rename 自然村_规范化 to 自然村_规范名
-    df_optimized = df_optimized.rename(columns={'自然村_规范化': '自然村_规范名'})
+    # Rename: committee (行政村→村委会) and village name (自然村_规范化→自然村_规范名)
+    rename_map = {S.committee_col_raw: S.committee_col_preprocessed,
+                  '自然村_规范化': S.village_name_col_normalized}
+    df_optimized = df_optimized.rename(columns=rename_map)
 
     # Add village_id column (will be populated after writing to database)
-    df_optimized['village_id'] = None
+    df_optimized[S.village_id_col] = None
 
     # Write to database
     logger.info("Writing optimized table to database...")
-    df_optimized.to_sql("广东省自然村_预处理", conn, if_exists="replace", index=False)
+    df_optimized.to_sql(S.preprocessed_table, conn, if_exists="replace", index=False)
 
     # Populate village_id using ROWID
     logger.info("Populating village_id...")
     cursor = conn.cursor()
-    cursor.execute("""
-        UPDATE 广东省自然村_预处理
-        SET village_id = 'v_' || ROWID
+    cursor.execute(f"""
+        UPDATE {S.preprocessed_table}
+        SET {S.village_id_col} = 'v_' || ROWID
     """)
     conn.commit()
     logger.info("village_id populated successfully")
 
     # Verify
-    cursor.execute("SELECT COUNT(*) FROM 广东省自然村_预处理")
+    cursor.execute(f"SELECT COUNT(*) FROM {S.preprocessed_table}")
     count = cursor.fetchone()[0]
     logger.info(f"Verification: {count} rows written")
 
-    # Statistics (using df_final which has all the metadata)
+    # Statistics
     total_count = len(df_final)
-    valid_count = (df_final['字符数量'] > 0).sum()
-    prefix_count = df_final[df_final['字符数量'] > 0]['有前缀'].sum()
-    numbered_count = df_final[df_final['字符数量'] > 0]['有编号后缀'].sum()
+    valid_count = (df_final[S.char_count_col] > 0).sum()
+    prefix_count = df_final[df_final[S.char_count_col] > 0]['有前缀'].sum()
+    numbered_count = df_final[df_final[S.char_count_col] > 0]['有编号后缀'].sum()
 
     logger.info(f"\nPreprocessing Statistics:")
     logger.info(f"  Total villages: {total_count}")
-    logger.info(f"  Valid villages (字符数量 > 0): {valid_count}")
+    logger.info(f"  Valid villages ({S.char_count_col} > 0): {valid_count}")
     logger.info(f"  Prefixes removed: {prefix_count} ({100*prefix_count/valid_count:.1f}%)")
     logger.info(f"  Numbered villages: {numbered_count} ({100*numbered_count/valid_count:.1f}%)")
 

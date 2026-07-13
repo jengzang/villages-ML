@@ -18,6 +18,7 @@ from ..analysis.char_frequency import (
     calculate_lift
 )
 from ..analysis.regional_analysis import compute_regional_tendency
+from src.schema import DEFAULT_SCHEMA
 from ..analysis.diagnostic_reports import create_comprehensive_report
 
 logger = logging.getLogger(__name__)
@@ -297,8 +298,7 @@ class CharacterFrequencyPipeline:
 
             # Regional statistics
             for level in self.config.frequency.region_levels:
-                level_map = {'city': '市级', 'county': '区县级', 'township': '乡镇级'}
-                col = level_map[level]
+                col = DEFAULT_SCHEMA.level_map[level]
                 n_regions = villages_df[col].nunique()
                 f.write(f"Number of {level} regions: {n_regions:,}\n")
 

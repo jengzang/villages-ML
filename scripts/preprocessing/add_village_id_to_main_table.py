@@ -1,7 +1,7 @@
 """Add village_id to main table by mapping to preprocessed table ROWID.
 
 This script:
-1. Adds village_id column to main table (广东省自然村)
+1. Adds village_id column to main table
 2. Populates village_id by mapping to preprocessed table
 3. Creates index on village_id for fast lookups
 """
@@ -9,6 +9,12 @@ This script:
 import sqlite3
 import logging
 from pathlib import Path
+import sys
+
+project_root = Path(__file__).parent.parent.parent
+sys.path.insert(0, str(project_root))
+
+from src.schema import DEFAULT_SCHEMA as S
 
 logging.basicConfig(
     level=logging.INFO,
@@ -31,36 +37,36 @@ def main():
 
     # Add village_id column if not exists
     try:
-        cursor.execute("ALTER TABLE 广东省自然村 ADD COLUMN village_id TEXT")
-        logger.info("Added village_id column to main table")
+        cursor.execute(f"ALTER TABLE {S.raw_table} ADD COLUMN {S.village_id_col} TEXT")
+        logger.info(f"Added {S.village_id_col} column to {S.raw_table}")
     except sqlite3.OperationalError as e:
         if "duplicate column name" in str(e).lower():
-            logger.info("village_id column already exists")
+            logger.info(f"{S.village_id_col} column already exists")
         else:
             raise
 
     # Populate village_id by mapping to preprocessed table
-    logger.info("Populating village_id...")
-    cursor.execute("""
-        UPDATE 广东省自然村
-        SET village_id = (
-            SELECT p.village_id
-            FROM 广东省自然村_预处理 p
-            WHERE p.市级 = 广东省自然村.市级
-              AND p.区县级 = 广东省自然村.区县级
-              AND p.乡镇级 = 广东省自然村.乡镇级
-              AND p.村委会 = 广东省自然村.村委会
-              AND p.自然村 = 广东省自然村.自然村
+    logger.info(f"Populating {S.village_id_col}...")
+    cursor.execute(f"""
+        UPDATE {S.raw_table}
+        SET {S.village_id_col} = (
+            SELECT p.{S.village_id_col}
+            FROM {S.preprocessed_table} p
+            WHERE p.{S.city_col} = {S.raw_table}.{S.city_col}
+              AND p.{S.county_col} = {S.raw_table}.{S.county_col}
+              AND p.{S.township_col} = {S.raw_table}.{S.township_col}
+              AND p.{S.committee_col_preprocessed} = {S.raw_table}.{S.committee_col_raw}
+              AND p.{S.village_name_col_raw} = {S.raw_table}.{S.village_name_col_raw}
             LIMIT 1
         )
     """)
     conn.commit()
-    logger.info("village_id populated")
+    logger.info(f"{S.village_id_col} populated")
 
     # Create index
-    logger.info("Creating index on village_id...")
+    logger.info(f"Creating index on {S.village_id_col}...")
     try:
-        cursor.execute("CREATE INDEX idx_main_village_id ON 广东省自然村(village_id)")
+        cursor.execute(f"CREATE INDEX idx_main_village_id ON {S.raw_table}({S.village_id_col})")
         logger.info("Index created successfully")
     except sqlite3.OperationalError as e:
         if "already exists" in str(e).lower():
@@ -69,23 +75,23 @@ def main():
             raise
 
     # Verify
-    cursor.execute("SELECT COUNT(*) FROM 广东省自然村 WHERE village_id IS NOT NULL")
+    cursor.execute(f"SELECT COUNT(*) FROM {S.raw_table} WHERE {S.village_id_col} IS NOT NULL")
     populated_count = cursor.fetchone()[0]
 
-    cursor.execute("SELECT COUNT(*) FROM 广东省自然村")
+    cursor.execute(f"SELECT COUNT(*) FROM {S.raw_table}")
     total_count = cursor.fetchone()[0]
 
     coverage = (populated_count / total_count * 100) if total_count > 0 else 0
 
     logger.info(f"\nVerification:")
     logger.info(f"  Total villages: {total_count:,}")
-    logger.info(f"  Populated village_id: {populated_count:,}")
+    logger.info(f"  Populated {S.village_id_col}: {populated_count:,}")
     logger.info(f"  Coverage: {coverage:.2f}%")
 
     if populated_count < total_count:
-        cursor.execute("SELECT COUNT(*) FROM 广东省自然村 WHERE village_id IS NULL LIMIT 10")
+        cursor.execute(f"SELECT COUNT(*) FROM {S.raw_table} WHERE {S.village_id_col} IS NULL LIMIT 10")
         null_count = cursor.fetchone()[0]
-        logger.warning(f"  {null_count:,} villages have NULL village_id")
+        logger.warning(f"  {null_count:,} villages have NULL {S.village_id_col}")
 
     conn.close()
     logger.info("Complete!")

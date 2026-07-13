@@ -13,6 +13,7 @@ from typing import Dict, List, Optional
 import pandas as pd
 import numpy as np
 
+from src.schema import VillageTableSchema, DEFAULT_SCHEMA
 from src.features.feature_extractor import VillageFeatureExtractor
 from src.data.db_writer import (
     create_feature_materialization_tables,
@@ -24,12 +25,14 @@ from src.pipelines.region_aggregation import compute_and_write_all_aggregates
 logger = logging.getLogger(__name__)
 
 
-def load_villages(conn: sqlite3.Connection) -> pd.DataFrame:
+def load_villages(conn: sqlite3.Connection,
+                  schema: VillageTableSchema = DEFAULT_SCHEMA) -> pd.DataFrame:
     """
     Load all villages from database.
 
     Args:
         conn: SQLite database connection
+        schema: Table schema definition
 
     Returns:
         DataFrame with village data
@@ -37,8 +40,8 @@ def load_villages(conn: sqlite3.Connection) -> pd.DataFrame:
     logger.info("Loading villages from database")
 
     # Query all columns and rename them
-    # Column order: 市级, 县区级, 乡镇, 村委会, 自然村, 拼音, 语言分布, longitude, latitude, 备注, 更新时间, 数据来源
-    query = "SELECT * FROM 广东省自然村"
+    # Column order: known from raw table schema (市级, ...)
+    query = f"SELECT * FROM {schema.raw_table}"
 
     df = pd.read_sql_query(query, conn)
 
@@ -177,26 +180,30 @@ def write_village_features(conn: sqlite3.Connection, run_id: str, df: pd.DataFra
 
     # Get village_id mapping from preprocessed table
     logger.info("Loading village_id mapping from preprocessed table...")
-    id_mapping_query = """
+    S = DEFAULT_SCHEMA
+    id_mapping_query = f"""
     SELECT
-        市级, 区县级, 乡镇级, 村委会, 自然村_去前缀,
-        village_id
-    FROM 广东省自然村_预处理
-    WHERE village_id IS NOT NULL
+        {S.city_col}, {S.county_col}, {S.township_col},
+        {S.committee_col_preprocessed}, {S.village_name_col_prefix_removed},
+        {S.village_id_col}
+    FROM {S.preprocessed_table}
+    WHERE {S.village_id_col} IS NOT NULL
     """
     id_mapping = pd.read_sql(id_mapping_query, conn)
 
     # Merge village_id into features dataframe
     # Match on: city, county, town, village_committee, village_name
+    right_cols = [S.city_col, S.county_col, S.township_col,
+                  S.committee_col_preprocessed, S.village_name_col_prefix_removed]
     df = df.merge(
         id_mapping,
         left_on=['city', 'county', 'town', 'village_committee', 'village_name'],
-        right_on=['市级', '区县级', '乡镇级', '村委会', '自然村_去前缀'],
+        right_on=right_cols,
         how='left'
     )
 
     # Drop the Chinese column names from merge
-    df = df.drop(columns=['市级', '区县级', '乡镇级', '村委会', '自然村_去前缀'], errors='ignore')
+    df = df.drop(columns=right_cols, errors='ignore')
 
     # Check coverage
     null_count = df['village_id'].isna().sum()
