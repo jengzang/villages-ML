@@ -649,7 +649,7 @@ def _sync_active_run_ids(db_path, phase_id, run_id, output_run_id):
         elif phase_id == 3 and output_run_id:
             upsert_active_run_id(conn, 'semantic_indices', output_run_id, 'semantic_indices')
         elif phase_id == 4:
-            upsert_active_run_id(conn, 'spatial_clusters', 'spatial_eps_20', 'spatial_clusters')
+            upsert_active_run_id(conn, 'spatial_clusters', 'spatial_eps_25', 'spatial_clusters')
             upsert_active_run_id(conn, 'spatial_integration', 'spatial_multi_tendency', 'spatial_tendency_integration')
         elif phase_id == 5 and run_id:
             upsert_active_run_id(conn, 'village_features', run_id, 'village_features')

@@ -27,8 +27,8 @@ from src.pipelines.spatial_pipeline import run_spatial_analysis_pipeline
 MULTI_RESOLUTION_CONFIGS = [
     {"run_id": "spatial_eps_05",      "eps_km": 0.5,  "min_samples": 15, "method": "dbscan"},
     {"run_id": "spatial_eps_15",      "eps_km": 1.5,  "min_samples": 25, "method": "dbscan"},
-    {"run_id": "spatial_eps_30",      "eps_km": 3.0,  "min_samples": 35, "method": "dbscan"},
-    {"run_id": "spatial_eps_50",      "eps_km": 5.0,  "min_samples": 50, "method": "dbscan"},
+    {"run_id": "spatial_eps_25",      "eps_km": 2.5,  "min_samples": 60, "method": "dbscan"},
+    {"run_id": "spatial_eps_45",      "eps_km": 4.5,  "min_samples": 100, "method": "dbscan"},
     {"run_id": "spatial_hdbscan_v2",  "eps_km": 0.0,  "min_samples": 35, "method": "hdbscan"},
 ]
 
