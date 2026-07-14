@@ -18,6 +18,19 @@ def test_ngram_indexes_use_space_constrained_query_shapes():
     assert "ON ngram_tendency(level, region, lift DESC)" in index_sql
 
 
+def test_ngram_indexes_keep_baseline_filters_until_benchmarked():
+    index_sql = "\n".join(NGRAM_INDEXES)
+
+    assert "idx_regional_ngram_level " in index_sql
+    assert "ON regional_ngram_frequency(level)" in index_sql
+
+    assert "idx_regional_ngram_region " in index_sql
+    assert "ON regional_ngram_frequency(region)" in index_sql
+
+    assert "idx_ngram_sig_level " in index_sql
+    assert "ON ngram_significance(level)" in index_sql
+
+
 def test_ngram_indexes_do_not_create_redundant_single_column_indexes():
     index_sql = "\n".join(NGRAM_INDEXES)
 
@@ -26,13 +39,11 @@ def test_ngram_indexes_do_not_create_redundant_single_column_indexes():
         "idx_regional_ngram_city ",
         "idx_regional_ngram_county ",
         "idx_regional_ngram_township ",
-        "idx_regional_ngram_region ",
         "idx_ngram_tendency_city ",
         "idx_ngram_tendency_county ",
         "idx_ngram_tendency_township ",
         "idx_ngram_tendency_region ",
         "idx_ngram_tendency_lift ",
-        "idx_ngram_sig_level ",
         "idx_ngram_sig_city ",
         "idx_ngram_sig_county ",
         "idx_ngram_sig_township ",

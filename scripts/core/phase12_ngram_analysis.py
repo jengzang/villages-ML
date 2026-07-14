@@ -817,8 +817,11 @@ def step8_create_optimization_indexes(db_path: str):
     ngram_indexes = [
         ('idx_ngram_freq_n_position_frequency', 'ngram_frequency', 'n, position, frequency DESC'),
         ('idx_regional_ngram_level_n_region_freq', 'regional_ngram_frequency', 'level, n, region, frequency DESC'),
+        ('idx_regional_ngram_level', 'regional_ngram_frequency', 'level'),
+        ('idx_regional_ngram_region', 'regional_ngram_frequency', 'region'),
         ('idx_ngram_tendency_level_lift', 'ngram_tendency', 'level, lift DESC'),
         ('idx_ngram_tendency_level_region_lift', 'ngram_tendency', 'level, region, lift DESC'),
+        ('idx_ngram_sig_level', 'ngram_significance', 'level'),
     ]
 
     for idx_name, table, columns in ngram_indexes:
@@ -831,7 +834,7 @@ def step8_create_optimization_indexes(db_path: str):
     conn.commit()
     conn.close()
 
-    print("\n[OK] Query-shaped n-gram indexes created (4 indexes)")
+    print("\n[OK] Query-shaped n-gram indexes created (7 indexes)")
     print("Note: Regional n-gram index uses region display key to limit index size")
 
 
