@@ -810,16 +810,15 @@ def step8_create_optimization_indexes(db_path: str):
     for level, count in results:
         print(f"    - {level}: {count}")
 
-    # Part 3: Create optimized indexes on ngram_tendency
-    # Note: Only create essential indexes to minimize space overhead
-    # Removed redundant indexes: level_county, level_city (data deleted, dynamic aggregation used)
-    # PRIMARY KEY already covers: (level, city, county, township, ngram, n, position)
-    print("\n[3/3] Creating optimized indexes on ngram_tendency...")
+    # Part 3: Create query-shaped n-gram indexes.
+    # PRIMARY KEY already covers: (level, city, county, township, ngram, n, position).
+    # Keep this set intentionally small for space-constrained deployments.
+    print("\n[3/3] Creating query-shaped n-gram indexes...")
     ngram_indexes = [
-        ('idx_ngram_tendency_level_ngram', 'ngram_tendency', 'level, ngram'),
-        ('idx_ngram_tendency_level_township', 'ngram_tendency', 'level, township'),
+        ('idx_ngram_freq_n_position_frequency', 'ngram_frequency', 'n, position, frequency DESC'),
+        ('idx_regional_ngram_level_n_region_freq', 'regional_ngram_frequency', 'level, n, region, frequency DESC'),
         ('idx_ngram_tendency_level_lift', 'ngram_tendency', 'level, lift DESC'),
-        ('idx_ngram_tendency_region', 'ngram_tendency', 'region')  # For backward compatibility
+        ('idx_ngram_tendency_level_region_lift', 'ngram_tendency', 'level, region, lift DESC'),
     ]
 
     for idx_name, table, columns in ngram_indexes:
@@ -832,9 +831,8 @@ def step8_create_optimization_indexes(db_path: str):
     conn.commit()
     conn.close()
 
-    print("\n[OK] Optimized indexes created (4 indexes)")
-    print("Note: City/County level indexes removed - using dynamic aggregation")
-    print("Expected API performance improvement: 95%+ (2-3s -> 0.1-0.15s)")
+    print("\n[OK] Query-shaped n-gram indexes created (4 indexes)")
+    print("Note: Regional n-gram index uses region display key to limit index size")
 
 
 def step9_populate_village_ngrams(db_path: str):

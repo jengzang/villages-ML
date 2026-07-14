@@ -112,26 +112,17 @@ NGRAM_SCHEMA = {
 }
 
 # Indexes for faster queries
+# Keep this list small: production storage is constrained, so each index should
+# match a stable backend query shape instead of covering speculative access.
 NGRAM_INDEXES = [
     "CREATE INDEX IF NOT EXISTS idx_ngram_freq_ngram ON ngram_frequency(ngram)",
-    "CREATE INDEX IF NOT EXISTS idx_ngram_freq_n ON ngram_frequency(n)",
-    "CREATE INDEX IF NOT EXISTS idx_regional_ngram_level ON regional_ngram_frequency(level)",
-    "CREATE INDEX IF NOT EXISTS idx_regional_ngram_city ON regional_ngram_frequency(city)",
-    "CREATE INDEX IF NOT EXISTS idx_regional_ngram_county ON regional_ngram_frequency(county)",
-    "CREATE INDEX IF NOT EXISTS idx_regional_ngram_township ON regional_ngram_frequency(township)",
-    "CREATE INDEX IF NOT EXISTS idx_regional_ngram_region ON regional_ngram_frequency(region)",
+    "CREATE INDEX IF NOT EXISTS idx_ngram_freq_n_position_frequency ON ngram_frequency(n, position, frequency DESC)",
+    "CREATE INDEX IF NOT EXISTS idx_regional_ngram_level_n_region_freq ON regional_ngram_frequency(level, n, region, frequency DESC)",
     "CREATE INDEX IF NOT EXISTS idx_regional_ngram_ngram ON regional_ngram_frequency(ngram)",
     "CREATE INDEX IF NOT EXISTS idx_ngram_tendency_level ON ngram_tendency(level)",
-    "CREATE INDEX IF NOT EXISTS idx_ngram_tendency_city ON ngram_tendency(city)",
-    "CREATE INDEX IF NOT EXISTS idx_ngram_tendency_county ON ngram_tendency(county)",
-    "CREATE INDEX IF NOT EXISTS idx_ngram_tendency_township ON ngram_tendency(township)",
-    "CREATE INDEX IF NOT EXISTS idx_ngram_tendency_region ON ngram_tendency(region)",
-    "CREATE INDEX IF NOT EXISTS idx_ngram_tendency_lift ON ngram_tendency(lift DESC)",
+    "CREATE INDEX IF NOT EXISTS idx_ngram_tendency_level_region_lift ON ngram_tendency(level, region, lift DESC)",
+    "CREATE INDEX IF NOT EXISTS idx_ngram_tendency_level_lift ON ngram_tendency(level, lift DESC)",
     "CREATE INDEX IF NOT EXISTS idx_ngram_tendency_zscore ON ngram_tendency(z_score DESC)",
-    "CREATE INDEX IF NOT EXISTS idx_ngram_sig_level ON ngram_significance(level)",
-    "CREATE INDEX IF NOT EXISTS idx_ngram_sig_city ON ngram_significance(city)",
-    "CREATE INDEX IF NOT EXISTS idx_ngram_sig_county ON ngram_significance(county)",
-    "CREATE INDEX IF NOT EXISTS idx_ngram_sig_township ON ngram_significance(township)",
     "CREATE INDEX IF NOT EXISTS idx_ngram_sig_pvalue ON ngram_significance(p_value)",
     "CREATE INDEX IF NOT EXISTS idx_structural_patterns_type ON structural_patterns(pattern_type)",
     "CREATE INDEX IF NOT EXISTS idx_village_ngrams_id ON village_ngrams(village_id)",
