@@ -334,6 +334,57 @@ def print_summary(results: Dict[int, bool], start_time: float, dry_run: bool):
     print()
 
 
+def run_database_maintenance(db_path: str, run_vacuum: bool = False) -> bool:
+    """Run final SQLite maintenance after the selected phase pipeline finishes."""
+    import os
+    import sqlite3
+
+    if not os.path.exists(db_path):
+        print(f"\n⚠️  Database maintenance skipped: database not found at {db_path}")
+        return False
+
+    print("\n" + "="*80)
+    print("Database Maintenance (数据库维护)")
+    print("="*80)
+    print(f"Database: {db_path}")
+
+    start_time = time.time()
+    conn = sqlite3.connect(db_path)
+    try:
+        print("\n[1/2] Running ANALYZE...")
+        conn.execute("ANALYZE")
+        conn.commit()
+        print("      [OK] ANALYZE completed")
+
+        print("[2/2] Running PRAGMA optimize...")
+        conn.execute("PRAGMA optimize")
+        print("      [OK] PRAGMA optimize completed")
+
+        if run_vacuum:
+            conn.close()
+            conn = None
+            print("\n[Optional] Running VACUUM...")
+            vacuum_start = time.time()
+            vacuum_conn = sqlite3.connect(db_path)
+            try:
+                vacuum_conn.execute("VACUUM")
+            finally:
+                vacuum_conn.close()
+            print(f"      [OK] VACUUM completed in {time.time() - vacuum_start:.1f}s")
+        else:
+            print("\n[Optional] VACUUM skipped. Use --vacuum to rebuild and compact the database.")
+
+        elapsed = time.time() - start_time
+        print(f"\n✅ Database maintenance completed in {elapsed:.1f}s")
+        return True
+    except sqlite3.Error as e:
+        print(f"\n⚠️  Database maintenance failed: {e}")
+        return False
+    finally:
+        if conn is not None:
+            conn.close()
+
+
 # Phase definitions with complete metadata
 PHASES = {
     # ========== CORE PHASES (0-7) ==========
@@ -887,6 +938,16 @@ def main():
         action="store_true",
         help="Skip dependency checking (advanced users only, 跳过依赖检查)"
     )
+    behavior_group.add_argument(
+        "--skip-maintenance",
+        action="store_true",
+        help="Skip final ANALYZE and PRAGMA optimize after execution (跳过退出前数据库维护)"
+    )
+    behavior_group.add_argument(
+        "--vacuum",
+        action="store_true",
+        help="Run VACUUM during final maintenance. Requires extra disk space and time. (退出前额外执行 VACUUM)"
+    )
 
     # Information arguments
     info_group = parser.add_argument_group('Information (信息查询)')
@@ -1025,6 +1086,11 @@ def main():
 
     # Print summary
     print_summary(results, overall_start, args.dry_run)
+
+    if not args.dry_run and results and not args.skip_maintenance:
+        run_database_maintenance(args.db_path, run_vacuum=args.vacuum)
+    elif args.skip_maintenance:
+        print("\n⚠️  Final database maintenance skipped due to --skip-maintenance")
 
     # Return exit code
     all_success = all(results.values())
