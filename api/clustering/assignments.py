@@ -6,12 +6,13 @@ from fastapi import APIRouter, Depends, Query, HTTPException
 from typing import List, Optional
 import sqlite3
 
-from ..dependencies import get_db, execute_query, execute_single
-from ..config import DEFAULT_RUN_ID, DEFAULT_CLUSTERING_RUN_ID
+from ..dependencies import get_db, get_dbpath, execute_query, execute_single
 from ..models import ClusterAssignment, ClusterProfile, ClusteringMetrics
-from ..run_id_manager import run_id_manager
+from ..run_id_manager import get_run_id_manager
+from ..schema_runtime import qcolumn, qtable, run_id_analysis_type, normalize_region_level
+from ..schema_keys import C, T
 
-router = APIRouter(prefix="/clustering", tags=["clustering"])
+router = APIRouter(prefix="/clustering")
 
 
 @router.get("/assignments", response_model=List[ClusterAssignment])
@@ -20,7 +21,8 @@ def get_cluster_assignments(
     algorithm: str = Query("kmeans", description="聚类算法", pattern="^(kmeans|dbscan|gmm)$"),
     region_level: str = Query("county", description="区域级别", pattern="^(city|county|township)$"),
     cluster_id: Optional[int] = Query(None, description="聚类ID过滤"),
-    db: sqlite3.Connection = Depends(get_db)
+    db: sqlite3.Connection = Depends(get_db),
+    dbpath: str = Depends(get_dbpath),
 ):
     """
     获取聚类分配结果
@@ -37,24 +39,34 @@ def get_cluster_assignments(
     """
     # 如果未指定run_id，使用活跃版本
     if run_id is None:
-        run_id = run_id_manager.get_active_run_id("clustering_county")
+        run_id = get_run_id_manager(dbpath).get_active_run_id(
+            run_id_analysis_type(dbpath, T.CLUSTER_ASSIGNMENTS)
+        )
 
-    query = """
+    table = qtable(dbpath, T.CLUSTER_ASSIGNMENTS)
+    run_id_col = qcolumn(dbpath, T.CLUSTER_ASSIGNMENTS, C.CLUSTER_ASSIGNMENTS.RUN_ID)
+    algorithm_col = qcolumn(dbpath, T.CLUSTER_ASSIGNMENTS, C.CLUSTER_ASSIGNMENTS.ALGORITHM)
+    region_level_col = qcolumn(dbpath, T.CLUSTER_ASSIGNMENTS, C.CLUSTER_ASSIGNMENTS.REGION_LEVEL)
+    region_name_col = qcolumn(dbpath, T.CLUSTER_ASSIGNMENTS, C.CLUSTER_ASSIGNMENTS.REGION_NAME)
+    cluster_id_col = qcolumn(dbpath, T.CLUSTER_ASSIGNMENTS, C.CLUSTER_ASSIGNMENTS.CLUSTER_ID)
+    distance_col = qcolumn(dbpath, T.CLUSTER_ASSIGNMENTS, C.CLUSTER_ASSIGNMENTS.DISTANCE_TO_CENTROID)
+
+    query = f"""
         SELECT
-            region_name,
-            cluster_id,
-            distance_to_centroid
-        FROM cluster_assignments
-        WHERE run_id = ? AND algorithm = ? AND region_level = ?
+            {region_name_col} as region_name,
+            {cluster_id_col} as cluster_id,
+            {distance_col} as distance_to_centroid
+        FROM {table}
+        WHERE {run_id_col} = ? AND {algorithm_col} = ? AND {region_level_col} = ?
     """
-    params = [run_id, algorithm, region_level]
+    params = [run_id, algorithm, normalize_region_level(dbpath, T.CLUSTER_ASSIGNMENTS, region_level)]
 
     # 现场过滤：聚类ID
     if cluster_id is not None:
-        query += " AND cluster_id = ?"
+        query += f" AND {cluster_id_col} = ?"
         params.append(cluster_id)
 
-    query += " ORDER BY cluster_id, region_name"
+    query += f" ORDER BY {cluster_id_col}, {region_name_col}"
 
     results = execute_query(db, query, tuple(params))
 
@@ -73,7 +85,8 @@ def get_cluster_assignment_by_region(
     region_name: str = Query(..., description="区域名称"),
     algorithm: str = Query("kmeans", description="聚类算法", pattern="^(kmeans|dbscan|gmm)$"),
     region_level: str = Query("county", description="区域级别"),
-    db: sqlite3.Connection = Depends(get_db)
+    db: sqlite3.Connection = Depends(get_db),
+    dbpath: str = Depends(get_dbpath),
 ):
     """
     获取指定区域的聚类分配
@@ -90,18 +103,28 @@ def get_cluster_assignment_by_region(
     """
     # 如果未指定run_id，使用活跃版本
     if run_id is None:
-        run_id = run_id_manager.get_active_run_id("clustering_county")
+        run_id = get_run_id_manager(dbpath).get_active_run_id(
+            run_id_analysis_type(dbpath, T.CLUSTER_ASSIGNMENTS)
+        )
 
-    query = """
+    table = qtable(dbpath, T.CLUSTER_ASSIGNMENTS)
+    run_id_col = qcolumn(dbpath, T.CLUSTER_ASSIGNMENTS, C.CLUSTER_ASSIGNMENTS.RUN_ID)
+    algorithm_col = qcolumn(dbpath, T.CLUSTER_ASSIGNMENTS, C.CLUSTER_ASSIGNMENTS.ALGORITHM)
+    region_level_col = qcolumn(dbpath, T.CLUSTER_ASSIGNMENTS, C.CLUSTER_ASSIGNMENTS.REGION_LEVEL)
+    region_name_col = qcolumn(dbpath, T.CLUSTER_ASSIGNMENTS, C.CLUSTER_ASSIGNMENTS.REGION_NAME)
+    cluster_id_col = qcolumn(dbpath, T.CLUSTER_ASSIGNMENTS, C.CLUSTER_ASSIGNMENTS.CLUSTER_ID)
+    distance_col = qcolumn(dbpath, T.CLUSTER_ASSIGNMENTS, C.CLUSTER_ASSIGNMENTS.DISTANCE_TO_CENTROID)
+
+    query = f"""
         SELECT
-            region_name,
-            cluster_id,
-            distance_to_centroid
-        FROM cluster_assignments
-        WHERE run_id = ? AND region_name = ? AND algorithm = ? AND region_level = ?
+            {region_name_col} as region_name,
+            {cluster_id_col} as cluster_id,
+            {distance_col} as distance_to_centroid
+        FROM {table}
+        WHERE {run_id_col} = ? AND {region_name_col} = ? AND {algorithm_col} = ? AND {region_level_col} = ?
     """
 
-    result = execute_single(db, query, (run_id, region_name, algorithm, region_level))
+    result = execute_single(db, query, (run_id, region_name, algorithm, normalize_region_level(dbpath, T.CLUSTER_ASSIGNMENTS, region_level)))
 
     if not result:
         raise HTTPException(
@@ -117,7 +140,8 @@ def get_cluster_profiles(
     run_id: Optional[str] = Query(None, description="聚类运行ID（留空使用活跃版本）"),
     algorithm: str = Query("kmeans", description="聚类算法", pattern="^(kmeans|dbscan|gmm)$"),
     cluster_id: Optional[int] = Query(None, description="聚类ID"),
-    db: sqlite3.Connection = Depends(get_db)
+    db: sqlite3.Connection = Depends(get_db),
+    dbpath: str = Depends(get_dbpath),
 ):
     """
     获取聚类画像
@@ -133,26 +157,37 @@ def get_cluster_profiles(
     """
     # 如果未指定run_id，使用活跃版本
     if run_id is None:
-        run_id = run_id_manager.get_active_run_id("clustering_county")
+        run_id = get_run_id_manager(dbpath).get_active_run_id(
+            run_id_analysis_type(dbpath, T.CLUSTER_PROFILES)
+        )
 
-    query = """
+    table = qtable(dbpath, T.CLUSTER_PROFILES)
+    run_id_col = qcolumn(dbpath, T.CLUSTER_PROFILES, C.CLUSTER_PROFILES.RUN_ID)
+    algorithm_col = qcolumn(dbpath, T.CLUSTER_PROFILES, C.CLUSTER_PROFILES.ALGORITHM)
+    cluster_id_col = qcolumn(dbpath, T.CLUSTER_PROFILES, C.CLUSTER_PROFILES.CLUSTER_ID)
+    cluster_size_col = qcolumn(dbpath, T.CLUSTER_PROFILES, C.CLUSTER_PROFILES.CLUSTER_SIZE)
+    top_features_col = qcolumn(dbpath, T.CLUSTER_PROFILES, C.CLUSTER_PROFILES.TOP_FEATURES_JSON)
+    top_semantic_col = qcolumn(dbpath, T.CLUSTER_PROFILES, C.CLUSTER_PROFILES.TOP_SEMANTIC_CATEGORIES_JSON)
+    top_suffixes_col = qcolumn(dbpath, T.CLUSTER_PROFILES, C.CLUSTER_PROFILES.TOP_SUFFIXES_JSON)
+
+    query = f"""
         SELECT
-            cluster_id,
-            cluster_size,
-            top_features_json,
-            top_semantic_categories_json,
-            top_suffixes_json
-        FROM cluster_profiles
-        WHERE run_id = ? AND algorithm = ?
+            {cluster_id_col} as cluster_id,
+            {cluster_size_col} as cluster_size,
+            {top_features_col} as top_features_json,
+            {top_semantic_col} as top_semantic_categories_json,
+            {top_suffixes_col} as top_suffixes_json
+        FROM {table}
+        WHERE {run_id_col} = ? AND {algorithm_col} = ?
     """
     params = [run_id, algorithm]
 
     # 现场过滤：聚类ID
     if cluster_id is not None:
-        query += " AND cluster_id = ?"
+        query += f" AND {cluster_id_col} = ?"
         params.append(cluster_id)
 
-    query += " ORDER BY cluster_id"
+    query += f" ORDER BY {cluster_id_col}"
 
     results = execute_query(db, query, tuple(params))
 
@@ -179,7 +214,8 @@ def get_cluster_profiles(
 def get_clustering_metrics(
     run_id: Optional[str] = Query(None, description="分析运行ID（留空使用活跃版本）"),
     algorithm: Optional[str] = Query(None, description="聚类算法", pattern="^(kmeans|dbscan|gmm)$"),
-    db: sqlite3.Connection = Depends(get_db)
+    db: sqlite3.Connection = Depends(get_db),
+    dbpath: str = Depends(get_dbpath),
 ):
     """
     获取聚类质量指标
@@ -194,26 +230,36 @@ def get_clustering_metrics(
     """
     # 如果未指定run_id，使用活跃版本
     if run_id is None:
-        run_id = run_id_manager.get_active_run_id("clustering_county")
+        run_id = get_run_id_manager(dbpath).get_active_run_id(
+            run_id_analysis_type(dbpath, T.CLUSTERING_METRICS)
+        )
 
-    query = """
+    table = qtable(dbpath, T.CLUSTERING_METRICS)
+    run_id_col = qcolumn(dbpath, T.CLUSTERING_METRICS, C.CLUSTERING_METRICS.RUN_ID)
+    algorithm_col = qcolumn(dbpath, T.CLUSTERING_METRICS, C.CLUSTERING_METRICS.ALGORITHM)
+    k_col = qcolumn(dbpath, T.CLUSTERING_METRICS, C.CLUSTERING_METRICS.K)
+    silhouette_col = qcolumn(dbpath, T.CLUSTERING_METRICS, C.CLUSTERING_METRICS.SILHOUETTE_SCORE)
+    davies_col = qcolumn(dbpath, T.CLUSTERING_METRICS, C.CLUSTERING_METRICS.DAVIES_BOULDIN_INDEX)
+    calinski_col = qcolumn(dbpath, T.CLUSTERING_METRICS, C.CLUSTERING_METRICS.CALINSKI_HARABASZ_SCORE)
+
+    query = f"""
         SELECT
-            algorithm,
-            k,
-            silhouette_score,
-            davies_bouldin_index,
-            calinski_harabasz_score
-        FROM clustering_metrics
-        WHERE run_id = ?
+            {algorithm_col} as algorithm,
+            {k_col} as k,
+            {silhouette_col} as silhouette_score,
+            {davies_col} as davies_bouldin_index,
+            {calinski_col} as calinski_harabasz_score
+        FROM {table}
+        WHERE {run_id_col} = ?
     """
     params = [run_id]
 
     # 现场过滤：算法
     if algorithm is not None:
-        query += " AND algorithm = ?"
+        query += f" AND {algorithm_col} = ?"
         params.append(algorithm)
 
-    query += " ORDER BY algorithm, k"
+    query += f" ORDER BY {algorithm_col}, {k_col}"
 
     results = execute_query(db, query, tuple(params))
 
@@ -231,7 +277,8 @@ def get_best_clustering(
     run_id: Optional[str] = Query(None, description="分析运行ID（留空使用活跃版本）"),
     algorithm: str = Query("kmeans", description="聚类算法", pattern="^(kmeans|dbscan|gmm)$"),
     metric: str = Query("silhouette_score", description="优化指标"),
-    db: sqlite3.Connection = Depends(get_db)
+    db: sqlite3.Connection = Depends(get_db),
+    dbpath: str = Depends(get_dbpath),
 ):
     """
     获取最优聚类配置
@@ -247,21 +294,36 @@ def get_best_clustering(
     """
     # 如果未指定run_id，使用活跃版本
     if run_id is None:
-        run_id = run_id_manager.get_active_run_id("clustering_county")
+        run_id = get_run_id_manager(dbpath).get_active_run_id(
+            run_id_analysis_type(dbpath, T.CLUSTERING_METRICS)
+        )
 
     # 根据指标选择排序方向（silhouette和CH越大越好，DB越小越好）
     order = "DESC" if metric in ["silhouette_score", "calinski_harabasz_score"] else "ASC"
+    metric_column_map = {
+        "silhouette_score": qcolumn(dbpath, T.CLUSTERING_METRICS, C.CLUSTERING_METRICS.SILHOUETTE_SCORE),
+        "davies_bouldin_index": qcolumn(dbpath, T.CLUSTERING_METRICS, C.CLUSTERING_METRICS.DAVIES_BOULDIN_INDEX),
+        "calinski_harabasz_score": qcolumn(dbpath, T.CLUSTERING_METRICS, C.CLUSTERING_METRICS.CALINSKI_HARABASZ_SCORE),
+    }
+    metric_col = metric_column_map.get(metric, qcolumn(dbpath, T.CLUSTERING_METRICS, C.CLUSTERING_METRICS.SILHOUETTE_SCORE))
+    table = qtable(dbpath, T.CLUSTERING_METRICS)
+    run_id_col = qcolumn(dbpath, T.CLUSTERING_METRICS, C.CLUSTERING_METRICS.RUN_ID)
+    algorithm_col = qcolumn(dbpath, T.CLUSTERING_METRICS, C.CLUSTERING_METRICS.ALGORITHM)
+    k_col = qcolumn(dbpath, T.CLUSTERING_METRICS, C.CLUSTERING_METRICS.K)
+    silhouette_col = qcolumn(dbpath, T.CLUSTERING_METRICS, C.CLUSTERING_METRICS.SILHOUETTE_SCORE)
+    davies_col = qcolumn(dbpath, T.CLUSTERING_METRICS, C.CLUSTERING_METRICS.DAVIES_BOULDIN_INDEX)
+    calinski_col = qcolumn(dbpath, T.CLUSTERING_METRICS, C.CLUSTERING_METRICS.CALINSKI_HARABASZ_SCORE)
 
     query = f"""
         SELECT
-            algorithm,
-            k,
-            silhouette_score,
-            davies_bouldin_index,
-            calinski_harabasz_score
-        FROM clustering_metrics
-        WHERE run_id = ? AND algorithm = ?
-        ORDER BY {metric} {order}
+            {algorithm_col} as algorithm,
+            {k_col} as k,
+            {silhouette_col} as silhouette_score,
+            {davies_col} as davies_bouldin_index,
+            {calinski_col} as calinski_harabasz_score
+        FROM {table}
+        WHERE {run_id_col} = ? AND {algorithm_col} = ?
+        ORDER BY {metric_col} {order}
         LIMIT 1
     """
 

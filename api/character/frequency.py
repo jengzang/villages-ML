@@ -6,56 +6,62 @@ from fastapi import APIRouter, Depends, Query, HTTPException
 from typing import List, Optional
 import sqlite3
 
-from ..dependencies import get_db, execute_query
-from ..config import DEFAULT_RUN_ID, DEFAULT_PAGE_SIZE, MAX_PAGE_SIZE
+from ..dependencies import get_db, get_dbpath, execute_query
 from ..models import CharFrequency, RegionalCharFrequency
+from ..schema_runtime import qcolumn, qtable, normalize_region_level
+from ..schema_keys import C, T
 
-router = APIRouter(prefix="/character/frequency", tags=["character"])
+router = APIRouter(prefix="/character/frequency")
 
 
 @router.get("/global", response_model=List[CharFrequency])
 def get_global_character_frequency(
-    run_id: str = Query(DEFAULT_RUN_ID, description="分析运行ID"),
     top_n: int = Query(100, ge=1, le=1000, description="返回前N个字符"),
     min_frequency: Optional[int] = Query(None, ge=1, description="最小频次过滤"),
-    db: sqlite3.Connection = Depends(get_db)
+    db: sqlite3.Connection = Depends(get_db),
+    dbpath: str = Depends(get_dbpath),
 ):
     """
     获取全局字符频率
     Get global character frequency statistics
 
     Args:
-        run_id: 分析运行ID
         top_n: 返回前N个高频字符
         min_frequency: 最小频次阈值（现场过滤）
 
     Returns:
         List[CharFrequency]: 字符频率列表
     """
-    query = """
+    table = qtable(dbpath, T.CHAR_FREQUENCY_GLOBAL)
+    char_col = qcolumn(dbpath, T.CHAR_FREQUENCY_GLOBAL, C.CHAR_FREQUENCY_GLOBAL.CHAR)
+    frequency_col = qcolumn(dbpath, T.CHAR_FREQUENCY_GLOBAL, C.CHAR_FREQUENCY_GLOBAL.FREQUENCY)
+    village_count_col = qcolumn(dbpath, T.CHAR_FREQUENCY_GLOBAL, C.CHAR_FREQUENCY_GLOBAL.VILLAGE_COUNT)
+    rank_col = qcolumn(dbpath, T.CHAR_FREQUENCY_GLOBAL, C.CHAR_FREQUENCY_GLOBAL.RANK)
+
+    query = f"""
         SELECT
-            char as character,
-            frequency,
-            village_count,
-            rank
-        FROM char_frequency_global
-        WHERE run_id = ?
+            {char_col} as character,
+            {frequency_col} as frequency,
+            {village_count_col} as village_count,
+            {rank_col} as rank
+        FROM {table}
+        WHERE 1=1
     """
-    params = [run_id]
+    params = []
 
     # 现场过滤：最小频次
     if min_frequency is not None:
-        query += " AND frequency >= ?"
+        query += f" AND {frequency_col} >= ?"
         params.append(min_frequency)
 
     # 现场排序和限制
-    query += " ORDER BY frequency DESC LIMIT ?"
+    query += f" ORDER BY {frequency_col} DESC LIMIT ?"
     params.append(top_n)
 
     results = execute_query(db, query, tuple(params))
 
     if not results:
-        raise HTTPException(status_code=404, detail=f"No data found for run_id: {run_id}")
+        raise HTTPException(status_code=404, detail="No data found")
 
     return results
 
@@ -63,74 +69,78 @@ def get_global_character_frequency(
 @router.get("/regional", response_model=List[RegionalCharFrequency])
 def get_regional_character_frequency(
     region_level: str = Query(..., description="区域级别", pattern="^(city|county|township)$"),
-    region_name: Optional[str] = Query(None, description="区域名称（可选，用于向后兼容）"),
-    city: Optional[str] = Query(None, description="市级（可选）"),
-    county: Optional[str] = Query(None, description="区县级（可选）"),
-    township: Optional[str] = Query(None, description="乡镇级（可选）"),
+    region_name: Optional[str] = Query(None, description="区域名称（模糊匹配，向后兼容）"),
+    city: Optional[str] = Query(None, description="市级过滤"),
+    county: Optional[str] = Query(None, description="区县级过滤"),
+    township: Optional[str] = Query(None, description="乡镇级过滤"),
     top_n: int = Query(50, ge=1, le=500, description="每个区域返回前N个字符"),
-    db: sqlite3.Connection = Depends(get_db)
+    db: sqlite3.Connection = Depends(get_db),
+    dbpath: str = Depends(get_dbpath),
 ):
     """
-    获取区域字符频率（支持层级查询）
-    Get regional character frequency statistics with hierarchical filtering
-
-    支持两种查询方式：
-    1. 层级查询：使用 city/county/township 参数精确指定位置
-    2. 名称查询：使用 region_name 参数（可能返回多个重复地名的数据）
+    获取区域字符频率
+    Get regional character frequency statistics
 
     Args:
         region_level: 区域级别 (city/county/township)
-        region_name: 区域名称（可选，向后兼容）
-        city: 市级名称（可选）
-        county: 区县级名称（可选）
-        township: 乡镇级名称（可选）
+        region_name: 区域名称（模糊匹配，可选，向后兼容）
+        city: 市级过滤（精确匹配）
+        county: 区县级过滤（精确匹配）
+        township: 乡镇级过滤（精确匹配）
         top_n: 每个区域返回前N个字符
 
     Returns:
         List[RegionalCharFrequency]: 区域字符频率列表
-
-    Examples:
-        # 精确查询特定位置
-        ?region_level=township&city=清远市&county=清新区&township=太平镇&top_n=50
-
-        # 查询所有同名地点
-        ?region_level=township&region_name=太平镇&top_n=50
     """
     # 构建查询
-    query = """
-        SELECT
-            city,
-            county,
-            township,
-            region_name,
-            char as character,
-            frequency,
-            rank_within_region as rank
-        FROM char_regional_analysis
-        WHERE region_level = ?
+    table = qtable(dbpath, T.CHAR_REGIONAL_ANALYSIS)
+    region_level_col = qcolumn(dbpath, T.CHAR_REGIONAL_ANALYSIS, C.CHAR_REGIONAL_ANALYSIS.REGION_LEVEL)
+    region_name_col = qcolumn(dbpath, T.CHAR_REGIONAL_ANALYSIS, C.CHAR_REGIONAL_ANALYSIS.REGION_NAME)
+    city_col = qcolumn(dbpath, T.CHAR_REGIONAL_ANALYSIS, C.CHAR_REGIONAL_ANALYSIS.CITY)
+    county_col = qcolumn(dbpath, T.CHAR_REGIONAL_ANALYSIS, C.CHAR_REGIONAL_ANALYSIS.COUNTY)
+    township_col = qcolumn(dbpath, T.CHAR_REGIONAL_ANALYSIS, C.CHAR_REGIONAL_ANALYSIS.TOWNSHIP)
+    char_col = qcolumn(dbpath, T.CHAR_REGIONAL_ANALYSIS, C.CHAR_REGIONAL_ANALYSIS.CHAR)
+    frequency_col = qcolumn(dbpath, T.CHAR_REGIONAL_ANALYSIS, C.CHAR_REGIONAL_ANALYSIS.FREQUENCY)
+    village_count_col = qcolumn(dbpath, T.CHAR_REGIONAL_ANALYSIS, C.CHAR_REGIONAL_ANALYSIS.VILLAGE_COUNT)
+    rank_col = qcolumn(dbpath, T.CHAR_REGIONAL_ANALYSIS, C.CHAR_REGIONAL_ANALYSIS.RANK_WITHIN_REGION)
+
+    query = f"""
+        SELECT DISTINCT
+            {region_level_col} as region_level,
+            {region_name_col} as region_name,
+            {city_col} as city,
+            {county_col} as county,
+            {township_col} as township,
+            {char_col} as character,
+            {frequency_col} as frequency,
+            {village_count_col} as village_count,
+            {rank_col} as rank
+        FROM {table}
+        WHERE {region_level_col} = ?
     """
-    params = [region_level]
+    params = [normalize_region_level(dbpath, T.CHAR_REGIONAL_ANALYSIS, region_level)]
 
-    # 层级过滤（优先使用）
+    # 优先使用层级参数（精确匹配）
     if city is not None:
-        query += " AND city = ?"
+        query += f" AND {city_col} = ?"
         params.append(city)
-
     if county is not None:
-        query += " AND county = ?"
+        query += f" AND {county_col} = ?"
         params.append(county)
-
+    elif city is not None and region_level == 'township':
+        # Handle 东莞市/中山市 (no county level)
+        query += f" AND ({county_col} IS NULL OR {county_col} = '')"
     if township is not None:
-        query += " AND township = ?"
+        query += f" AND {township_col} = ?"
         params.append(township)
 
-    # 名称过滤（向后兼容）
+    # 向后兼容：region_name（模糊匹配）
     if region_name is not None:
-        query += " AND region_name = ?"
-        params.append(region_name)
+        query += f" AND ({city_col} = ? OR {county_col} = ? OR {township_col} = ?)"
+        params.extend([region_name, region_name, region_name])
 
     # 现场排序和限制（每个区域前N个）
-    query += " AND rank_within_region <= ? ORDER BY city, county, township, rank_within_region"
+    query += f" AND {rank_col} <= ? ORDER BY {region_name_col}, {rank_col}"
     params.append(top_n)
 
     results = execute_query(db, query, tuple(params))

@@ -6,25 +6,37 @@
 - POST /api/compute/features/aggregate - 区域特征聚合
 """
 
-from fastapi import APIRouter, HTTPException, Depends
+from fastapi import APIRouter, HTTPException, Depends, Query
 from typing import Dict, Any
 import logging
+import threading
 
 from .validators import FeatureExtractionParams, FeatureAggregationParams
 from .cache import compute_cache
 from .engine import FeatureEngine
-from .timeout import timeout, TimeoutException
-from ..config import get_db_path
+from .timeout import run_with_timeout, TimeoutException
+from ..config import COMPUTE_FEATURE_TIMEOUT, COMPUTE_TIMEOUT
+from ..schema_config import DEFAULT_DATABASE_KEY
+from ..schema_runtime import resolve_db_path
 
 logger = logging.getLogger(__name__)
 
-router = APIRouter(prefix="/compute/features", tags=["compute-features"])
+router = APIRouter(prefix="/compute/features")
+
+_engine_instances = {}
+_engine_lock = threading.Lock()
 
 
-def get_feature_engine():
+def get_feature_engine(
+    dbpath: str = Query(DEFAULT_DATABASE_KEY, description="VillagesML database mapping key, not a filesystem path"),
+):
     """获取特征引擎实例"""
-    db_path = get_db_path()
-    return FeatureEngine(db_path)
+    if dbpath not in _engine_instances:
+        with _engine_lock:
+            if dbpath not in _engine_instances:
+                db_path = resolve_db_path(dbpath)
+                _engine_instances[dbpath] = FeatureEngine(db_path, dbpath=dbpath)
+    return _engine_instances[dbpath]
 
 
 @router.post("/extract")
@@ -33,11 +45,10 @@ async def extract_features(
     engine: FeatureEngine = Depends(get_feature_engine)
 ) -> Dict[str, Any]:
     """
-    批量提取村庄特征
+    批量提取村庄特征（需要登录）
 
     Args:
         params: 提取参数
-
     Returns:
         特征提取结果
 
@@ -55,8 +66,7 @@ async def extract_features(
         logger.info(f"Extracting features for {len(params.villages)} villages")
 
         # 执行提取（带超时控制）
-        with timeout(3):  # 3秒超时
-            result = engine.extract_features(params.dict())
+        result = await run_with_timeout(engine.extract_features, COMPUTE_FEATURE_TIMEOUT, params.dict())
 
         # 缓存结果
         compute_cache.set("feature_extract", params.dict(), result)
@@ -67,6 +77,13 @@ async def extract_features(
     except TimeoutException as e:
         logger.error(f"Feature extraction timeout: {str(e)}")
         raise HTTPException(status_code=408, detail=str(e))
+
+    except HTTPException:
+        raise
+
+    except ValueError as e:
+        logger.warning(f"Feature extraction validation error: {str(e)}")
+        raise HTTPException(status_code=422, detail=str(e))
 
     except Exception as e:
         logger.error(f"Feature extraction error: {str(e)}")
@@ -79,11 +96,10 @@ async def aggregate_features(
     engine: FeatureEngine = Depends(get_feature_engine)
 ) -> Dict[str, Any]:
     """
-    聚合区域特征
+    聚合区域特征（需要登录）
 
     Args:
         params: 聚合参数
-
     Returns:
         特征聚合结果
 
@@ -101,8 +117,7 @@ async def aggregate_features(
         logger.info(f"Aggregating features for {len(params.region_names)} regions")
 
         # 执行聚合（带超时控制）
-        with timeout(5):  # 5秒超时
-            result = engine.aggregate_features(params.dict())
+        result = await run_with_timeout(engine.aggregate_features, COMPUTE_TIMEOUT, params.dict())
 
         # 缓存结果
         compute_cache.set("feature_aggregate", params.dict(), result)
@@ -114,9 +129,14 @@ async def aggregate_features(
         logger.error(f"Feature aggregation timeout: {str(e)}")
         raise HTTPException(status_code=408, detail=str(e))
 
+    except HTTPException:
+        raise
+
+    except ValueError as e:
+        logger.warning(f"Feature aggregation validation error: {str(e)}")
+        raise HTTPException(status_code=422, detail=str(e))
+
     except Exception as e:
         logger.error(f"Feature aggregation error: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Aggregation failed: {str(e)}")
 
-
-import time

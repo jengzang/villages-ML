@@ -2,20 +2,17 @@
 API配置文件
 Configuration file for the Villages Analysis API
 """
-from pathlib import Path
 import os
 
-# 数据库路径常量 - 便于修改
-# Database path constant - easy to modify
-DB_PATH = os.getenv("VILLAGES_DB_PATH", "data/villages.db")
+# 数据库路径常量 - 使用项目统一路径管理
+# Database path constant - using project's centralized path management
+from app.common.path import GD_VILLAGE_DB_PATH
+DB_PATH = os.getenv("VILLAGES_DB_PATH", GD_VILLAGE_DB_PATH)
 
 # 查询策略配置
 # Query policy configuration
-DEFAULT_PAGE_SIZE = 50
-MAX_PAGE_SIZE = 1000
-DEFAULT_RUN_ID = "freq_final_001"  # 默认分析运行ID（字符频率）
-DEFAULT_SEMANTIC_RUN_ID = "semantic_001"  # 语义分析默认run_id
-DEFAULT_CLUSTERING_RUN_ID = "cluster_001"  # 聚类分析默认run_id
+DEFAULT_PAGE_SIZE = 20
+MAX_PAGE_SIZE = 50
 
 # API配置
 # API configuration
@@ -44,12 +41,18 @@ QUERY_TIMEOUT = 30
 ENABLE_CACHE = False
 CACHE_TTL = 3600  # 1 hour
 
-# 计算模块配置
-# Compute module configuration
-COMPUTE_TIMEOUT = 5  # 单次计算超时（秒）
-COMPUTE_SCAN_TIMEOUT = 15  # 参数扫描超时（秒）
-COMPUTE_CACHE_SIZE = 100  # 缓存条目数
-COMPUTE_CACHE_TTL = 3600  # 缓存过期时间（秒）
+# 计算模块超时配置 (秒)
+# Compute module timeout configuration (seconds)
+COMPUTE_TIMEOUT = 15            # 标准计算（聚类/子集对比/聚合）
+COMPUTE_FEATURE_TIMEOUT = 15  # 特征提取（多表联合查询）
+COMPUTE_SEMANTIC_TIMEOUT = 5  # 语义分析（共现/网络）
+COMPUTE_SCAN_TIMEOUT = 15     # 参数扫描（多个k值迭代）
+COMPUTE_HEAVY_TIMEOUT = 60    # 重量级计算（全表扫描采样）
+
+# 缓存配置
+# Cache configuration
+COMPUTE_CACHE_SIZE = 100   # 缓存条目数
+COMPUTE_CACHE_TTL = 3600   # 缓存过期时间（秒）
 
 
 def get_db_path() -> str:

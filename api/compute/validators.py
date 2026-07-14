@@ -4,9 +4,13 @@
 使用Pydantic进行请求参数验证
 """
 
-from pydantic import BaseModel, Field, validator
+from pydantic import BaseModel, Field, validator, model_validator
 from typing import List, Optional, Dict, Any
 from enum import Enum
+
+from ..schema_keys import semantic_feature_categories
+
+SUBSET_SEMANTIC_TAG_WHITELIST = semantic_feature_categories()
 
 
 class AlgorithmType(str, Enum):
@@ -39,6 +43,12 @@ class PreprocessingConfig(BaseModel):
     standardize: bool = True
 
 
+class DBSCANConfig(BaseModel):
+    """DBSCAN算法配置"""
+    eps: float = Field(0.5, gt=0, le=10, description="邻域半径")
+    min_samples: int = Field(5, ge=1, le=20, description="最小样本数")
+
+
 class ClusteringParams(BaseModel):
     """聚类参数验证"""
     algorithm: AlgorithmType
@@ -47,6 +57,7 @@ class ClusteringParams(BaseModel):
     region_filter: Optional[List[str]] = None
     features: FeatureConfig = Field(default_factory=FeatureConfig)
     preprocessing: PreprocessingConfig = Field(default_factory=PreprocessingConfig)
+    dbscan_config: Optional[DBSCANConfig] = None
     random_state: int = Field(42, ge=0)
 
     @validator('k')
@@ -94,6 +105,7 @@ class SemanticAnalysisParams(BaseModel):
     min_cooccurrence: int = Field(5, ge=1, le=100)
     alpha: float = Field(0.05, gt=0, lt=1)
     categories: Optional[List[str]] = None
+    detail: bool = Field(False, description="是否使用详细表（53子类别）")
 
     @validator('categories')
     def validate_categories(cls, v):
@@ -112,6 +124,7 @@ class SemanticNetworkParams(BaseModel):
     region_name: Optional[str] = None
     min_edge_weight: float = Field(0.5, ge=0, le=10)
     centrality_metrics: List[str] = Field(["degree", "betweenness"])
+    detail: bool = Field(False, description="是否使用详细表（53子类别）")
 
     @validator('centrality_metrics')
     def validate_centrality_metrics(cls, v):
@@ -124,23 +137,16 @@ class SemanticNetworkParams(BaseModel):
 
 
 class VillageInput(BaseModel):
-    """村庄输入"""
-    name: str = Field(..., min_length=1, max_length=50)
-    city: Optional[str] = None
-    county: Optional[str] = None
+    """村庄输入（仅支持 ID）"""
+    village_id: str = Field(..., min_length=1, max_length=50, description="村庄唯一标识符")
 
 
 class FeatureExtractionParams(BaseModel):
     """特征提取参数"""
-    villages: List[VillageInput] = Field(..., min_items=1, max_items=1000)
+    villages: List[VillageInput] = Field(..., min_items=1, max_items=100000)
     features: Dict[str, Any] = Field(default_factory=dict)
 
-    @validator('villages')
-    def validate_villages(cls, v):
-        """验证村庄列表"""
-        if len(v) > 1000:
-            raise ValueError("Cannot extract features for more than 1000 villages at once")
-        return v
+
 
 
 class FeatureAggregationParams(BaseModel):
@@ -159,6 +165,39 @@ class SubsetFilter(BaseModel):
     name_pattern: Optional[str] = None
     sample_size: Optional[int] = Field(None, ge=100, le=10000)
 
+    @validator('semantic_tags')
+    def validate_semantic_tags(cls, v):
+        """Validate semantic tags against village_features sem_* whitelist."""
+        if not v:
+            return v
+
+        normalized_tags = []
+        invalid_tags = []
+        seen = set()
+
+        for tag in v:
+            if tag is None:
+                continue
+
+            normalized = str(tag).strip().lower()
+            if normalized.startswith("sem_"):
+                normalized = normalized[4:]
+
+            if normalized in SUBSET_SEMANTIC_TAG_WHITELIST:
+                if normalized not in seen:
+                    seen.add(normalized)
+                    normalized_tags.append(normalized)
+            else:
+                invalid_tags.append(str(tag))
+
+        if invalid_tags:
+            allowed = ", ".join(sorted(SUBSET_SEMANTIC_TAG_WHITELIST))
+            raise ValueError(
+                f"Invalid semantic_tags: {invalid_tags}. Allowed tags: {allowed}"
+            )
+
+        return normalized_tags or None
+
 
 class SubsetClusteringParams(BaseModel):
     """子集聚类参数"""
@@ -167,9 +206,29 @@ class SubsetClusteringParams(BaseModel):
 
 
 class ComparisonGroup(BaseModel):
-    """对比组"""
-    filter: SubsetFilter
+    """对比组（支持两种模式：village_ids 或 filter）"""
     label: str = Field(..., min_length=1, max_length=50)
+    village_ids: Optional[List[int]] = Field(None, description="村庄ID列表（推荐使用）")
+    filter: Optional[SubsetFilter] = Field(None, description="过滤条件（向后兼容）")
+
+    @validator('village_ids')
+    def validate_village_ids(cls, v):
+        """验证村庄ID列表"""
+        if v is not None:
+            if len(v) == 0:
+                raise ValueError("village_ids cannot be empty")
+            if len(v) > 100000:
+                raise ValueError("Cannot compare more than 100000 villages at once")
+        return v
+
+    @model_validator(mode='after')
+    def validate_filter_or_ids(self):
+        """确保 village_ids 或 filter 至少提供一个"""
+        if self.village_ids is None and self.filter is None:
+            raise ValueError("Either village_ids or filter must be provided")
+        if self.village_ids is not None and self.filter is not None:
+            raise ValueError("Cannot specify both village_ids and filter")
+        return self
 
 
 class SubsetComparisonParams(BaseModel):
@@ -177,3 +236,107 @@ class SubsetComparisonParams(BaseModel):
     group_a: ComparisonGroup
     group_b: ComparisonGroup
     analysis: Dict[str, Any] = Field(default_factory=dict)
+
+
+class TendencyMetric(str, Enum):
+    """倾向性指标类型"""
+    Z_SCORE = "z_score"
+    LIFT = "lift"
+    LOG_ODDS = "log_odds"
+
+
+class SamplingStrategy(str, Enum):
+    """采样策略"""
+    RANDOM = "random"
+    STRATIFIED = "stratified"
+    SPATIAL = "spatial"
+
+
+class CharacterTendencyClusteringParams(BaseModel):
+    """字符倾向性聚类参数"""
+    algorithm: AlgorithmType
+    k: Optional[int] = Field(None, ge=2, le=20)
+    region_level: RegionLevel
+    region_filter: Optional[List[str]] = None
+    top_n_chars: int = Field(100, ge=10, le=500, description="每个区域选择top N字符")
+    tendency_metric: TendencyMetric = TendencyMetric.Z_SCORE
+    preprocessing: PreprocessingConfig = Field(default_factory=PreprocessingConfig)
+    dbscan_config: DBSCANConfig = Field(default_factory=DBSCANConfig)
+    random_state: int = Field(42, ge=0)
+
+    @validator('k')
+    def validate_k(cls, v, values):
+        """验证k值"""
+        algorithm = values.get('algorithm')
+        if algorithm in [AlgorithmType.KMEANS, AlgorithmType.GMM] and v is None:
+            raise ValueError("k is required for kmeans/gmm")
+        if algorithm == AlgorithmType.DBSCAN and v is not None:
+            raise ValueError("k should not be specified for dbscan")
+        return v
+
+
+class SampledVillageClusteringParams(BaseModel):
+    """采样村庄聚类参数"""
+    algorithm: AlgorithmType
+    k: Optional[int] = Field(None, ge=2, le=20)
+    sampling_strategy: SamplingStrategy = SamplingStrategy.RANDOM
+    sample_size: int = Field(5000, ge=100, le=10000, description="采样大小")
+    filter: Optional[SubsetFilter] = None
+    features: FeatureConfig = Field(default_factory=FeatureConfig)
+    preprocessing: PreprocessingConfig = Field(default_factory=PreprocessingConfig)
+    random_state: int = Field(42, ge=0)
+
+    @validator('k')
+    def validate_k(cls, v, values):
+        """验证k值"""
+        algorithm = values.get('algorithm')
+        if algorithm in [AlgorithmType.KMEANS, AlgorithmType.GMM] and v is None:
+            raise ValueError("k is required for kmeans/gmm")
+        if algorithm == AlgorithmType.DBSCAN and v is not None:
+            raise ValueError("k should not be specified for dbscan")
+        return v
+
+
+class SpatialAwareClusteringParams(BaseModel):
+    """空间感知聚类参数"""
+    algorithm: AlgorithmType
+    k: Optional[int] = Field(None, ge=2, le=20)
+    spatial_run_id: str = Field(..., description="空间聚类运行ID")
+    features: Dict[str, bool] = Field(
+        default_factory=lambda: {
+            "use_semantic_profile": True,
+            "use_naming_patterns": True,
+            "use_geographic": True,
+            "use_cluster_size": True
+        }
+    )
+    preprocessing: PreprocessingConfig = Field(default_factory=PreprocessingConfig)
+    random_state: int = Field(42, ge=0)
+
+    @validator('k')
+    def validate_k(cls, v, values):
+        """验证k值"""
+        algorithm = values.get('algorithm')
+        if algorithm in [AlgorithmType.KMEANS, AlgorithmType.GMM] and v is None:
+            raise ValueError("k is required for kmeans/gmm")
+        if algorithm == AlgorithmType.DBSCAN and v is not None:
+            raise ValueError("k should not be specified for dbscan")
+        return v
+
+
+class HierarchicalClusteringParams(BaseModel):
+    """层次聚类参数"""
+    algorithm: AlgorithmType
+    k_city: int = Field(3, ge=2, le=10, description="市级聚类数")
+    k_county: int = Field(8, ge=2, le=15, description="县级聚类数")
+    k_township: int = Field(15, ge=2, le=30, description="镇级聚类数")
+    features: FeatureConfig = Field(default_factory=FeatureConfig)
+    preprocessing: PreprocessingConfig = Field(default_factory=PreprocessingConfig)
+    random_state: int = Field(42, ge=0)
+
+    @validator('algorithm')
+    def validate_algorithm(cls, v):
+        """验证算法类型"""
+        if v == AlgorithmType.DBSCAN:
+            raise ValueError("DBSCAN is not supported for hierarchical clustering")
+        return v

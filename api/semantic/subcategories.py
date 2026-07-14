@@ -1,146 +1,158 @@
-"""
-语义子类别API
-Semantic Subcategory API endpoints
+﻿"""Semantic subcategory API endpoints."""
 
-Phase 17: 提供细化的语义子类别查询功能
-"""
-from fastapi import APIRouter, Depends, Query, HTTPException
-from typing import List, Optional, Dict
-import sqlite3
-import json
 from pathlib import Path
+import json
+import sqlite3
+from typing import Dict, List, Optional
 
-from ..dependencies import get_db, execute_query
+from fastapi import APIRouter, Depends, HTTPException, Query
 
-router = APIRouter(prefix="/semantic/subcategory", tags=["semantic"])
+from ..dependencies import execute_query, get_db, get_dbpath
+from ..schema_runtime import normalize_region_level, qcolumn, qtable
+from ..schema_keys import T
 
-# 加载 v4_pilot 词典
-LEXICON_PATH = Path(__file__).parent.parent.parent / "data" / "semantic_lexicon_v4_pilot.json"
+router = APIRouter(prefix="/semantic/subcategory")
+
+PROJECT_ROOT = Path(__file__).resolve().parents[3]
+LEXICON_PATH = PROJECT_ROOT / "data" / "semantic_lexicon_v4.json"
+LEGACY_LEXICON_PATH = PROJECT_ROOT.parent / "data" / "semantic_lexicon_v4.json"
+
+
+def _subcategory_schema(dbpath: str, logical_table: str):
+    return qtable(dbpath, logical_table), lambda name: qcolumn(dbpath, logical_table, name)
 
 
 def load_lexicon() -> Dict:
-    """加载 v4_pilot 词典"""
-    with open(LEXICON_PATH, 'r', encoding='utf-8') as f:
-        return json.load(f)
+    """Load the semantic lexicon from disk."""
+    lexicon_path = LEXICON_PATH if LEXICON_PATH.exists() else LEGACY_LEXICON_PATH
+    if not lexicon_path.exists():
+        raise HTTPException(status_code=404, detail="Semantic lexicon is not available on server")
+
+    try:
+        with open(lexicon_path, "r", encoding="utf-8") as f:
+            data = json.load(f)
+    except json.JSONDecodeError:
+        raise HTTPException(status_code=500, detail="Semantic lexicon file is corrupted")
+
+    if not isinstance(data, dict):
+        raise HTTPException(status_code=500, detail="Semantic lexicon format is invalid")
+
+    return data
+
+
+def _flatten_subcategories(lexicon: Dict) -> Dict[str, list]:
+    """Flatten v4 nested {parent: {sub: [chars]}} into {parent_sub: [chars]}."""
+    categories = lexicon.get("categories", {})
+    if categories:
+        flat = {}
+        for parent, subs in categories.items():
+            for sub, chars in subs.items():
+                flat[f"{parent}_{sub}"] = chars
+        return flat
+    # backward compat: old v4_hybrid flat format
+    return lexicon.get("subcategories", {})
 
 
 @router.get("/list")
 def get_subcategories(
-    parent_category: Optional[str] = Query(None, description="父类别过滤（mountain/water）")
+    parent_category: Optional[str] = Query(None, description="Parent category filter (terrain/water)"),
 ):
-    """
-    获取所有子类别列表
-    Get all subcategories
-
-    Args:
-        parent_category: 可选的父类别过滤
-
-    Returns:
-        Dict: 子类别列表及其字符
-    """
+    """Get all subcategories, optionally filtered by parent category."""
     lexicon = load_lexicon()
-    subcategories = lexicon.get("subcategories", {})
+    subcategories = _flatten_subcategories(lexicon)
 
     if parent_category:
-        # 过滤特定父类别的子类别
         filtered = {
-            k: v for k, v in subcategories.items()
-            if k.startswith(f"{parent_category}_")
+            key: value
+            for key, value in subcategories.items()
+            if key.startswith(f"{parent_category}_")
         }
         if not filtered:
             raise HTTPException(
                 status_code=404,
-                detail=f"No subcategories found for parent category: {parent_category}"
+                detail=f"No subcategories found for parent category: {parent_category}",
             )
         return {
             "parent_category": parent_category,
             "subcategories": filtered,
-            "count": len(filtered)
+            "count": len(filtered),
         }
 
     return {
+        "parent_categories": sorted(lexicon.get("categories", {}).keys()),
         "subcategories": subcategories,
-        "count": len(subcategories)
+        "count": len(subcategories),
     }
 
 
 @router.get("/chars/{subcategory}")
 def get_subcategory_chars(subcategory: str):
-    """
-    获取特定子类别的字符列表
-    Get characters for a specific subcategory
-
-    Args:
-        subcategory: 子类别名称（如 mountain_peak）
-
-    Returns:
-        Dict: 子类别信息及其字符列表
-    """
+    """Get characters under a specific semantic subcategory (parent_sub format, e.g. terrain_peak_ridge)."""
     lexicon = load_lexicon()
+
+    # try nested v4 format first: {parent: {sub: [chars]}}
+    categories = lexicon.get("categories", {})
+    if "_" in subcategory:
+        parts = subcategory.split("_", 1)
+        parent, sub = parts[0], parts[1]
+        if parent in categories and sub in categories[parent]:
+            chars = categories[parent][sub]
+            return {
+                "subcategory": subcategory,
+                "parent_category": parent,
+                "characters": chars,
+                "char_count": len(chars),
+            }
+
+    # fallback: old flat format
     subcategories = lexicon.get("subcategories", {})
+    if subcategory in subcategories:
+        parent = subcategory.split("_")[0] if "_" in subcategory else "unknown"
+        return {
+            "subcategory": subcategory,
+            "parent_category": parent,
+            "characters": subcategories[subcategory],
+            "char_count": len(subcategories[subcategory]),
+        }
 
-    if subcategory not in subcategories:
-        raise HTTPException(
-            status_code=404,
-            detail=f"Subcategory not found: {subcategory}"
-        )
-
-    # 确定父类别
-    parent = subcategory.split("_")[0] if "_" in subcategory else "unknown"
-
-    return {
-        "subcategory": subcategory,
-        "parent_category": parent,
-        "characters": subcategories[subcategory],
-        "char_count": len(subcategories[subcategory])
-    }
+    raise HTTPException(status_code=404, detail=f"Subcategory not found: {subcategory}")
 
 
 @router.get("/vtf/global")
 def get_global_subcategory_vtf(
-    parent_category: Optional[str] = Query(None, description="父类别过滤"),
-    subcategory: Optional[str] = Query(None, description="子类别过滤"),
-    limit: int = Query(100, ge=1, le=1000, description="返回记录数限制"),
-    db: sqlite3.Connection = Depends(get_db)
+    parent_category: Optional[str] = Query(None, description="Parent category filter"),
+    subcategory: Optional[str] = Query(None, description="Subcategory filter"),
+    limit: int = Query(100, ge=1, le=1000, description="Max records"),
+    db: sqlite3.Connection = Depends(get_db),
+    dbpath: str = Depends(get_dbpath),
 ):
-    """
-    获取全局子类别虚拟词频
-    Get global subcategory virtual term frequency
-
-    Args:
-        parent_category: 可选的父类别过滤
-        subcategory: 可选的子类别过滤
-        limit: 返回记录数限制
-
-    Returns:
-        List[Dict]: 子类别 VTF 统计
-    """
-    query = """
+    """Get global subcategory VTF metrics."""
+    table, col = _subcategory_schema(dbpath, "semantic_subcategory_vtf_global")
+    query = f"""
         SELECT
-            subcategory,
-            parent_category,
-            char_count,
-            village_count,
-            vtf,
-            percentage
-        FROM semantic_subcategory_vtf_global
+            {col("subcategory")} as subcategory,
+            {col("parent_category")} as parent_category,
+            {col("char_count")} as char_count,
+            {col("village_count")} as village_count,
+            {col("vtf")} as vtf,
+            {col("percentage")} as percentage
+        FROM {table}
         WHERE 1=1
     """
-    params = []
+    params: List[object] = []
 
     if parent_category:
-        query += " AND parent_category = ?"
+        query += f" AND {col('parent_category')} = ?"
         params.append(parent_category)
 
     if subcategory:
-        query += " AND subcategory = ?"
+        query += f" AND {col('subcategory')} = ?"
         params.append(subcategory)
 
-    query += " ORDER BY vtf DESC LIMIT ?"
+    query += f" ORDER BY {col('vtf')} DESC LIMIT ?"
     params.append(limit)
 
     results = execute_query(db, query, tuple(params))
-
     if not results:
         raise HTTPException(status_code=404, detail="No subcategory VTF data found")
 
@@ -149,66 +161,55 @@ def get_global_subcategory_vtf(
 
 @router.get("/vtf/regional")
 def get_regional_subcategory_vtf(
-    region_level: str = Query("市级", description="区域级别"),
-    region_name: Optional[str] = Query(None, description="区域名称"),
-    parent_category: Optional[str] = Query(None, description="父类别过滤"),
-    subcategory: Optional[str] = Query(None, description="子类别过滤"),
-    min_tendency: Optional[float] = Query(None, description="最小倾向值"),
-    limit: int = Query(100, ge=1, le=1000, description="返回记录数限制"),
-    db: sqlite3.Connection = Depends(get_db)
+    region_level: str = Query("city", description="Region level (city/county/township)"),
+    region_name: Optional[str] = Query(None, description="Region name"),
+    parent_category: Optional[str] = Query(None, description="Parent category filter"),
+    subcategory: Optional[str] = Query(None, description="Subcategory filter"),
+    min_tendency: Optional[float] = Query(None, description="Minimum tendency"),
+    min_villages: int = Query(0, ge=0, le=100, description="Minimum village count"),
+    limit: int = Query(100, ge=1, le=1000, description="Max records"),
+    db: sqlite3.Connection = Depends(get_db),
+    dbpath: str = Depends(get_dbpath),
 ):
-    """
-    获取区域子类别虚拟词频
-    Get regional subcategory virtual term frequency
-
-    Args:
-        region_level: 区域级别（市级/区县级/乡镇级）
-        region_name: 可选的区域名称过滤
-        parent_category: 可选的父类别过滤
-        subcategory: 可选的子类别过滤
-        min_tendency: 最小倾向值过滤
-        limit: 返回记录数限制
-
-    Returns:
-        List[Dict]: 区域子类别 VTF 统计
-    """
-    query = """
+    """Get regional subcategory VTF metrics."""
+    table, col = _subcategory_schema(dbpath, "semantic_subcategory_vtf_regional")
+    query = f"""
         SELECT
-            region_level,
-            region_name,
-            subcategory,
-            parent_category,
-            char_count,
-            village_count,
-            vtf,
-            percentage,
-            tendency
-        FROM semantic_subcategory_vtf_regional
-        WHERE region_level = ?
+            {col("region_level")} as region_level,
+            {col("region_name")} as region_name,
+            {col("subcategory")} as subcategory,
+            {col("parent_category")} as parent_category,
+            {col("char_count")} as char_count,
+            {col("village_count")} as village_count,
+            {col("vtf")} as vtf,
+            {col("percentage")} as percentage,
+            {col("tendency")} as tendency
+        FROM {table}
+        WHERE {col("region_level")} = ?
+          AND {col("village_count")} >= ?
     """
-    params = [region_level]
+    params: List[object] = [normalize_region_level(dbpath, T.SEMANTIC_SUBCATEGORY_VTF_REGIONAL, region_level), min_villages]
 
     if region_name:
-        query += " AND region_name = ?"
+        query += f" AND {col('region_name')} = ?"
         params.append(region_name)
 
     if parent_category:
-        query += " AND parent_category = ?"
+        query += f" AND {col('parent_category')} = ?"
         params.append(parent_category)
 
     if subcategory:
-        query += " AND subcategory = ?"
+        query += f" AND {col('subcategory')} = ?"
         params.append(subcategory)
 
     if min_tendency is not None:
-        query += " AND tendency >= ?"
+        query += f" AND {col('tendency')} >= ?"
         params.append(min_tendency)
 
-    query += " ORDER BY tendency DESC LIMIT ?"
+    query += f" ORDER BY {col('tendency')} DESC LIMIT ?"
     params.append(limit)
 
     results = execute_query(db, query, tuple(params))
-
     if not results:
         raise HTTPException(status_code=404, detail="No regional subcategory VTF data found")
 
@@ -217,45 +218,37 @@ def get_regional_subcategory_vtf(
 
 @router.get("/tendency/top")
 def get_top_tendency_subcategories(
-    region_level: str = Query("市级", description="区域级别"),
-    parent_category: Optional[str] = Query(None, description="父类别过滤"),
-    top_n: int = Query(10, ge=1, le=50, description="返回前N个"),
-    db: sqlite3.Connection = Depends(get_db)
+    region_level: str = Query("city", description="Region level (city/county/township)"),
+    parent_category: Optional[str] = Query(None, description="Parent category filter"),
+    min_villages: int = Query(5, ge=0, le=100, description="Minimum village count"),
+    top_n: int = Query(10, ge=1, le=100, description="Top N records"),
+    db: sqlite3.Connection = Depends(get_db),
+    dbpath: str = Depends(get_dbpath),
 ):
-    """
-    获取倾向值最高的子类别
-    Get subcategories with highest tendency values
-
-    Args:
-        region_level: 区域级别
-        parent_category: 可选的父类别过滤
-        top_n: 返回前N个
-
-    Returns:
-        List[Dict]: 倾向值最高的子类别
-    """
-    query = """
+    """Get top-N subcategories by tendency."""
+    table, col = _subcategory_schema(dbpath, "semantic_subcategory_vtf_regional")
+    query = f"""
         SELECT
-            region_name,
-            subcategory,
-            parent_category,
-            tendency,
-            percentage,
-            village_count
-        FROM semantic_subcategory_vtf_regional
-        WHERE region_level = ?
+            {col("region_name")} as region_name,
+            {col("subcategory")} as subcategory,
+            {col("parent_category")} as parent_category,
+            {col("tendency")} as tendency,
+            {col("percentage")} as percentage,
+            {col("village_count")} as village_count
+        FROM {table}
+        WHERE {col("region_level")} = ?
+          AND {col("village_count")} >= ?
     """
-    params = [region_level]
+    params: List[object] = [normalize_region_level(dbpath, T.SEMANTIC_SUBCATEGORY_VTF_REGIONAL, region_level), min_villages]
 
     if parent_category:
-        query += " AND parent_category = ?"
+        query += f" AND {col('parent_category')} = ?"
         params.append(parent_category)
 
-    query += " ORDER BY tendency DESC LIMIT ?"
+    query += f" ORDER BY {col('tendency')} DESC LIMIT ?"
     params.append(top_n)
 
     results = execute_query(db, query, tuple(params))
-
     if not results:
         raise HTTPException(status_code=404, detail="No tendency data found")
 
@@ -264,49 +257,45 @@ def get_top_tendency_subcategories(
 
 @router.get("/comparison")
 def compare_subcategories(
-    region_name: str = Query(..., description="区域名称"),
-    region_level: str = Query("市级", description="区域级别"),
-    parent_category: str = Query(..., description="父类别（mountain/water）"),
-    db: sqlite3.Connection = Depends(get_db)
+    region_name: str = Query(..., description="Region name"),
+    region_level: str = Query("city", description="Region level (city/county/township)"),
+    parent_category: str = Query(..., description="Parent category"),
+    min_villages: int = Query(0, ge=0, le=100, description="Minimum village count"),
+    db: sqlite3.Connection = Depends(get_db),
+    dbpath: str = Depends(get_dbpath),
 ):
-    """
-    比较特定区域的子类别分布
-    Compare subcategory distribution in a specific region
-
-    Args:
-        region_name: 区域名称
-        region_level: 区域级别
-        parent_category: 父类别
-
-    Returns:
-        Dict: 子类别比较数据
-    """
-    query = """
+    """Compare subcategory distribution for a specific region and parent category."""
+    table, col = _subcategory_schema(dbpath, "semantic_subcategory_vtf_regional")
+    query = f"""
         SELECT
-            subcategory,
-            vtf,
-            percentage,
-            tendency,
-            village_count
-        FROM semantic_subcategory_vtf_regional
-        WHERE region_level = ?
-          AND region_name = ?
-          AND parent_category = ?
-        ORDER BY vtf DESC
+            {col("subcategory")} as subcategory,
+            {col("vtf")} as vtf,
+            {col("percentage")} as percentage,
+            {col("tendency")} as tendency,
+            {col("village_count")} as village_count
+        FROM {table}
+        WHERE {col("region_level")} = ?
+          AND {col("region_name")} = ?
+          AND {col("parent_category")} = ?
+          AND {col("village_count")} >= ?
+        ORDER BY {col("vtf")} DESC
     """
 
-    results = execute_query(db, query, (region_level, region_name, parent_category))
-
+    results = execute_query(db, query, (normalize_region_level(dbpath, T.SEMANTIC_SUBCATEGORY_VTF_REGIONAL, region_level), region_name, parent_category, min_villages))
     if not results:
         raise HTTPException(
             status_code=404,
-            detail=f"No data found for {region_name} ({parent_category})"
+            detail=(
+                f"No data found for {region_name} ({parent_category}) "
+                f"with min_villages >= {min_villages}"
+            ),
         )
 
     return {
         "region_name": region_name,
         "region_level": region_level,
         "parent_category": parent_category,
+        "min_villages": min_villages,
         "subcategories": results,
-        "total_count": len(results)
+        "total_count": len(results),
     }
