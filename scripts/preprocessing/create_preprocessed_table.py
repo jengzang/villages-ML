@@ -12,6 +12,7 @@ This script:
 import sqlite3
 import logging
 import json
+import time
 from pathlib import Path
 import pandas as pd
 import sys
@@ -34,6 +35,161 @@ logging.basicConfig(
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
 )
 logger = logging.getLogger(__name__)
+
+
+def materialize_metadata_stats(
+    conn: sqlite3.Connection,
+    data_version: str = "phase0_preprocessing",
+):
+    """Materialize small metadata tables for overview and region list APIs."""
+    cursor = conn.cursor()
+    generated_at = time.time()
+
+    cursor.execute("DROP TABLE IF EXISTS metadata_overview_stats")
+    cursor.execute("""
+    CREATE TABLE metadata_overview_stats (
+        total_villages INTEGER NOT NULL,
+        total_cities INTEGER NOT NULL,
+        total_counties INTEGER NOT NULL,
+        total_townships INTEGER NOT NULL,
+        unique_characters INTEGER NOT NULL,
+        generated_at REAL NOT NULL,
+        data_version TEXT NOT NULL
+    )
+    """)
+
+    cursor.execute(f"""
+        SELECT
+            COUNT(*) as total_villages,
+            COUNT(DISTINCT {S.city_col}) as total_cities,
+            COUNT(DISTINCT {S.county_col}) as total_counties,
+            COUNT(DISTINCT {S.township_col}) as total_townships
+        FROM {S.preprocessed_table}
+    """)
+    total_villages, total_cities, total_counties, total_townships = cursor.fetchone()
+
+    unique_chars = set()
+    cursor.execute(f"""
+        SELECT {S.char_set_col}
+        FROM {S.preprocessed_table}
+        WHERE {S.char_set_col} IS NOT NULL AND {S.char_set_col} != ''
+    """)
+    for (char_set_json,) in cursor.fetchall():
+        try:
+            unique_chars.update(json.loads(char_set_json))
+        except (TypeError, json.JSONDecodeError):
+            continue
+
+    cursor.execute("""
+        INSERT INTO metadata_overview_stats (
+            total_villages,
+            total_cities,
+            total_counties,
+            total_townships,
+            unique_characters,
+            generated_at,
+            data_version
+        )
+        VALUES (?, ?, ?, ?, ?, ?, ?)
+    """, (
+        total_villages,
+        total_cities,
+        total_counties,
+        total_townships,
+        len(unique_chars),
+        generated_at,
+        data_version,
+    ))
+
+    cursor.execute("DROP TABLE IF EXISTS region_hierarchy_stats")
+    cursor.execute("""
+    CREATE TABLE region_hierarchy_stats (
+        level TEXT NOT NULL,
+        name TEXT NOT NULL,
+        city TEXT,
+        county TEXT,
+        township TEXT,
+        parent TEXT,
+        village_count INTEGER NOT NULL,
+        sort_key TEXT,
+        generated_at REAL NOT NULL,
+        data_version TEXT NOT NULL,
+        PRIMARY KEY (level, city, county, township)
+    )
+    """)
+
+    cursor.execute(f"""
+        INSERT INTO region_hierarchy_stats (
+            level, name, city, county, township, parent,
+            village_count, sort_key, generated_at, data_version
+        )
+        SELECT
+            'city',
+            {S.city_col},
+            {S.city_col},
+            NULL,
+            NULL,
+            NULL,
+            COUNT(*),
+            {S.city_col},
+            ?,
+            ?
+        FROM {S.preprocessed_table}
+        WHERE {S.city_col} IS NOT NULL AND {S.city_col} != ''
+        GROUP BY {S.city_col}
+    """, (generated_at, data_version))
+
+    cursor.execute(f"""
+        INSERT INTO region_hierarchy_stats (
+            level, name, city, county, township, parent,
+            village_count, sort_key, generated_at, data_version
+        )
+        SELECT
+            'county',
+            {S.county_col},
+            {S.city_col},
+            {S.county_col},
+            NULL,
+            {S.city_col},
+            COUNT(*),
+            {S.city_col} || '|' || {S.county_col},
+            ?,
+            ?
+        FROM {S.preprocessed_table}
+        WHERE {S.county_col} IS NOT NULL AND {S.county_col} != ''
+        GROUP BY {S.city_col}, {S.county_col}
+    """, (generated_at, data_version))
+
+    cursor.execute(f"""
+        INSERT INTO region_hierarchy_stats (
+            level, name, city, county, township, parent,
+            village_count, sort_key, generated_at, data_version
+        )
+        SELECT
+            'township',
+            {S.township_col},
+            {S.city_col},
+            {S.county_col},
+            {S.township_col},
+            {S.county_col},
+            COUNT(*),
+            {S.city_col} || '|' || {S.county_col} || '|' || {S.township_col},
+            ?,
+            ?
+        FROM {S.preprocessed_table}
+        WHERE {S.township_col} IS NOT NULL AND {S.township_col} != ''
+        GROUP BY {S.city_col}, {S.county_col}, {S.township_col}
+    """, (generated_at, data_version))
+
+    cursor.execute(
+        "CREATE INDEX idx_region_hierarchy_level_sort ON region_hierarchy_stats(level, sort_key)"
+    )
+    cursor.execute(
+        "CREATE INDEX idx_region_hierarchy_parent ON region_hierarchy_stats(level, parent)"
+    )
+
+    conn.commit()
+    logger.info("Materialized metadata_overview_stats and region_hierarchy_stats")
 
 
 def create_preprocessed_table(conn: sqlite3.Connection):
@@ -217,6 +373,10 @@ def main():
     """)
     conn.commit()
     logger.info("village_id populated successfully")
+
+    # Materialize lightweight metadata tables for backend overview/regions APIs.
+    logger.info("Materializing metadata stats...")
+    materialize_metadata_stats(conn)
 
     # Verify
     cursor.execute(f"SELECT COUNT(*) FROM {S.preprocessed_table}")
