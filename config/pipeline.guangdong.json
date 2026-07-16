@@ -1,0 +1,97 @@
+{
+  "dataset": {
+    "key": "guangdong",
+    "db_path": "data/villages.db"
+  },
+  "run": {
+    "run_id_prefix": "run"
+  },
+  "phases": {
+    "1": {
+      "args": {
+        "db_path": "data/villages.db",
+        "vector_size": 100,
+        "window": 3,
+        "min_count": 2,
+        "epochs": 15,
+        "model_type": "skipgram",
+        "precompute_similarities": true,
+        "top_k": 50
+      }
+    },
+    "2": {
+      "args": {
+        "db_path": "data/villages.db"
+      }
+    },
+    "3": {
+      "args": {
+        "db_path": "data/villages.db"
+      }
+    },
+    "4": {
+      "args": {
+        "db_path": "data/villages.db",
+        "multi_resolution": true,
+        "integrate_tendency": true
+      }
+    },
+    "5": {
+      "args": {
+        "db_path": "data/villages.db"
+      }
+    },
+    "6": {
+      "args": {
+        "db_path": "data/villages.db"
+      }
+    },
+    "10": {
+      "args": {
+        "db_path": "data/villages.db"
+      }
+    },
+    "11": {
+      "args": {
+        "db_path": "data/villages.db",
+        "tables": "query_policy"
+      }
+    },
+    "12": {
+      "args": {
+        "db_path": "data/villages.db"
+      }
+    },
+    "13": {
+      "args": {
+        "db_path": "data/villages.db",
+        "mode": "hotspots",
+        "hotspot_bandwidth_km": 6.0,
+        "hotspot_threshold_percentile": 80.0,
+        "hotspot_cluster_eps_km": 1.0,
+        "hotspot_cluster_min_samples": 10,
+        "hotspot_sample_size": 0
+      }
+    },
+    "14": {
+      "args": {
+        "db_path": "data/villages.db"
+      }
+    },
+    "15": {
+      "args": {
+        "db_path": "data/villages.db"
+      }
+    },
+    "17": {
+      "args": {
+        "db_path": "data/villages.db"
+      }
+    },
+    "18": {
+      "args": {
+        "db_path": "data/villages.db"
+      }
+    }
+  }
+}

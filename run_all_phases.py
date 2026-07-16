@@ -108,17 +108,20 @@ from datetime import datetime
 from pathlib import Path
 from typing import Dict, List, Optional
 
+from src.pipeline_config import load_pipeline_config, merge_phase_definitions
+
 
 # ========== HELPER FUNCTIONS ==========
 
-def print_phase_list():
+def print_phase_list(phases: Optional[Dict[int, dict]] = None):
     """Print a formatted list of all available phases."""
+    phases = phases or PHASES
     print("\n" + "="*80)
     print("Available Phases (可用阶段)")
     print("="*80)
 
     groups = {"core": [], "statistical": [], "advanced": []}
-    for phase_id, phase in sorted(PHASES.items()):
+    for phase_id, phase in sorted(phases.items()):
         group = phase.get('group', 'core')
         groups[group].append((phase_id, phase))
 
@@ -144,13 +147,14 @@ def print_phase_list():
     print()
 
 
-def print_phase_info(phase_id: int):
+def print_phase_info(phase_id: int, phases: Optional[Dict[int, dict]] = None):
     """Print detailed information about a specific phase."""
-    if phase_id not in PHASES:
+    phases = phases or PHASES
+    if phase_id not in phases:
         print(f"❌ Error: Phase {phase_id} not found")
         return
 
-    phase = PHASES[phase_id]
+    phase = phases[phase_id]
 
     print("\n" + "="*80)
     print(f"Phase {phase_id}: {phase['name']} ({phase.get('name_zh', '')})")
@@ -189,14 +193,15 @@ def print_phase_info(phase_id: int):
     print()
 
 
-def print_phase_groups():
+def print_phase_groups(phases: Optional[Dict[int, dict]] = None):
     """Print phase groups and their members."""
+    phases = phases or PHASES
     print("\n" + "="*80)
     print("Phase Groups (阶段分组)")
     print("="*80)
 
     groups = {}
-    for phase_id, phase in PHASES.items():
+    for phase_id, phase in phases.items():
         group = phase.get('group', 'core')
         if group not in groups:
             groups[group] = []
@@ -220,10 +225,11 @@ def print_phase_groups():
     print()
 
 
-def get_phases_by_group(group: str) -> List[int]:
+def get_phases_by_group(group: str, phases: Optional[Dict[int, dict]] = None) -> List[int]:
     """Get all phase IDs in a specific group."""
+    phases = phases or PHASES
     return sorted([
-        phase_id for phase_id, phase in PHASES.items()
+        phase_id for phase_id, phase in phases.items()
         if phase.get('group') == group
     ])
 
@@ -248,11 +254,12 @@ def parse_phase_list(phase_str: str) -> Optional[List[int]]:
         return None
 
 
-def check_dependencies(phases_to_run: List[int]) -> Dict[int, List[int]]:
+def check_dependencies(phases_to_run: List[int], phases: Optional[Dict[int, dict]] = None) -> Dict[int, List[int]]:
     """Check if all dependencies are satisfied."""
+    phases = phases or PHASES
     missing = {}
     for phase_id in phases_to_run:
-        phase = PHASES[phase_id]
+        phase = phases[phase_id]
         deps = phase.get('dependencies', [])
         missing_deps = [d for d in deps if d not in phases_to_run]
         if missing_deps:
@@ -260,8 +267,9 @@ def check_dependencies(phases_to_run: List[int]) -> Dict[int, List[int]]:
     return missing
 
 
-def print_execution_plan(phases_to_run: List[int], args):
+def print_execution_plan(phases_to_run: List[int], args, phases: Optional[Dict[int, dict]] = None):
     """Print the execution plan."""
+    phases = phases or PHASES
     print("\n" + "="*80)
     print("Execution Plan (执行计划)")
     print("="*80)
@@ -279,7 +287,7 @@ def print_execution_plan(phases_to_run: List[int], args):
     total_min_time = 0
     total_max_time = 0
     for phase_id in phases_to_run:
-        time_str = PHASES[phase_id].get('estimated_time', '0-0 min')
+        time_str = phases[phase_id].get('estimated_time', '0-0 min')
         if '-' in time_str:
             min_t, max_t = time_str.split('-')
             total_min_time += int(min_t.strip().split()[0])
@@ -293,13 +301,14 @@ def print_execution_plan(phases_to_run: List[int], args):
     print("-"*80)
 
     for phase_id in phases_to_run:
-        phase = PHASES[phase_id]
+        phase = phases[phase_id]
         critical = "⚠️" if phase.get('critical') else "  "
         print(f"{critical} Phase {phase_id:2d}: {phase['name']:30s} [{phase.get('estimated_time', 'N/A'):>10s}]")
 
 
-def print_summary(results: Dict[int, bool], start_time: float, dry_run: bool):
+def print_summary(results: Dict[int, bool], start_time: float, dry_run: bool, phases: Optional[Dict[int, dict]] = None):
     """Print execution summary."""
+    phases = phases or PHASES
     elapsed = time.time() - start_time
 
     print("\n" + "="*80)
@@ -325,7 +334,7 @@ def print_summary(results: Dict[int, bool], start_time: float, dry_run: bool):
 
     for phase_id in sorted(results.keys()):
         status = "✅ OK  " if results[phase_id] else "❌ FAIL"
-        phase_name = PHASES[phase_id]['name']
+        phase_name = phases[phase_id]['name']
         print(f"  {status} | Phase {phase_id:2d}: {phase_name}")
 
     if dry_run:
@@ -715,7 +724,41 @@ def _sync_active_run_ids(db_path, phase_id, run_id, output_run_id):
         conn.close()
 
 
-def run_phase(phase_id, run_id_prefix="run", dry_run=False, db_path="data/villages.db"):
+def build_phase_command(
+    phase_id,
+    phases: Optional[Dict[int, dict]] = None,
+    run_id_prefix="run",
+    db_path="data/villages.db",
+    now_str: Optional[str] = None,
+):
+    """Build the subprocess command for one phase."""
+    phases = phases or PHASES
+    if phase_id not in phases:
+        raise KeyError(f"Phase {phase_id} not found")
+
+    phase = phases[phase_id]
+    run_id = None
+    output_run_id = None
+    timestamp = now_str or datetime.now().strftime('%Y%m%d_%H%M%S')
+    cmd = ["python", phase['script']]
+
+    if phase.get('special_run_id_handling') and phase_id in (3, 6):
+        return cmd, run_id, output_run_id
+
+    if phase.get('use_run_id', True) and phase_id > 0:
+        run_id = f"{run_id_prefix}_{phase_id:02d}_{timestamp}"
+        cmd.extend(["--run-id", run_id])
+
+    args = phase['args'].copy() if phase['args'] else []
+    if '--db-path' in args and db_path != "data/villages.db":
+        idx = args.index('--db-path')
+        args[idx + 1] = db_path
+    cmd.extend(args)
+
+    return cmd, run_id, output_run_id
+
+
+def run_phase(phase_id, run_id_prefix="run", dry_run=False, db_path="data/villages.db", phases: Optional[Dict[int, dict]] = None):
     """Run a single analysis phase.
 
     Args:
@@ -727,11 +770,12 @@ def run_phase(phase_id, run_id_prefix="run", dry_run=False, db_path="data/villag
     Returns:
         bool: True if phase completed successfully, False otherwise
     """
-    if phase_id not in PHASES:
+    phases = phases or PHASES
+    if phase_id not in phases:
         print(f"❌ Error: Phase {phase_id} not found")
         return False
 
-    phase = PHASES[phase_id]
+    phase = phases[phase_id]
 
     # Track generated run_ids for active_run_ids sync after success
     run_id = None
@@ -758,11 +802,9 @@ def run_phase(phase_id, run_id_prefix="run", dry_run=False, db_path="data/villag
         tables = ', '.join(phase['output_tables'])
         print(f"Output tables: {tables}")
 
-    # Build command
-    cmd = ["python", phase['script']]
-
     # Handle special run ID cases (e.g., Phase 3 needs --char-run-id and --output-run-id)
     if phase.get('special_run_id_handling') and phase_id == 3:
+        cmd = ["python", phase['script']]
         # Phase 3 needs char-run-id from Phase 1
         import sqlite3
         try:
@@ -787,6 +829,7 @@ def run_phase(phase_id, run_id_prefix="run", dry_run=False, db_path="data/villag
             return False
     # Handle Phase 6 (Clustering) - needs semantic-run-id and morphology-run-id
     elif phase.get('special_run_id_handling') and phase_id == 6:
+        cmd = ["python", phase['script']]
         import sqlite3
         try:
             conn = sqlite3.connect(db_path)
@@ -825,17 +868,20 @@ def run_phase(phase_id, run_id_prefix="run", dry_run=False, db_path="data/villag
         except Exception as e:
             print(f"❌ Error querying database for run IDs: {e}")
             return False
-    # Add run-id if the script supports it (standard case)
-    elif phase.get('use_run_id', True) and phase_id > 0:
-        run_id = f"{run_id_prefix}_{phase_id:02d}_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
-        cmd.extend(["--run-id", run_id])
+    else:
+        cmd, run_id, output_run_id = build_phase_command(
+            phase_id,
+            phases=phases,
+            run_id_prefix=run_id_prefix,
+            db_path=db_path,
+        )
 
-    # Add phase-specific arguments (replace db-path if needed)
-    args = phase['args'].copy() if phase['args'] else []
-    if '--db-path' in args and db_path != "data/villages.db":
-        idx = args.index('--db-path')
-        args[idx + 1] = db_path
-    cmd.extend(args)
+    if phase.get('special_run_id_handling') and phase_id in (3, 6):
+        args = phase['args'].copy() if phase['args'] else []
+        if '--db-path' in args and db_path != "data/villages.db":
+            idx = args.index('--db-path')
+            args[idx + 1] = db_path
+        cmd.extend(args)
 
     print(f"\nCommand: {' '.join(cmd)}")
 
@@ -904,16 +950,22 @@ def main():
     config_group.add_argument(
         "--db-path",
         type=str,
-        default="data/villages.db",
+        default=None,
         metavar="PATH",
         help="Path to database file (default: data/villages.db)"
     )
     config_group.add_argument(
         "--run-id-prefix",
         type=str,
-        default="run",
+        default=None,
         metavar="PREFIX",
         help="Prefix for run IDs (default: 'run')"
+    )
+    config_group.add_argument(
+        "--config",
+        type=str,
+        metavar="PATH",
+        help="Path to pipeline profile JSON config"
     )
 
     # Behavior arguments
@@ -970,26 +1022,38 @@ def main():
 
     args = parser.parse_args()
 
+    try:
+        pipeline_config = load_pipeline_config(args.config)
+        phases = merge_phase_definitions(PHASES, pipeline_config)
+    except ValueError as e:
+        print(f"❌ Error: {e}")
+        return 1
+
+    if args.db_path is None:
+        args.db_path = pipeline_config.get("dataset", {}).get("db_path", "data/villages.db")
+    if args.run_id_prefix is None:
+        args.run_id_prefix = pipeline_config.get("run", {}).get("run_id_prefix", "run")
+
     # Handle information queries
     if args.list:
-        print_phase_list()
+        print_phase_list(phases)
         return 0
 
     if args.info is not None:
-        print_phase_info(args.info)
+        print_phase_info(args.info, phases)
         return 0
 
     if args.show_groups:
-        print_phase_groups()
+        print_phase_groups(phases)
         return 0
 
     # Determine which phases to run
     phases_to_run = []
 
     if args.all:
-        phases_to_run = sorted(PHASES.keys())
+        phases_to_run = sorted(phases.keys())
     elif args.group:
-        phases_to_run = get_phases_by_group(args.group)
+        phases_to_run = get_phases_by_group(args.group, phases)
     elif args.phases:
         phases_to_run = parse_phase_list(args.phases)
         if phases_to_run is None:
@@ -999,25 +1063,25 @@ def main():
         return 1
 
     # Validate phases
-    invalid = [p for p in phases_to_run if p not in PHASES]
+    invalid = [p for p in phases_to_run if p not in phases]
     if invalid:
         print(f"❌ Error: Invalid phase IDs: {invalid}")
-        print(f"Valid phases: {sorted(PHASES.keys())}")
+        print(f"Valid phases: {sorted(phases.keys())}")
         return 1
 
     # Check dependencies
     if not args.skip_dependencies:
-        missing_deps = check_dependencies(phases_to_run)
+        missing_deps = check_dependencies(phases_to_run, phases)
         if missing_deps:
             print(f"\n⚠️  Warning: Missing dependencies detected!")
             for phase_id, deps in missing_deps.items():
-                phase_name = PHASES[phase_id]['name']
+                phase_name = phases[phase_id]['name']
                 print(f"  Phase {phase_id} ({phase_name}) requires: {deps}")
             print(f"\n💡 Tip: Add missing phases or use --skip-dependencies to ignore")
             return 1
 
     # Print execution plan
-    print_execution_plan(phases_to_run, args)
+    print_execution_plan(phases_to_run, args, phases)
 
     # Handle --clear: drop all tables except raw data
     if args.clear and not args.dry_run:
@@ -1073,7 +1137,7 @@ def main():
     results = {}
 
     for phase_id in phases_to_run:
-        success = run_phase(phase_id, args.run_id_prefix, args.dry_run, args.db_path)
+        success = run_phase(phase_id, args.run_id_prefix, args.dry_run, args.db_path, phases)
         results[phase_id] = success
 
         if not success and not args.dry_run:
@@ -1085,7 +1149,7 @@ def main():
                 break
 
     # Print summary
-    print_summary(results, overall_start, args.dry_run)
+    print_summary(results, overall_start, args.dry_run, phases)
 
     if not args.dry_run and results and not args.skip_maintenance:
         run_database_maintenance(args.db_path, run_vacuum=args.vacuum)
