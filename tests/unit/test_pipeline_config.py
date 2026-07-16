@@ -121,3 +121,15 @@ def test_guangdong_profile_defines_args_for_every_pipeline_phase():
     for phase_id in PHASES:
         assert "args" in config["phases"][str(phase_id)]
         assert isinstance(config["phases"][str(phase_id)]["args"], dict)
+
+
+def test_national_profile_defines_args_for_every_pipeline_phase():
+    config = load_pipeline_config("config/pipeline.national.json")
+
+    configured_phase_ids = {int(phase_id) for phase_id in config["phases"]}
+
+    assert config["dataset"]["key"] == "national"
+    assert configured_phase_ids == set(PHASES)
+    for phase_id in PHASES:
+        assert "args" in config["phases"][str(phase_id)]
+        assert isinstance(config["phases"][str(phase_id)]["args"], dict)

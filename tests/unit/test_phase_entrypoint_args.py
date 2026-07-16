@@ -41,8 +41,15 @@ def _extract_options(args):
     return {arg for arg in args if arg.startswith("--")}
 
 
-def test_guangdong_profile_only_emits_supported_phase_options():
-    config = load_pipeline_config("config/pipeline.guangdong.json")
+@pytest.mark.parametrize(
+    "config_path",
+    [
+        "config/pipeline.guangdong.json",
+        "config/pipeline.national.json",
+    ],
+)
+def test_profile_only_emits_supported_phase_options(config_path):
+    config = load_pipeline_config(config_path)
     phases = merge_phase_definitions(PHASES, config)
 
     for phase_id, phase in phases.items():

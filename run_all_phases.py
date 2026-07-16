@@ -805,75 +805,94 @@ def run_phase(phase_id, run_id_prefix="run", dry_run=False, db_path="data/villag
     # Handle special run ID cases (e.g., Phase 3 needs --char-run-id and --output-run-id)
     if phase.get('special_run_id_handling') and phase_id == 3:
         cmd = ["python", phase['script']]
-        # Phase 3 needs char-run-id from Phase 1
-        import sqlite3
-        try:
-            conn = sqlite3.connect(db_path)
-            cursor = conn.cursor()
-            cursor.execute("SELECT DISTINCT run_id FROM char_embeddings ORDER BY run_id DESC LIMIT 1")
-            result = cursor.fetchone()
-            conn.close()
+        if dry_run:
+            char_run_id = f"{run_id_prefix}_01_DRYRUN"
+            output_run_id = f"{run_id_prefix}_{phase_id:02d}_DRYRUN"
+            cmd.extend(["--char-run-id", char_run_id])
+            cmd.extend(["--output-run-id", output_run_id])
+            print(f"Using char-run-id: {char_run_id}")
+            print(f"Output run-id: {output_run_id}")
+        else:
+            # Phase 3 needs char-run-id from Phase 1
+            import sqlite3
+            try:
+                conn = sqlite3.connect(db_path)
+                cursor = conn.cursor()
+                cursor.execute("SELECT DISTINCT run_id FROM char_embeddings ORDER BY run_id DESC LIMIT 1")
+                result = cursor.fetchone()
+                conn.close()
 
-            if result:
-                char_run_id = result[0]
-                output_run_id = f"{run_id_prefix}_{phase_id:02d}_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
-                cmd.extend(["--char-run-id", char_run_id])
-                cmd.extend(["--output-run-id", output_run_id])
-                print(f"Using char-run-id: {char_run_id}")
-                print(f"Output run-id: {output_run_id}")
-            else:
-                print(f"❌ Error: No character embeddings found in database. Run Phase 1 first.")
+                if result:
+                    char_run_id = result[0]
+                    output_run_id = f"{run_id_prefix}_{phase_id:02d}_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
+                    cmd.extend(["--char-run-id", char_run_id])
+                    cmd.extend(["--output-run-id", output_run_id])
+                    print(f"Using char-run-id: {char_run_id}")
+                    print(f"Output run-id: {output_run_id}")
+                else:
+                    print(f"❌ Error: No character embeddings found in database. Run Phase 1 first.")
+                    return False
+            except Exception as e:
+                print(f"❌ Error querying database for char-run-id: {e}")
                 return False
-        except Exception as e:
-            print(f"❌ Error querying database for char-run-id: {e}")
-            return False
     # Handle Phase 6 (Clustering) - needs semantic-run-id and morphology-run-id
     elif phase.get('special_run_id_handling') and phase_id == 6:
         cmd = ["python", phase['script']]
-        import sqlite3
-        try:
-            conn = sqlite3.connect(db_path)
-            cursor = conn.cursor()
+        if dry_run:
+            semantic_run_id = f"{run_id_prefix}_03_DRYRUN"
+            morphology_run_id = f"{run_id_prefix}_18_DRYRUN"
+            output_run_id = f"{run_id_prefix}_{phase_id:02d}_DRYRUN"
+            cmd.extend(["--semantic-run-id", semantic_run_id])
+            cmd.extend(["--morphology-run-id", morphology_run_id])
+            cmd.extend(["--output-run-id", output_run_id])
+            print(f"Using semantic-run-id: {semantic_run_id}")
+            print(f"Using morphology-run-id: {morphology_run_id}")
+            print(f"Output run-id: {output_run_id}")
+        else:
+            import sqlite3
+            try:
+                conn = sqlite3.connect(db_path)
+                cursor = conn.cursor()
 
-            # Get semantic run ID from Phase 3
-            cursor.execute("SELECT DISTINCT run_id FROM semantic_vtf_global ORDER BY run_id DESC LIMIT 1")
-            semantic_result = cursor.fetchone()
+                # Get semantic run ID from Phase 3
+                cursor.execute("SELECT DISTINCT run_id FROM semantic_vtf_global ORDER BY run_id DESC LIMIT 1")
+                semantic_result = cursor.fetchone()
 
-            # Get morphology run ID from Phase 18 (morphology patterns) - use dummy if not available
-            cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='pattern_regional_analysis'")
-            pattern_table_exists = cursor.fetchone()
+                # Get morphology run ID from Phase 18 (morphology patterns) - use dummy if not available
+                cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='pattern_regional_analysis'")
+                pattern_table_exists = cursor.fetchone()
 
-            if pattern_table_exists:
-                cursor.execute("PRAGMA table_info(pattern_regional_analysis)")
-                pattern_columns = {row[1] for row in cursor.fetchall()}
-                if "run_id" in pattern_columns:
-                    cursor.execute("SELECT DISTINCT run_id FROM pattern_regional_analysis ORDER BY run_id DESC LIMIT 1")
-                    morphology_result = cursor.fetchone()
-                    morphology_run_id = morphology_result[0] if morphology_result else "dummy_morph"
+                if pattern_table_exists:
+                    cursor.execute("PRAGMA table_info(pattern_regional_analysis)")
+                    pattern_columns = {row[1] for row in cursor.fetchall()}
+                    if "run_id" in pattern_columns:
+                        cursor.execute("SELECT DISTINCT run_id FROM pattern_regional_analysis ORDER BY run_id DESC LIMIT 1")
+                        morphology_result = cursor.fetchone()
+                        morphology_run_id = morphology_result[0] if morphology_result else "dummy_morph"
+                    else:
+                        morphology_run_id = "dummy_morph"
+                        print("⚠️  Warning: pattern_regional_analysis has no run_id column. Using dummy value (morphology features will be skipped).")
                 else:
                     morphology_run_id = "dummy_morph"
-                    print("⚠️  Warning: pattern_regional_analysis has no run_id column. Using dummy value (morphology features will be skipped).")
-            else:
-                morphology_run_id = "dummy_morph"
-                print(f"⚠️  Warning: No morphology data found. Using dummy value (morphology features will be skipped).")
+                    print(f"⚠️  Warning: No morphology data found. Using dummy value (morphology features will be skipped).")
 
-            conn.close()
+                conn.close()
 
-            if semantic_result:
-                semantic_run_id = semantic_result[0]
-                output_run_id = f"{run_id_prefix}_{phase_id:02d}_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
-                cmd.extend(["--semantic-run-id", semantic_run_id])
-                cmd.extend(["--morphology-run-id", morphology_run_id])
-                cmd.extend(["--output-run-id", output_run_id])
-                print(f"Using semantic-run-id: {semantic_run_id}")
-                print(f"Using morphology-run-id: {morphology_run_id}")
-                print(f"Output run-id: {output_run_id}")
-            else:
-                print(f"❌ Error: No semantic analysis data found in database. Run Phase 3 first.")
+                if semantic_result:
+                    semantic_run_id = semantic_result[0]
+                    output_run_id = f"{run_id_prefix}_{phase_id:02d}_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
+                    cmd.extend(["--semantic-run-id", semantic_run_id])
+                    cmd.extend(["--morphology-run-id", morphology_run_id])
+                    cmd.extend(["--output-run-id", output_run_id])
+                    print(f"Using semantic-run-id: {semantic_run_id}")
+                    print(f"Using morphology-run-id: {morphology_run_id}")
+                    print(f"Output run-id: {output_run_id}")
+                else:
+                    print(f"❌ Error: No semantic analysis data found in database. Run Phase 3 first.")
+                    return False
+            except Exception as e:
+                print(f"❌ Error querying database for run IDs: {e}")
                 return False
-        except Exception as e:
-            print(f"❌ Error querying database for run IDs: {e}")
-            return False
     else:
         cmd, run_id, output_run_id = build_phase_command(
             phase_id,
