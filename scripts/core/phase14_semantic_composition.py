@@ -20,6 +20,7 @@ Approach: Offline-heavy, maximum accuracy, leverages Phase 2 semantic labels
 import sqlite3
 import sys
 import json
+import argparse
 from pathlib import Path
 from datetime import datetime
 
@@ -527,7 +528,12 @@ def step6_extract_village_structures(db_path: str):
     conn.close()
 
 
-def step7_generate_semantic_indices_detailed(db_path: str):
+def step7_generate_semantic_indices_detailed(
+    db_path: str,
+    run_id: str = "semantic_indices_detailed_001",
+    lexicon_path: str | None = None,
+    region_levels: list[str] | None = None,
+):
     """Step 7: Generate semantic_indices_detailed using v4 lexicon (53 subcategories)."""
     print("\n" + "="*60)
     print("Step 7: Generating semantic_indices_detailed (76 subcategories)")
@@ -561,7 +567,7 @@ def step7_generate_semantic_indices_detailed(db_path: str):
     conn.commit()
 
     # Load v4 lexicon
-    lexicon_v4 = str(project_root / 'data' / 'semantic_lexicon_v4.json')
+    lexicon_v4 = lexicon_path or str(project_root / 'data' / 'semantic_lexicon_v4.json')
     lexicon = SemanticLexicon(lexicon_v4)
     print(f"Loaded v4 lexicon: {len(lexicon.list_categories())} categories")
 
@@ -574,8 +580,8 @@ def step7_generate_semantic_indices_detailed(db_path: str):
 
     # Calculate indices for each region level
     calculator = SemanticIndexCalculator(lexicon)
-    run_id = "semantic_indices_detailed_001"
     all_indices = []
+    requested_levels = set(region_levels or ['city', 'county', 'township'])
 
     level_config = [
         ('city', '市级', 'city'),
@@ -584,6 +590,8 @@ def step7_generate_semantic_indices_detailed(db_path: str):
     ]
 
     for level, col_name, group_col in level_config:
+        if level not in requested_levels:
+            continue
         print(f"\nProcessing {level} level...")
         if level == 'city':
             level_df = villages_df[['市级', '自然村']].copy()
@@ -605,6 +613,11 @@ def step7_generate_semantic_indices_detailed(db_path: str):
         regional_indices['run_id'] = run_id
         all_indices.append(regional_indices)
         print(f"  {len(regional_indices)} region-category pairs")
+
+    if not all_indices:
+        print("[WARNING] No semantic index levels selected; skipping detailed indices")
+        conn.close()
+        return
 
     combined = pd.concat(all_indices, ignore_index=True)
 
@@ -647,9 +660,32 @@ def step7_generate_semantic_indices_detailed(db_path: str):
     conn.close()
 
 
+def parse_args():
+    parser = argparse.ArgumentParser(description="Phase 14: Semantic Composition Analysis")
+    parser.add_argument("--db-path", default="data/villages.db", help="Path to SQLite database")
+    parser.add_argument(
+        "--run-id",
+        default="semantic_indices_detailed_001",
+        help="Run ID for semantic_indices_detailed records",
+    )
+    parser.add_argument(
+        "--lexicon-path",
+        default=str(project_root / "data" / "semantic_lexicon_v4.json"),
+        help="Path to semantic lexicon used for detailed indices",
+    )
+    parser.add_argument(
+        "--region-levels",
+        default="city,county,township",
+        help="Comma-separated detailed semantic index region levels",
+    )
+    return parser.parse_args()
+
+
 def main():
     """Main execution function."""
-    db_path = 'data/villages.db'
+    args = parse_args()
+    db_path = args.db_path
+    region_levels = [level.strip() for level in args.region_levels.split(",") if level.strip()]
 
     print("\n" + "="*60)
     print("Phase 14: Semantic Composition Analysis")
@@ -666,7 +702,12 @@ def main():
         step4_detect_patterns(db_path)
         step5_detect_conflicts(db_path)
         step6_extract_village_structures(db_path)
-        step7_generate_semantic_indices_detailed(db_path)
+        step7_generate_semantic_indices_detailed(
+            db_path,
+            run_id=args.run_id,
+            lexicon_path=args.lexicon_path,
+            region_levels=region_levels,
+        )
 
         end_time = datetime.now()
         duration = (end_time - start_time).total_seconds()

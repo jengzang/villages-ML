@@ -57,6 +57,7 @@ def parse_args():
     parser.add_argument("--hotspot-cluster-min-samples", type=int, default=5)
     parser.add_argument("--hotspot-full-count-radius-km", type=float, default=3.0)
     parser.add_argument("--hotspot-sample-seed", type=int, default=20260712)
+    parser.add_argument("--batch-size", type=int, default=10000, help="Rows to write per batch in features mode")
     return parser.parse_args()
 
 
@@ -275,7 +276,7 @@ def run_feature_pipeline(args) -> None:
         logger.info("Writing spatial features to database...")
 
         cursor = conn.cursor()
-        batch_size = 10000
+        batch_size = args.batch_size
         total_batches = (len(merged_df) + batch_size - 1) // batch_size
 
         for i in range(0, len(merged_df), batch_size):

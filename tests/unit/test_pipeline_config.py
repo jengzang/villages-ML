@@ -110,3 +110,14 @@ def test_load_pipeline_config_rejects_unsupported_extension(tmp_path):
 
     with pytest.raises(ValueError, match="Only JSON"):
         load_pipeline_config(str(config_path))
+
+
+def test_guangdong_profile_defines_args_for_every_pipeline_phase():
+    config = load_pipeline_config("config/pipeline.guangdong.json")
+
+    configured_phase_ids = {int(phase_id) for phase_id in config["phases"]}
+
+    assert configured_phase_ids == set(PHASES)
+    for phase_id in PHASES:
+        assert "args" in config["phases"][str(phase_id)]
+        assert isinstance(config["phases"][str(phase_id)]["args"], dict)

@@ -844,9 +844,15 @@ def run_phase(phase_id, run_id_prefix="run", dry_run=False, db_path="data/villag
             pattern_table_exists = cursor.fetchone()
 
             if pattern_table_exists:
-                cursor.execute("SELECT DISTINCT run_id FROM pattern_frequency_regional ORDER BY run_id DESC LIMIT 1")
-                morphology_result = cursor.fetchone()
-                morphology_run_id = morphology_result[0] if morphology_result else "dummy_morph"
+                cursor.execute("PRAGMA table_info(pattern_regional_analysis)")
+                pattern_columns = {row[1] for row in cursor.fetchall()}
+                if "run_id" in pattern_columns:
+                    cursor.execute("SELECT DISTINCT run_id FROM pattern_regional_analysis ORDER BY run_id DESC LIMIT 1")
+                    morphology_result = cursor.fetchone()
+                    morphology_run_id = morphology_result[0] if morphology_result else "dummy_morph"
+                else:
+                    morphology_run_id = "dummy_morph"
+                    print("⚠️  Warning: pattern_regional_analysis has no run_id column. Using dummy value (morphology features will be skipped).")
             else:
                 morphology_run_id = "dummy_morph"
                 print(f"⚠️  Warning: No morphology data found. Using dummy value (morphology features will be skipped).")

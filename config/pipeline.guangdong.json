@@ -7,6 +7,14 @@
     "run_id_prefix": "run"
   },
   "phases": {
+    "0": {
+      "args": {
+        "db_path": "data/villages.db",
+        "prefix_min_length": 2,
+        "prefix_confidence_threshold": 0.7,
+        "metadata_version": "phase0_preprocessing"
+      }
+    },
     "1": {
       "args": {
         "db_path": "data/villages.db",
@@ -15,40 +23,69 @@
         "min_count": 2,
         "epochs": 15,
         "model_type": "skipgram",
+        "workers": 4,
+        "negative": 5,
+        "output_dir": "models/embeddings",
         "precompute_similarities": true,
-        "top_k": 50
+        "top_k": 50,
+        "notes": "Guangdong baseline character embeddings"
       }
     },
     "2": {
       "args": {
-        "db_path": "data/villages.db"
+        "db_path": "data/villages.db",
+        "output_dir": "results",
+        "log_level": "INFO"
       }
     },
     "3": {
       "args": {
-        "db_path": "data/villages.db"
+        "db_path": "data/villages.db",
+        "lexicon_path": "data/semantic_lexicon_v1.json",
+        "region_levels": ["city", "county", "township"]
       }
     },
     "4": {
       "args": {
         "db_path": "data/villages.db",
+        "eps_km": 2.0,
+        "min_samples": 5,
+        "method": "dbscan",
         "multi_resolution": true,
-        "integrate_tendency": true
+        "multi_resolution_configs": "spatial_eps_05:dbscan:0.5:15;spatial_eps_15:dbscan:1.5:25;spatial_eps_25:dbscan:2.5:60;spatial_eps_45:dbscan:4.5:100;spatial_hdbscan_v2:hdbscan:0.0:35",
+        "integrate_tendency": true,
+        "tendency_chars": 100
       }
     },
     "5": {
       "args": {
-        "db_path": "data/villages.db"
+        "db_path": "data/villages.db",
+        "lexicon_path": "data/semantic_lexicon_v1.json",
+        "batch_size": 10000
       }
     },
     "6": {
+      "args": {
+        "db_path": "data/villages.db",
+        "region_level": "county",
+        "k_range": [4, 6, 8, 10, 12, 15, 18, 20],
+        "top_n_suffix2": 100,
+        "top_n_suffix3": 100,
+        "pca_components": 50,
+        "n_init": 20,
+        "max_iter": 500,
+        "random_state": 42
+      }
+    },
+    "7": {
       "args": {
         "db_path": "data/villages.db"
       }
     },
     "10": {
       "args": {
-        "db_path": "data/villages.db"
+        "db_path": "data/villages.db",
+        "significance_level": 0.05
       }
     },
     "11": {
@@ -75,27 +112,43 @@
         "hotspot_threshold_percentile": 80.0,
         "hotspot_cluster_eps_km": 1.0,
         "hotspot_cluster_min_samples": 10,
-        "hotspot_sample_size": 0
+        "hotspot_sample_size": 0,
+        "hotspot_full_count_radius_km": 3.0,
+        "hotspot_sample_seed": 20260712,
+        "batch_size": 10000
       }
     },
     "14": {
       "args": {
-        "db_path": "data/villages.db"
+        "db_path": "data/villages.db",
+        "lexicon_path": "data/semantic_lexicon_v4.json",
+        "region_levels": ["city", "county", "township"]
       }
     },
     "15": {
+      "args": {
+        "db_path": "data/villages.db",
+        "region_levels": ["city", "county"],
+        "top_k_global": 100,
+        "z_score_threshold": 2.0,
+        "summary_limit": 10
+      }
+    },
+    "16": {
       "args": {
         "db_path": "data/villages.db"
       }
     },
     "17": {
       "args": {
-        "db_path": "data/villages.db"
+        "db_path": "data/villages.db",
+        "lexicon_path": "data/semantic_lexicon_v4.json"
       }
     },
     "18": {
       "args": {
-        "db_path": "data/villages.db"
+        "db_path": "data/villages.db",
+        "output_dir": "results/morphology"
       }
     }
   }

@@ -22,6 +22,7 @@ LEXICON VERSION: v4 (9 parents, 53 subcategories)
 import sqlite3
 import json
 import time
+import argparse
 from pathlib import Path
 from typing import Dict, List, Tuple
 from collections import defaultdict
@@ -386,13 +387,25 @@ def validate_subcategory_data(conn: sqlite3.Connection):
     print("\n[OK] 数据验证完成")
 
 
+def parse_args():
+    parser = argparse.ArgumentParser(description="Phase 17: Semantic subcategory VTF analysis")
+    parser.add_argument("--run-id", default=None, help="Accepted for pipeline run tracking")
+    parser.add_argument("--db-path", default=str(DB_PATH), help="Path to SQLite database")
+    parser.add_argument("--lexicon-path", default=str(LEXICON_V4_PATH), help="Path to v4 semantic lexicon")
+    return parser.parse_args()
+
+
 def main():
     """主函数"""
+    args = parse_args()
+    db_path = Path(args.db_path)
+    lexicon_path = Path(args.lexicon_path)
+
     print("\n" + "=" * 60)
     print("Phase 17: 语义子类别细化（v4 词典：9 父类, 53 子类）")
     print("=" * 60)
-    print(f"数据库：{DB_PATH}")
-    print(f"v4 词典：{LEXICON_V4_PATH}")
+    print(f"数据库：{db_path}")
+    print(f"v4 词典：{lexicon_path}")
     print("=" * 60)
 
     start_time = time.time()
@@ -402,19 +415,19 @@ def main():
     print("Step 1: 加载 v4 词典")
     print("=" * 60)
 
-    if not LEXICON_V4_PATH.exists():
-        print(f"[ERROR] v4 词典不存在：{LEXICON_V4_PATH}")
+    if not lexicon_path.exists():
+        print(f"[ERROR] v4 词典不存在：{lexicon_path}")
         return
 
-    v4 = load_lexicon(LEXICON_V4_PATH)
+    v4 = load_lexicon(lexicon_path)
     flat = flatten_v4_subcategories(v4)
-    print(f"[OK] 已加载 v4 词典：{LEXICON_V4_PATH}")
+    print(f"[OK] 已加载 v4 词典：{lexicon_path}")
     print(f"   - 版本：{v4.get('version', 'unknown')}")
     print(f"   - {len(set(s for s, _, _ in flat))} 个子类别")
     print(f"   - {len(flat)} 个字符映射")
 
     # 连接数据库
-    conn = sqlite3.connect(DB_PATH)
+    conn = sqlite3.connect(db_path)
 
     try:
         # Step 2: 创建数据表

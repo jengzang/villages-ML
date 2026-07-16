@@ -36,6 +36,13 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 
+def _parse_k_range(values):
+    result = []
+    for value in values:
+        result.extend(int(item.strip()) for item in str(value).split(",") if item.strip())
+    return result
+
+
 def main():
     parser = argparse.ArgumentParser(
         description='Run clustering analysis on region-level features',
@@ -126,6 +133,7 @@ def main():
     )
 
     args = parser.parse_args()
+    args.k_range = _parse_k_range(args.k_range)
 
     # Set default output directory
     if not args.output_dir:

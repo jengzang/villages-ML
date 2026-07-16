@@ -9,6 +9,7 @@ This script is kept as a no-op for backward compatibility with the pipeline runn
 """
 
 import sys
+import argparse
 from pathlib import Path
 
 project_root = Path(__file__).parent.parent.parent
@@ -16,6 +17,11 @@ sys.path.insert(0, str(project_root))
 
 
 def main():
+    parser = argparse.ArgumentParser(description="Phase 7 deprecated no-op")
+    parser.add_argument("--db-path", default="data/villages.db", help="Accepted for pipeline config compatibility")
+    parser.add_argument("--run-id", default=None, help="Accepted for pipeline config compatibility")
+    parser.parse_args()
+
     print("=" * 60)
     print("Phase 7: Feature Materialization (DEPRECATED)")
     print("=" * 60)

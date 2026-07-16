@@ -33,6 +33,32 @@ MULTI_RESOLUTION_CONFIGS = [
 ]
 
 
+def parse_multi_resolution_configs(value: str):
+    """Parse run_id:method:eps_km:min_samples entries separated by semicolons."""
+    configs = []
+    for item in value.split(";"):
+        item = item.strip()
+        if not item:
+            continue
+        parts = item.split(":")
+        if len(parts) != 4:
+            raise argparse.ArgumentTypeError(
+                "Each multi-resolution config must be run_id:method:eps_km:min_samples"
+            )
+        run_id, method, eps_km, min_samples = parts
+        if method not in {"dbscan", "hdbscan"}:
+            raise argparse.ArgumentTypeError(f"Unsupported spatial method: {method}")
+        configs.append({
+            "run_id": run_id,
+            "method": method,
+            "eps_km": float(eps_km),
+            "min_samples": int(min_samples),
+        })
+    if not configs:
+        raise argparse.ArgumentTypeError("At least one multi-resolution config is required")
+    return configs
+
+
 def setup_logging(verbose: bool = False):
     """Setup logging configuration."""
     level = logging.DEBUG if verbose else logging.INFO
@@ -104,6 +130,12 @@ Examples:
         action='store_true',
         help='Run all 5 predefined spatial configurations (eps=0.3/10/20, hdbscan, v2)'
     )
+    parser.add_argument(
+        '--multi-resolution-configs',
+        type=parse_multi_resolution_configs,
+        default=MULTI_RESOLUTION_CONFIGS,
+        help='Semicolon-separated run_id:method:eps_km:min_samples configs'
+    )
 
     parser.add_argument(
         '--feature-run-id',
@@ -153,14 +185,15 @@ Examples:
     logger = logging.getLogger(__name__)
 
     if args.multi_resolution:
+        multi_resolution_configs = args.multi_resolution_configs
         logger.info("=" * 80)
         logger.info("MULTI-RESOLUTION SPATIAL ANALYSIS")
-        logger.info(f"Running {len(MULTI_RESOLUTION_CONFIGS)} configurations")
+        logger.info(f"Running {len(multi_resolution_configs)} configurations")
         logger.info("=" * 80)
 
-        for i, cfg in enumerate(MULTI_RESOLUTION_CONFIGS):
+        for i, cfg in enumerate(multi_resolution_configs):
             logger.info(f"\n{'#'*80}")
-            logger.info(f"Config {i+1}/{len(MULTI_RESOLUTION_CONFIGS)}: {cfg['run_id']}")
+            logger.info(f"Config {i+1}/{len(multi_resolution_configs)}: {cfg['run_id']}")
             logger.info(f"  method={cfg['method']}, eps_km={cfg['eps_km']}, min_samples={cfg['min_samples']}")
             logger.info(f"{'#'*80}")
 
@@ -173,7 +206,7 @@ Examples:
                     method=cfg['method'],
                     feature_run_id=args.feature_run_id,
                     output_dir=args.output_dir,
-                    generate_maps=args.generate_maps and (i == len(MULTI_RESOLUTION_CONFIGS) - 1),
+                    generate_maps=args.generate_maps and (i == len(multi_resolution_configs) - 1),
                 )
                 logger.info(f"Config {cfg['run_id']} complete: "
                            f"{stats['n_clusters']} clusters, "
@@ -204,7 +237,7 @@ Examples:
             run_integration(
                 db_path=args.db_path,
                 tendency_run_id="latest",
-                spatial_run_id=MULTI_RESOLUTION_CONFIGS[-1]['run_id'],
+                spatial_run_id=multi_resolution_configs[-1]['run_id'],
                 output_run_id=output_run_id,
                 characters=characters
             )

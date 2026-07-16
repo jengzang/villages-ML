@@ -16,6 +16,13 @@ sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 from src.pipelines.semantic_pipeline import run_semantic_analysis_pipeline
 
 
+def _split_csv_values(values):
+    result = []
+    for value in values:
+        result.extend(item.strip() for item in value.split(",") if item.strip())
+    return result
+
+
 def setup_logging(verbose: bool = False):
     """Setup logging configuration."""
     level = logging.DEBUG if verbose else logging.INFO
@@ -81,6 +88,7 @@ def main():
     )
 
     args = parser.parse_args()
+    args.region_levels = _split_csv_values(args.region_levels)
 
     # Setup logging
     setup_logging(args.verbose)

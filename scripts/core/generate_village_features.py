@@ -70,9 +70,22 @@ def main():
     parser = argparse.ArgumentParser(description='Generate village_features table')
     parser.add_argument('--run-id', type=str, required=True, help='Run ID for this execution')
     parser.add_argument('--db-path', type=str, default='data/villages.db', help='Path to database')
+    parser.add_argument(
+        '--lexicon-path',
+        type=str,
+        default='data/semantic_lexicon_v1.json',
+        help='Path to semantic lexicon JSON',
+    )
+    parser.add_argument('--batch-size', type=int, default=10000, help='Rows to write per batch')
     args = parser.parse_args()
 
-    db_path = project_root / args.db_path
+    db_path = Path(args.db_path)
+    if not db_path.is_absolute():
+        db_path = project_root / db_path
+
+    lexicon_path = Path(args.lexicon_path)
+    if not lexicon_path.is_absolute():
+        lexicon_path = project_root / lexicon_path
 
     logger.info("=" * 80)
     logger.info("Generating village_features table")
@@ -94,7 +107,6 @@ def main():
 
         # Step 3: Extract features
         logger.info("Extracting features...")
-        lexicon_path = project_root / 'data' / 'semantic_lexicon_v1.json'
         extractor = VillageFeatureExtractor(str(lexicon_path))
         features_df = extractor.extract_batch(df, village_name_col='village_name')
         logger.info(f"Extracted features for {len(features_df)} villages")
@@ -134,7 +146,7 @@ def main():
 
         # Write in batches
         cursor = conn.cursor()
-        batch_size = 10000
+        batch_size = args.batch_size
         total_batches = (len(df_to_write) + batch_size - 1) // batch_size
 
         for i in range(0, len(df_to_write), batch_size):

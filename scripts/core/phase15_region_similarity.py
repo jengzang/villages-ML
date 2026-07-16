@@ -10,6 +10,7 @@ Output:
 
 import sqlite3
 import time
+import argparse
 from pathlib import Path
 import sys
 
@@ -62,13 +63,31 @@ def create_tables(conn: sqlite3.Connection):
     print("[OK] Created region_similarity table with indexes")
 
 
+def parse_args():
+    parser = argparse.ArgumentParser(description="Phase 15: Region Similarity Analysis")
+    parser.add_argument("--run-id", default=None, help="Accepted for pipeline run tracking")
+    parser.add_argument("--db-path", default=str(project_root / "data" / "villages.db"))
+    parser.add_argument(
+        "--region-levels",
+        default="city,county",
+        help="Comma-separated region levels to analyze",
+    )
+    parser.add_argument("--top-k-global", type=int, default=100)
+    parser.add_argument("--z-score-threshold", type=float, default=2.0)
+    parser.add_argument("--summary-limit", type=int, default=10)
+    return parser.parse_args()
+
+
 def main():
     """Main execution function."""
+    args = parse_args()
+    region_levels = [level.strip() for level in args.region_levels.split(",") if level.strip()]
+
     print("=" * 60)
     print("Phase 15: Region Similarity Analysis")
     print("=" * 60)
 
-    db_path = project_root / "data" / "villages.db"
+    db_path = Path(args.db_path)
     conn = sqlite3.connect(db_path)
 
     # Step 1: Create tables
@@ -82,13 +101,13 @@ def main():
     cursor = conn.cursor()
     created_at = time.time()
 
-    for region_level in ['city', 'county']:
+    for region_level in region_levels:
         # Step 3: Load regional data
         print(f"\n[Step 3] Loading {region_level}-level character data...")
         df = analyzer.load_regional_data(
             region_level=region_level,
-            top_k_global=100,
-            z_score_threshold=2.0
+            top_k_global=args.top_k_global,
+            z_score_threshold=args.z_score_threshold
         )
         print(f"  Loaded {len(df)} character-region records")
         print(f"  Feature characters: {len(analyzer.feature_chars)}")
@@ -106,7 +125,10 @@ def main():
         cosine_matrix = analyzer.compute_cosine_similarity()
 
         print("  Computing Jaccard similarity...")
-        jaccard_matrix = analyzer.compute_jaccard_similarity(df, z_score_threshold=2.0)
+        jaccard_matrix = analyzer.compute_jaccard_similarity(
+            df,
+            z_score_threshold=args.z_score_threshold,
+        )
 
         print("  Computing Euclidean distance...")
         euclidean_matrix = analyzer.compute_euclidean_distance()
@@ -174,26 +196,26 @@ def main():
         print(f"  Jaccard: avg={row[5]:.4f}  min={row[6]:.4f}  max={row[7]:.4f}")
 
     # Top 10 most similar pairs per level
-    for region_level in ['city', 'county']:
-        print(f"\n[Top 10 Most Similar Pairs ({region_level})]")
+    for region_level in region_levels:
+        print(f"\n[Top {args.summary_limit} Most Similar Pairs ({region_level})]")
         cursor.execute("""
         SELECT region1, region2, cosine_similarity, jaccard_similarity
         FROM region_similarity
         WHERE region_level = ?
         ORDER BY cosine_similarity DESC
-        LIMIT 10
-        """, (region_level,))
+        LIMIT ?
+        """, (region_level, args.summary_limit))
         for i, row in enumerate(cursor.fetchall(), 1):
             print(f"  {i}. {row[0]} <-> {row[1]}: cosine={row[2]:.4f}, jaccard={row[3]:.4f}")
 
-        print(f"\n[Top 10 Most Dissimilar Pairs ({region_level})]")
+        print(f"\n[Top {args.summary_limit} Most Dissimilar Pairs ({region_level})]")
         cursor.execute("""
         SELECT region1, region2, cosine_similarity, jaccard_similarity
         FROM region_similarity
         WHERE region_level = ?
         ORDER BY cosine_similarity ASC
-        LIMIT 10
-        """, (region_level,))
+        LIMIT ?
+        """, (region_level, args.summary_limit))
         for i, row in enumerate(cursor.fetchall(), 1):
             print(f"  {i}. {row[0]} <-> {row[1]}: cosine={row[2]:.4f}, jaccard={row[3]:.4f}")
 
@@ -206,4 +228,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-

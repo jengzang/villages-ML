@@ -9,9 +9,16 @@ endpoint. The precomputed tables (semantic_network_edges, semantic_network_centr
 semantic_network_stats) have zero API consumers.
 """
 
+import argparse
+
 
 def main():
     """DEPRECATED - Backend uses real-time computation instead."""
+    parser = argparse.ArgumentParser(description="Phase 16 deprecated no-op")
+    parser.add_argument("--db-path", default="data/villages.db", help="Accepted for pipeline config compatibility")
+    parser.add_argument("--run-id", default=None, help="Accepted for pipeline config compatibility")
+    parser.parse_args()
+
     print("=" * 60)
     print("Phase 16: Semantic Network Centrality Analysis (DEPRECATED)")
     print("=" * 60)

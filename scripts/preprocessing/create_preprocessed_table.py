@@ -13,6 +13,7 @@ import sqlite3
 import logging
 import json
 import time
+import argparse
 from pathlib import Path
 import pandas as pd
 import sys
@@ -35,6 +36,33 @@ logging.basicConfig(
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
 )
 logger = logging.getLogger(__name__)
+
+
+def parse_args():
+    parser = argparse.ArgumentParser(description="Create preprocessed village table")
+    parser.add_argument(
+        "--db-path",
+        default=str(project_root / "data" / "villages.db"),
+        help="Path to SQLite database",
+    )
+    parser.add_argument(
+        "--prefix-min-length",
+        type=int,
+        default=2,
+        help="Minimum removable administrative prefix length",
+    )
+    parser.add_argument(
+        "--prefix-confidence-threshold",
+        type=float,
+        default=0.7,
+        help="Confidence threshold for administrative prefix removal",
+    )
+    parser.add_argument(
+        "--metadata-version",
+        default="phase0_preprocessing",
+        help="Data version stored in metadata materialization tables",
+    )
+    return parser.parse_args()
 
 
 def materialize_metadata_stats(
@@ -230,7 +258,8 @@ def create_preprocessed_table(conn: sqlite3.Connection):
 
 def main():
     """Main preprocessing pipeline."""
-    db_path = Path(__file__).parent.parent.parent / "data" / "villages.db"
+    args = parse_args()
+    db_path = Path(args.db_path)
 
     if not db_path.exists():
         logger.error(f"Database not found: {db_path}")
@@ -295,8 +324,8 @@ def main():
 
     df_prefix_results = batch_clean_prefixes(
         input_df,
-        min_length=2,
-        confidence_threshold=0.7
+        min_length=args.prefix_min_length,
+        confidence_threshold=args.prefix_confidence_threshold
     )
 
     # Merge results back
@@ -376,7 +405,7 @@ def main():
 
     # Materialize lightweight metadata tables for backend overview/regions APIs.
     logger.info("Materializing metadata stats...")
-    materialize_metadata_stats(conn)
+    materialize_metadata_stats(conn, data_version=args.metadata_version)
 
     # Verify
     cursor.execute(f"SELECT COUNT(*) FROM {S.preprocessed_table}")
