@@ -59,7 +59,12 @@
     },
     "12": {
       "args": {
-        "db_path": "data/villages.db"
+        "db_path": "data/villages.db",
+        "n_values": [2, 3],
+        "regional_levels": ["township"],
+        "positions": ["all", "prefix", "suffix", "middle"],
+        "min_regional_count_by_n": "2:3,3:2",
+        "min_global_count_by_n": "2:10,3:5"
       }
     },
     "13": {

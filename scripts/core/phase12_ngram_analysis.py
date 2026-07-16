@@ -25,6 +25,7 @@ import sqlite3
 import sys
 from pathlib import Path
 import json
+import argparse
 from datetime import datetime
 
 # Add project root to path
@@ -34,9 +35,31 @@ sys.path.insert(0, str(project_root))
 from src.ngram_analysis import NgramExtractor, NgramAnalyzer, StructuralPatternDetector
 from src.ngram_schema import create_ngram_tables
 
-# Import run_id manager for auto-update (NEW: 2026-02-25)
+# Make scripts/utils importable for the optional active_run_ids update.
 sys.path.insert(0, str(project_root / 'scripts'))
-from utils.update_run_id import update_active_run_id
+
+
+def _parse_int_csv(value: str) -> list[int]:
+    return [int(part.strip()) for part in value.split(',') if part.strip()]
+
+
+def _parse_str_csv(value: str) -> list[str]:
+    return [part.strip() for part in value.split(',') if part.strip()]
+
+
+def _parse_thresholds(value: str | None) -> dict[int, int]:
+    """Parse ``2:3,3:2`` threshold strings into ``{2: 3, 3: 2}``."""
+    if not value:
+        return {}
+
+    thresholds: dict[int, int] = {}
+    for item in value.split(','):
+        item = item.strip()
+        if not item:
+            continue
+        n_text, threshold_text = item.split(':', 1)
+        thresholds[int(n_text.strip())] = int(threshold_text.strip())
+    return thresholds
 
 
 def step1_create_tables(db_path: str):
@@ -442,15 +465,37 @@ def step5_calculate_significance(db_path: str):
     print(f"    Filtered out: {total_tested - total_significant:,} non-significant n-grams")
 
 
-def step6_cleanup_insignificant_data(db_path: str):
+def _min_threshold_sql(column: str, thresholds_by_n: dict[int, int], n_column: str = "n") -> tuple[str, list[int]]:
+    """Build SQL for per-n support thresholds."""
+    if not thresholds_by_n:
+        return "1=1", []
+
+    clauses = []
+    params: list[int] = []
+    for n_value, threshold in sorted(thresholds_by_n.items()):
+        clauses.append(f"({n_column} = ? AND {column} >= ?)")
+        params.extend([n_value, threshold])
+    return "(" + " OR ".join(clauses) + ")", params
+
+
+def step6_cleanup_insignificant_data(
+    db_path: str,
+    min_regional_count_by_n: dict[int, int] | None = None,
+    min_global_count_by_n: dict[int, int] | None = None,
+):
     """Step 6: Clean up non-significant n-grams from tendency and frequency tables.
 
     This step removes non-significant n-grams from:
+    - ngram_significance
     - ngram_tendency
     - regional_ngram_frequency
 
-    Only n-grams that exist in ngram_significance (p < 0.05) are retained.
+    Only n-grams that exist in ngram_significance (p < 0.05) and satisfy
+    configured support thresholds are retained.
     """
+    min_regional_count_by_n = min_regional_count_by_n or {}
+    min_global_count_by_n = min_global_count_by_n or {}
+
     print("\n" + "="*60)
     print("Step 6: Cleaning Up Non-Significant N-grams")
     print("="*60)
@@ -465,9 +510,39 @@ def step6_cleanup_insignificant_data(db_path: str):
     cursor.execute("SELECT COUNT(*) FROM regional_ngram_frequency")
     frequency_before = cursor.fetchone()[0]
 
+    cursor.execute("SELECT COUNT(*) FROM ngram_significance")
+    significance_before = cursor.fetchone()[0]
+
     print(f"\nBefore cleanup:")
+    print(f"  ngram_significance: {significance_before:,} rows")
     print(f"  ngram_tendency: {tendency_before:,} rows")
     print(f"  regional_ngram_frequency: {frequency_before:,} rows")
+
+    if min_regional_count_by_n or min_global_count_by_n:
+        print("\nDeleting low-support n-grams from ngram_significance...")
+        regional_sql, regional_params = _min_threshold_sql(
+            "nt.regional_count", min_regional_count_by_n, "nt.n"
+        )
+        global_sql, global_params = _min_threshold_sql(
+            "nt.global_count", min_global_count_by_n, "nt.n"
+        )
+        support_params = regional_params + global_params
+        cursor.execute(f"""
+            DELETE FROM ngram_significance
+            WHERE NOT EXISTS (
+                SELECT 1 FROM ngram_tendency nt
+                WHERE nt.level = ngram_significance.level
+                AND nt.city IS ngram_significance.city
+                AND nt.county IS ngram_significance.county
+                AND nt.township IS ngram_significance.township
+                AND nt.ngram = ngram_significance.ngram
+                AND nt.n = ngram_significance.n
+                AND nt.position = ngram_significance.position
+                AND {regional_sql}
+                AND {global_sql}
+            )
+        """, support_params)
+        print(f"  Deleted {cursor.rowcount:,} low-support significance rows")
 
     # Delete from ngram_tendency
     print("\nDeleting non-significant n-grams from ngram_tendency...")
@@ -484,6 +559,8 @@ def step6_cleanup_insignificant_data(db_path: str):
             WHERE ngram_significance.ngram = ngram_tendency.ngram
             AND ngram_significance.level = ngram_tendency.level
             AND ngram_significance.city = ngram_tendency.city
+            AND ngram_significance.n = ngram_tendency.n
+            AND ngram_significance.position = ngram_tendency.position
         )
     """)
     tendency_deleted += cursor.rowcount
@@ -498,6 +575,8 @@ def step6_cleanup_insignificant_data(db_path: str):
             AND ngram_significance.level = ngram_tendency.level
             AND ngram_significance.city = ngram_tendency.city
             AND ngram_significance.county = ngram_tendency.county
+            AND ngram_significance.n = ngram_tendency.n
+            AND ngram_significance.position = ngram_tendency.position
         )
     """)
     tendency_deleted += cursor.rowcount
@@ -513,6 +592,8 @@ def step6_cleanup_insignificant_data(db_path: str):
             AND ngram_significance.city = ngram_tendency.city
             AND ngram_significance.county = ngram_tendency.county
             AND ngram_significance.township = ngram_tendency.township
+            AND ngram_significance.n = ngram_tendency.n
+            AND ngram_significance.position = ngram_tendency.position
         )
     """)
     tendency_deleted += cursor.rowcount
@@ -534,6 +615,8 @@ def step6_cleanup_insignificant_data(db_path: str):
             WHERE ngram_significance.ngram = regional_ngram_frequency.ngram
             AND ngram_significance.level = regional_ngram_frequency.level
             AND ngram_significance.city = regional_ngram_frequency.city
+            AND ngram_significance.n = regional_ngram_frequency.n
+            AND ngram_significance.position = regional_ngram_frequency.position
         )
     """)
     frequency_deleted += cursor.rowcount
@@ -548,6 +631,8 @@ def step6_cleanup_insignificant_data(db_path: str):
             AND ngram_significance.level = regional_ngram_frequency.level
             AND ngram_significance.city = regional_ngram_frequency.city
             AND ngram_significance.county = regional_ngram_frequency.county
+            AND ngram_significance.n = regional_ngram_frequency.n
+            AND ngram_significance.position = regional_ngram_frequency.position
         )
     """)
     frequency_deleted += cursor.rowcount
@@ -563,6 +648,8 @@ def step6_cleanup_insignificant_data(db_path: str):
             AND ngram_significance.city = regional_ngram_frequency.city
             AND ngram_significance.county = regional_ngram_frequency.county
             AND ngram_significance.township = regional_ngram_frequency.township
+            AND ngram_significance.n = regional_ngram_frequency.n
+            AND ngram_significance.position = regional_ngram_frequency.position
         )
     """)
     frequency_deleted += cursor.rowcount
@@ -578,9 +665,16 @@ def step6_cleanup_insignificant_data(db_path: str):
     cursor.execute("SELECT COUNT(*) FROM regional_ngram_frequency")
     frequency_after = cursor.fetchone()[0]
 
+    cursor.execute("SELECT COUNT(*) FROM ngram_significance")
+    significance_after = cursor.fetchone()[0]
+
     print(f"\nAfter cleanup:")
-    print(f"  ngram_tendency: {tendency_after:,} rows (retained {tendency_after/tendency_before*100:.1f}%)")
-    print(f"  regional_ngram_frequency: {frequency_after:,} rows (retained {frequency_after/frequency_before*100:.1f}%)")
+    significance_retained = significance_after / significance_before * 100 if significance_before else 0
+    tendency_retained = tendency_after / tendency_before * 100 if tendency_before else 0
+    frequency_retained = frequency_after / frequency_before * 100 if frequency_before else 0
+    print(f"  ngram_significance: {significance_after:,} rows (retained {significance_retained:.1f}%)")
+    print(f"  ngram_tendency: {tendency_after:,} rows (retained {tendency_retained:.1f}%)")
+    print(f"  regional_ngram_frequency: {frequency_after:,} rows (retained {frequency_retained:.1f}%)")
 
     print(f"\nTotal space saved: {tendency_deleted + frequency_deleted:,} rows deleted")
 
@@ -931,20 +1025,42 @@ def step9_populate_village_ngrams(db_path: str):
     conn.close()
 
 
-def main():
+def main(argv=None):
     """Main execution function."""
-    db_path = 'data/villages.db'
+    parser = argparse.ArgumentParser(description="Phase 12: N-gram Structure Analysis")
+    parser.add_argument("--db-path", default="data/villages.db", help="Path to database")
+    parser.add_argument("--run-id", default=None, help="Run ID for active_run_ids metadata")
+    parser.add_argument("--n-values", default="2,3", help="Comma-separated n values for regional analysis")
+    parser.add_argument("--regional-levels", default="township", help="Comma-separated regional levels")
+    parser.add_argument("--positions", default="all,prefix,suffix,middle", help="Comma-separated positions")
+    parser.add_argument("--min-regional-count-by-n", default="", help="Per-n thresholds, e.g. 2:3,3:2")
+    parser.add_argument("--min-global-count-by-n", default="", help="Per-n thresholds, e.g. 2:10,3:5")
+    args = parser.parse_args(argv)
+
+    db_path = args.db_path
+    n_values = _parse_int_csv(args.n_values)
+    regional_levels = _parse_str_csv(args.regional_levels)
+    positions = _parse_str_csv(args.positions)
+    min_regional_count_by_n = _parse_thresholds(args.min_regional_count_by_n)
+    min_global_count_by_n = _parse_thresholds(args.min_global_count_by_n)
 
     print("\n" + "="*60)
     print("Phase 12: N-gram Structure Analysis")
     print("="*60)
     print(f"Database: {db_path}")
+    print(f"N values: {n_values}")
+    print(f"Regional levels: {regional_levels}")
+    print(f"Positions: {positions}")
+    if min_regional_count_by_n:
+        print(f"Min regional count by n: {min_regional_count_by_n}")
+    if min_global_count_by_n:
+        print(f"Min global count by n: {min_global_count_by_n}")
     print(f"Start time: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
 
     start_time = datetime.now()
 
     # Generate run_id for this analysis
-    run_id = f"ngram_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
+    run_id = args.run_id or f"ngram_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
     print(f"Run ID: {run_id}")
 
     try:
@@ -954,7 +1070,11 @@ def main():
         step3_5_calculate_regional_totals_raw(db_path)  # NEW: Calculate raw totals
         step4_calculate_tendency(db_path)
         step5_calculate_significance(db_path)
-        step6_cleanup_insignificant_data(db_path)  # NEW: Clean up non-significant data
+        step6_cleanup_insignificant_data(
+            db_path,
+            min_regional_count_by_n=min_regional_count_by_n,
+            min_global_count_by_n=min_global_count_by_n,
+        )  # NEW: Clean up non-significant data
         step7_detect_patterns(db_path)
         step8_create_optimization_indexes(db_path)  # NEW: Create optimization indexes
         step9_populate_village_ngrams(db_path)  # NEW: Per-village n-grams for API
@@ -982,13 +1102,18 @@ def main():
         sig_count = cursor.fetchone()[0]
         conn.close()
 
-        update_active_run_id(
-            analysis_type="ngrams",
-            run_id=run_id,
-            script_name="phase12_ngram_analysis",
-            notes=f"N-gram analysis complete. {sig_count:,} significant n-grams (p < 0.05) stored.",
-            db_path=db_path
-        )
+        try:
+            from utils.update_run_id import update_active_run_id
+
+            update_active_run_id(
+                analysis_type="ngrams",
+                run_id=run_id,
+                script_name="phase12_ngram_analysis",
+                notes=f"N-gram analysis complete. {sig_count:,} significant n-grams (p < 0.05) stored.",
+                db_path=db_path
+            )
+        except ModuleNotFoundError as e:
+            print(f"[WARN] active_run_ids update skipped: missing optional dependency {e.name}")
 
     except Exception as e:
         print(f"\n[ERROR] Error: {e}")
