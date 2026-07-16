@@ -47,6 +47,13 @@ def _parse_str_csv(value: str) -> list[str]:
     return [part.strip() for part in value.split(',') if part.strip()]
 
 
+LEVEL_NAME_MAP = {
+    'city': '市级',
+    'county': '区县级',
+    'township': '乡镇级',
+}
+
+
 def _parse_thresholds(value: str | None) -> dict[int, int]:
     """Parse ``2:3,3:2`` threshold strings into ``{2: 3, 3: 2}``."""
     if not value:
@@ -62,6 +69,11 @@ def _parse_thresholds(value: str | None) -> dict[int, int]:
     return thresholds
 
 
+def _filter_positions(position_data: dict, positions: list[str]) -> dict:
+    requested = set(positions)
+    return {position: counter for position, counter in position_data.items() if position in requested}
+
+
 def step1_create_tables(db_path: str):
     """Step 1: Create database tables."""
     print("\n" + "="*60)
@@ -72,145 +84,104 @@ def step1_create_tables(db_path: str):
     print("[OK] Tables created successfully")
 
 
-def step2_extract_global_ngrams(db_path: str):
+def step2_extract_global_ngrams(
+    db_path: str,
+    n_values: list[int] | None = None,
+    positions: list[str] | None = None,
+):
     """Step 2: Extract global n-gram frequencies."""
+    n_values = n_values or [2, 3, 4]
+    positions = positions or ['all', 'prefix', 'suffix', 'middle']
+
     print("\n" + "="*60)
     print("Step 2: Extracting Global N-grams")
     print("="*60)
 
     # Extract n-grams first (read-only operation)
     with NgramExtractor(db_path) as extractor:
-        # Extract bigrams
-        print("\nExtracting bigrams...")
-        bigram_data = extractor.extract_all_ngrams(n=2)
-
-        # Extract trigrams
-        print("Extracting trigrams...")
-        trigram_data = extractor.extract_all_ngrams(n=3)
-
-        # Extract 4-grams
-        print("Extracting 4-grams...")
-        fourgram_data = extractor.extract_all_ngrams(n=4)
+        ngram_data_by_n = {}
+        for n in n_values:
+            print(f"\nExtracting {n}-grams...")
+            ngram_data_by_n[n] = _filter_positions(
+                extractor.extract_all_ngrams(n=n),
+                positions,
+            )
 
     # Now open connection for writing (after extractor is closed)
     conn = sqlite3.connect(db_path, timeout=60.0)
     cursor = conn.cursor()
 
-    # Store bigrams
-    print("\nStoring bigram frequencies...")
-    for position, counter in bigram_data.items():
-        total = sum(counter.values())
-        for ngram, freq in counter.items():
-            percentage = (freq / total * 100) if total > 0 else 0
-            cursor.execute("""
-                INSERT OR REPLACE INTO ngram_frequency
-                (ngram, n, position, frequency, total_count, percentage)
-                VALUES (?, ?, ?, ?, ?, ?)
-            """, (ngram, 2, position, freq, total, percentage))
-
-    # Store trigrams
-    print("Storing trigram frequencies...")
-    for position, counter in trigram_data.items():
-        total = sum(counter.values())
-        for ngram, freq in counter.items():
-            percentage = (freq / total * 100) if total > 0 else 0
-            cursor.execute("""
-                INSERT OR REPLACE INTO ngram_frequency
-                (ngram, n, position, frequency, total_count, percentage)
-                VALUES (?, ?, ?, ?, ?, ?)
-            """, (ngram, 3, position, freq, total, percentage))
-
-    # Store 4-grams
-    print("Storing 4-gram frequencies...")
-    for position, counter in fourgram_data.items():
-        total = sum(counter.values())
-        for ngram, freq in counter.items():
-            percentage = (freq / total * 100) if total > 0 else 0
-            cursor.execute("""
-                INSERT OR REPLACE INTO ngram_frequency
-                (ngram, n, position, frequency, total_count, percentage)
-                VALUES (?, ?, ?, ?, ?, ?)
-            """, (ngram, 4, position, freq, total, percentage))
+    for n, position_data in ngram_data_by_n.items():
+        print(f"\nStoring {n}-gram frequencies...")
+        for position, counter in position_data.items():
+            total = sum(counter.values())
+            for ngram, freq in counter.items():
+                percentage = (freq / total * 100) if total > 0 else 0
+                cursor.execute("""
+                    INSERT OR REPLACE INTO ngram_frequency
+                    (ngram, n, position, frequency, total_count, percentage)
+                    VALUES (?, ?, ?, ?, ?, ?)
+                """, (ngram, n, position, freq, total, percentage))
 
     conn.commit()
 
     # Print statistics
-    cursor.execute("SELECT COUNT(DISTINCT ngram) FROM ngram_frequency WHERE n = 2")
-    bigram_count = cursor.fetchone()[0]
-    cursor.execute("SELECT COUNT(DISTINCT ngram) FROM ngram_frequency WHERE n = 3")
-    trigram_count = cursor.fetchone()[0]
-    cursor.execute("SELECT COUNT(DISTINCT ngram) FROM ngram_frequency WHERE n = 4")
-    fourgram_count = cursor.fetchone()[0]
-
-    print(f"\n[OK] Extracted {bigram_count:,} unique bigrams")
-    print(f"[OK] Extracted {trigram_count:,} unique trigrams")
-    print(f"[OK] Extracted {fourgram_count:,} unique 4-grams")
+    for n in n_values:
+        cursor.execute("SELECT COUNT(DISTINCT ngram) FROM ngram_frequency WHERE n = ?", (n,))
+        ngram_count = cursor.fetchone()[0]
+        print(f"[OK] Extracted {ngram_count:,} unique {n}-grams")
 
     conn.close()
 
 
-def step3_extract_regional_ngrams(db_path: str):
+def step3_extract_regional_ngrams(
+    db_path: str,
+    n_values: list[int] | None = None,
+    regional_levels: list[str] | None = None,
+    positions: list[str] | None = None,
+):
     """Step 3: Extract regional n-gram frequencies with hierarchical grouping.
 
-    NOTE: Only extracts township-level data, but each row contains full hierarchical path
-    (city, county, township) to handle duplicate township names.
+    Each row contains full hierarchical path to handle duplicate place names.
     """
+    n_values = n_values or [2, 3]
+    regional_levels = regional_levels or ['township']
+    positions = positions or ['all', 'prefix', 'suffix', 'middle']
+
     print("\n" + "="*60)
-    print("Step 3: Extracting Regional N-grams (Township Level Only)")
+    print("Step 3: Extracting Regional N-grams")
     print("="*60)
 
     conn = sqlite3.connect(db_path, timeout=60.0)
     cursor = conn.cursor()
 
-    # Only process township level
-    level = '乡镇级'
-    level_en = 'township'
-
     with NgramExtractor(db_path) as extractor:
-        print(f"\nProcessing level: {level}")
+        for level_en in regional_levels:
+            level = LEVEL_NAME_MAP[level_en]
+            print(f"\nProcessing level: {level}")
 
-        # Bigrams
-        print(f"  Extracting bigrams for {level}...")
-        bigram_data = extractor.extract_regional_ngrams(n=2, level=level)
+            for n in n_values:
+                print(f"  Extracting {n}-grams for {level}...")
+                ngram_data = extractor.extract_regional_ngrams(n=n, level=level_en)
 
-        for hierarchical_key, position_data in bigram_data.items():
-            # Extract hierarchical components
-            city, county, township = hierarchical_key
-            region_name = township
+                for hierarchical_key, position_data in ngram_data.items():
+                    city, county, township = hierarchical_key
+                    region_name = {'city': city, 'county': county, 'township': township}[level_en]
 
-            for position, counter in position_data.items():
-                total = sum(counter.values())
-                for ngram, freq in counter.items():
-                    percentage = (freq / total * 100) if total > 0 else 0
-                    cursor.execute("""
-                        INSERT OR REPLACE INTO regional_ngram_frequency
-                        (level, city, county, township, region, ngram, n, position, frequency, total_count, percentage)
-                        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-                    """, (level_en, city, county, township, region_name, ngram, 2, position, freq, total, percentage))
-
-        # Trigrams
-        print(f"  Extracting trigrams for {level}...")
-        trigram_data = extractor.extract_regional_ngrams(n=3, level=level)
-
-        for hierarchical_key, position_data in trigram_data.items():
-            # Extract hierarchical components
-            city, county, township = hierarchical_key
-            region_name = township
-
-            for position, counter in position_data.items():
-                total = sum(counter.values())
-                for ngram, freq in counter.items():
-                    percentage = (freq / total * 100) if total > 0 else 0
-                    cursor.execute("""
-                        INSERT OR REPLACE INTO regional_ngram_frequency
-                        (level, city, county, township, region, ngram, n, position, frequency, total_count, percentage)
-                        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-                    """, (level_en, city, county, township, region_name, ngram, 3, position, freq, total, percentage))
+                    for position, counter in _filter_positions(position_data, positions).items():
+                        total = sum(counter.values())
+                        for ngram, freq in counter.items():
+                            percentage = (freq / total * 100) if total > 0 else 0
+                            cursor.execute("""
+                                INSERT OR REPLACE INTO regional_ngram_frequency
+                                (level, city, county, township, region, ngram, n, position, frequency, total_count, percentage)
+                                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                            """, (level_en, city, county, township, region_name, ngram, n, position, freq, total, percentage))
 
         conn.commit()
-        print(f"  [OK] Completed {level}")
+        print("  [OK] Completed configured levels")
 
-    print("\n[OK] Regional n-gram extraction complete (township level only)")
+    print("\n[OK] Regional n-gram extraction complete")
     conn.close()
 
 
@@ -257,13 +228,16 @@ def step3_5_calculate_regional_totals_raw(db_path: str):
     print("[OK] Regional total raw counts calculated")
 
 
-def step4_calculate_tendency(db_path: str):
+def step4_calculate_tendency(
+    db_path: str,
+    regional_levels: list[str] | None = None,
+):
     """Step 4: Calculate tendency scores with hierarchical grouping.
-
-    NOTE: Only processes township-level data (matching Step 3).
     """
+    regional_levels = regional_levels or ['township']
+
     print("\n" + "="*60)
-    print("Step 4: Calculating Tendency Scores (Township Level Only)")
+    print("Step 4: Calculating Tendency Scores")
     print("="*60)
 
     conn = sqlite3.connect(db_path, timeout=60.0)
@@ -272,71 +246,72 @@ def step4_calculate_tendency(db_path: str):
     analyzer = NgramAnalyzer(db_path)
     analyzer.__enter__()
 
-    # Only process township level
-    level = '乡镇级'
-    level_en = 'township'
+    for level_en in regional_levels:
+        print(f"\nProcessing level: {level_en}")
+        print("  Using optimized JOIN query for better performance...")
 
-    print(f"\nProcessing level: {level}")
-    print("  Using optimized JOIN query for better performance...")
+        cursor.execute("""
+            SELECT
+                r.level, r.city, r.county, r.township, r.region, r.ngram, r.n, r.position,
+                r.frequency as regional_count,
+                r.total_count as regional_total,
+                COALESCE(t.total_raw, r.total_count) as regional_total_raw,
+                g.frequency as global_count,
+                g.total_count as global_total
+            FROM regional_ngram_frequency r
+            LEFT JOIN temp_regional_totals_raw t
+                ON r.level = t.level
+                AND r.city IS t.city
+                AND r.county IS t.county
+                AND r.township IS t.township
+                AND r.n = t.n
+                AND r.position = t.position
+            LEFT JOIN ngram_frequency g
+                ON r.ngram = g.ngram
+                AND r.n = g.n
+                AND r.position = g.position
+            WHERE r.level = ?
+        """, (level_en,))
 
-    # Optimized: Use JOIN to get all data in one query instead of 3M+ individual queries
-    cursor.execute("""
-        SELECT
-            r.level, r.city, r.county, r.township, r.region, r.ngram, r.n, r.position,
-            r.frequency as regional_count,
-            r.total_count as regional_total,
-            COALESCE(t.total_raw, r.total_count) as regional_total_raw,
-            g.frequency as global_count,
-            g.total_count as global_total
-        FROM regional_ngram_frequency r
-        LEFT JOIN temp_regional_totals_raw t
-            ON r.level = t.level
-            AND r.city = t.city
-            AND r.county = t.county
-            AND r.township = t.township
-            AND r.n = t.n
-            AND r.position = t.position
-        LEFT JOIN ngram_frequency g
-            ON r.ngram = g.ngram
-            AND r.n = g.n
-            AND r.position = g.position
-        WHERE r.level = ?
-    """, (level_en,))
+        rows = cursor.fetchall()
+        total_rows = len(rows)
+        print(f"  Total rows to process: {total_rows:,}")
 
-    rows = cursor.fetchall()
-    total_rows = len(rows)
-    print(f"  Total rows to process: {total_rows:,}")
+        batch_size = 1000
+        batch_data = []
 
-    # Batch insert for better performance
-    batch_size = 1000
-    batch_data = []
+        for idx, (level_db, city, county, township, region, ngram, n, position,
+                  regional_count, regional_total, regional_total_raw,
+                  global_count, global_total) in enumerate(rows, 1):
 
-    for idx, (level_db, city, county, township, region, ngram, n, position,
-              regional_count, regional_total, regional_total_raw,
-              global_count, global_total) in enumerate(rows, 1):
+            if idx % 10000 == 0:
+                print(f"  Progress: {idx:,}/{total_rows:,} ({idx/total_rows*100:.1f}%)")
 
-        if idx % 10000 == 0:
-            print(f"  Progress: {idx:,}/{total_rows:,} ({idx/total_rows*100:.1f}%)")
+            if global_count is None or global_total is None:
+                continue
 
-        # Skip if global data is missing
-        if global_count is None or global_total is None:
-            continue
+            tendency = analyzer.calculate_tendency(
+                regional_count, regional_total,
+                global_count, global_total
+            )
 
-        # Calculate tendency
-        tendency = analyzer.calculate_tendency(
-            regional_count, regional_total,
-            global_count, global_total
-        )
+            batch_data.append((
+                level_en, city, county, township, region, ngram, n, position,
+                tendency['lift'], tendency['log_odds'], tendency['z_score'],
+                regional_count, regional_total, regional_total_raw, global_count, global_total
+            ))
 
-        # Add to batch
-        batch_data.append((
-            level_en, city, county, township, region, ngram, n, position,
-            tendency['lift'], tendency['log_odds'], tendency['z_score'],
-            regional_count, regional_total, regional_total_raw, global_count, global_total
-        ))
+            if len(batch_data) >= batch_size:
+                cursor.executemany("""
+                    INSERT OR REPLACE INTO ngram_tendency
+                    (level, city, county, township, region, ngram, n, position, lift, log_odds, z_score,
+                     regional_count, regional_total, regional_total_raw, global_count, global_total)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """, batch_data)
+                conn.commit()
+                batch_data = []
 
-        # Insert batch when full
-        if len(batch_data) >= batch_size:
+        if batch_data:
             cursor.executemany("""
                 INSERT OR REPLACE INTO ngram_tendency
                 (level, city, county, township, region, ngram, n, position, lift, log_odds, z_score,
@@ -344,37 +319,30 @@ def step4_calculate_tendency(db_path: str):
                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """, batch_data)
             conn.commit()
-            batch_data = []
 
-    # Insert remaining batch
-    if batch_data:
-        cursor.executemany("""
-            INSERT OR REPLACE INTO ngram_tendency
-            (level, city, county, township, region, ngram, n, position, lift, log_odds, z_score,
-             regional_count, regional_total, regional_total_raw, global_count, global_total)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-        """, batch_data)
-        conn.commit()
-
-    print(f"  [OK] Completed {level}")
+        print(f"  [OK] Completed {level_en}")
 
     analyzer.__exit__(None, None, None)
     conn.close()
-    print("\n[OK] Tendency calculation complete (township level only)")
+    print("\n[OK] Tendency calculation complete")
 
 
-def step5_calculate_significance(db_path: str):
-    """Step 5: Calculate statistical significance for township level only.
-
-    NOTE: This step only processes township level (matching Step 3-4).
+def step5_calculate_significance(
+    db_path: str,
+    regional_levels: list[str] | None = None,
+    alpha: float = 0.05,
+):
+    """Step 5: Calculate statistical significance.
 
     IMPORTANT: Only stores significant n-grams (p < 0.05) to optimize database size.
     Non-significant n-grams are not stored in ngram_significance table.
     """
+    regional_levels = regional_levels or ['township']
+
     print("\n" + "="*60)
-    print("Step 5: Calculating Statistical Significance (Township Level Only)")
+    print("Step 5: Calculating Statistical Significance")
     print("="*60)
-    print("NOTE: Only storing significant n-grams (p < 0.05)")
+    print(f"NOTE: Only storing significant n-grams (p < {alpha})")
 
     conn = sqlite3.connect(db_path, timeout=60.0)
     cursor = conn.cursor()
@@ -382,24 +350,12 @@ def step5_calculate_significance(db_path: str):
     analyzer = NgramAnalyzer(db_path)
     analyzer.__enter__()
 
-    # Map Chinese level names to English
-    level_map = {
-        '市级': 'city',
-        '区县级': 'county',
-        '乡镇级': 'township'
-    }
-
-    # Only process township level (matching Step 3-4)
-    levels = ['乡镇级']
-    alpha = 0.05  # Significance level
-
     # Track statistics
     total_tested = 0
     total_significant = 0
 
-    for level in levels:
-        print(f"\nProcessing level: {level}")
-        level_en = level_map[level]
+    for level_en in regional_levels:
+        print(f"\nProcessing level: {level_en}")
 
         # Get all tendency records with hierarchical columns
         cursor.execute("""
@@ -454,14 +410,16 @@ def step5_calculate_significance(db_path: str):
         total_significant += significant_count
 
         conn.commit()
-        print(f"  [OK] Completed {level}: {significant_count}/{total_rows} significant ({significant_count/total_rows*100:.1f}%)")
+        pct = significant_count / total_rows * 100 if total_rows else 0
+        print(f"  [OK] Completed {level_en}: {significant_count}/{total_rows} significant ({pct:.1f}%)")
 
     analyzer.__exit__(None, None, None)
     conn.close()
 
     print(f"\n[OK] Significance testing complete")
     print(f"    Total tested: {total_tested:,}")
-    print(f"    Total significant: {total_significant:,} ({total_significant/total_tested*100:.1f}%)")
+    total_pct = total_significant / total_tested * 100 if total_tested else 0
+    print(f"    Total significant: {total_significant:,} ({total_pct:.1f}%)")
     print(f"    Filtered out: {total_tested - total_significant:,} non-significant n-grams")
 
 
@@ -682,8 +640,15 @@ def step6_cleanup_insignificant_data(
     print("\n[OK] Cleanup complete - only significant n-grams retained")
 
 
-def step7_detect_patterns(db_path: str):
+def step7_detect_patterns(
+    db_path: str,
+    n_values: list[int] | None = None,
+    min_freq_by_n: dict[int, int] | None = None,
+):
     """Step 7: Detect structural patterns."""
+    n_values = n_values or [2, 3, 4]
+    min_freq_by_n = min_freq_by_n or {2: 100, 3: 50, 4: 30}
+
     print("\n" + "="*60)
     print("Step 7: Detecting Structural Patterns")
     print("="*60)
@@ -693,95 +658,36 @@ def step7_detect_patterns(db_path: str):
 
     detector = StructuralPatternDetector(db_path)
 
-    # Get bigrams, trigrams, and 4-grams
     from collections import Counter
 
-    cursor.execute("""
-        SELECT ngram, frequency
-        FROM ngram_frequency
-        WHERE n = 2 AND position = 'all'
-        ORDER BY frequency DESC
-    """)
-    bigrams = Counter({ngram: freq for ngram, freq in cursor.fetchall()})
-
-    cursor.execute("""
-        SELECT ngram, frequency
-        FROM ngram_frequency
-        WHERE n = 3 AND position = 'all'
-        ORDER BY frequency DESC
-    """)
-    trigrams = Counter({ngram: freq for ngram, freq in cursor.fetchall()})
-
-    cursor.execute("""
-        SELECT ngram, frequency
-        FROM ngram_frequency
-        WHERE n = 4 AND position = 'all'
-        ORDER BY frequency DESC
-    """)
-    fourgrams = Counter({ngram: freq for ngram, freq in cursor.fetchall()})
-
-    # Detect bigram templates
-    print("\nDetecting bigram templates...")
-    bigram_templates = detector.detect_templates(bigrams, min_freq=100)
-
-    for template in bigram_templates:
+    for n in n_values:
         cursor.execute("""
-            INSERT OR REPLACE INTO structural_patterns
-            (pattern, pattern_type, n, position, frequency, example, description)
-            VALUES (?, ?, ?, ?, ?, ?, ?)
-        """, (
-            template['pattern'],
-            template['type'],
-            2,
-            'all',
-            template['frequency'],
-            template['example'],
-            f"{template['type']} pattern"
-        ))
+            SELECT ngram, frequency
+            FROM ngram_frequency
+            WHERE n = ? AND position = 'all'
+            ORDER BY frequency DESC
+        """, (n,))
+        ngrams = Counter({ngram: freq for ngram, freq in cursor.fetchall()})
 
-    print(f"  [OK] Found {len(bigram_templates)} bigram templates")
+        print(f"\nDetecting {n}-gram templates...")
+        templates = detector.detect_templates(ngrams, min_freq=min_freq_by_n.get(n, 1))
 
-    # Detect trigram templates
-    print("Detecting trigram templates...")
-    trigram_templates = detector.detect_templates(trigrams, min_freq=50)
+        for template in templates:
+            cursor.execute("""
+                INSERT OR REPLACE INTO structural_patterns
+                (pattern, pattern_type, n, position, frequency, example, description)
+                VALUES (?, ?, ?, ?, ?, ?, ?)
+            """, (
+                template['pattern'],
+                template['type'],
+                n,
+                'all',
+                template['frequency'],
+                template['example'],
+                f"{template['type']} pattern"
+            ))
 
-    for template in trigram_templates:
-        cursor.execute("""
-            INSERT OR REPLACE INTO structural_patterns
-            (pattern, pattern_type, n, position, frequency, example, description)
-            VALUES (?, ?, ?, ?, ?, ?, ?)
-        """, (
-            template['pattern'],
-            template['type'],
-            3,
-            'all',
-            template['frequency'],
-            template['example'],
-            f"{template['type']} pattern"
-        ))
-
-    print(f"  [OK] Found {len(trigram_templates)} trigram templates")
-
-    # Detect 4-gram templates
-    print("Detecting 4-gram templates...")
-    fourgram_templates = detector.detect_templates(fourgrams, min_freq=30)
-
-    for template in fourgram_templates:
-        cursor.execute("""
-            INSERT OR REPLACE INTO structural_patterns
-            (pattern, pattern_type, n, position, frequency, example, description)
-            VALUES (?, ?, ?, ?, ?, ?, ?)
-        """, (
-            template['pattern'],
-            template['type'],
-            4,
-            'all',
-            template['frequency'],
-            template['example'],
-            f"{template['type']} pattern"
-        ))
-
-    print(f"  [OK] Found {len(fourgram_templates)} 4-gram templates")
+        print(f"  [OK] Found {len(templates)} {n}-gram templates")
 
     conn.commit()
     conn.close()
@@ -1065,17 +971,22 @@ def main(argv=None):
 
     try:
         step1_create_tables(db_path)
-        step2_extract_global_ngrams(db_path)
-        step3_extract_regional_ngrams(db_path)
+        step2_extract_global_ngrams(db_path, n_values=n_values, positions=positions)
+        step3_extract_regional_ngrams(
+            db_path,
+            n_values=n_values,
+            regional_levels=regional_levels,
+            positions=positions,
+        )
         step3_5_calculate_regional_totals_raw(db_path)  # NEW: Calculate raw totals
-        step4_calculate_tendency(db_path)
-        step5_calculate_significance(db_path)
+        step4_calculate_tendency(db_path, regional_levels=regional_levels)
+        step5_calculate_significance(db_path, regional_levels=regional_levels)
         step6_cleanup_insignificant_data(
             db_path,
             min_regional_count_by_n=min_regional_count_by_n,
             min_global_count_by_n=min_global_count_by_n,
         )  # NEW: Clean up non-significant data
-        step7_detect_patterns(db_path)
+        step7_detect_patterns(db_path, n_values=n_values)
         step8_create_optimization_indexes(db_path)  # NEW: Create optimization indexes
         step9_populate_village_ngrams(db_path)  # NEW: Per-village n-grams for API
 
