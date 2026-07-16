@@ -35,7 +35,13 @@
       "args": {
         "db_path": "data/villages.db",
         "output_dir": "results",
-        "log_level": "INFO"
+        "log_level": "INFO",
+        "region_levels": ["city", "county", "township"],
+        "chunk_size": 10000,
+        "persist_batch_size": 10000,
+        "min_global_support": 20,
+        "min_regional_support": 5,
+        "smoothing_alpha": 1.0
       }
     },
     "3": {
@@ -148,7 +154,15 @@
     "18": {
       "args": {
         "db_path": "data/villages.db",
-        "output_dir": "results/morphology"
+        "output_dir": "results/morphology",
+        "suffix_lengths": "1,2,3",
+        "prefix_lengths": "2,3",
+        "region_levels": ["city", "county", "township"],
+        "chunk_size": 10000,
+        "persist_batch_size": 10000,
+        "min_global_support": 20,
+        "min_regional_support": 5,
+        "smoothing_alpha": 1.0
       }
     }
   }

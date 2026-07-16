@@ -28,6 +28,7 @@ class FrequencyConfig:
     region_levels: List[str] = field(default_factory=lambda: ["city", "county", "township"])
     min_count_threshold: int = 10  # Minimum count for reporting
     chunk_size: int = 10000  # Chunk size for streaming processing
+    persist_batch_size: int = 10000  # Rows to insert per database batch
 
     def validate(self):
         """Validate configuration parameters."""
@@ -35,6 +36,10 @@ class FrequencyConfig:
         for level in self.region_levels:
             if level not in valid_levels:
                 raise ValueError(f"Invalid region level: {level}")
+        if self.chunk_size < 1:
+            raise ValueError("chunk_size must be >= 1")
+        if self.persist_batch_size < 1:
+            raise ValueError("persist_batch_size must be >= 1")
 
 
 @dataclass

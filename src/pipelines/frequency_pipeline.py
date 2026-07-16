@@ -80,7 +80,7 @@ class CharacterFrequencyPipeline:
                 run_id=self.config.run_id,
                 results_dir=self.output_dir,
                 region_levels=self.config.frequency.region_levels,
-                batch_size=10000
+                batch_size=self.config.frequency.persist_batch_size
             )
 
             # Done
@@ -303,4 +303,3 @@ class CharacterFrequencyPipeline:
                 f.write(f"Number of {level} regions: {n_regions:,}\n")
 
         logger.info(f"Saved summary report to {output_path}")
-

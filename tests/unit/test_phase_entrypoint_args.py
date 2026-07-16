@@ -21,6 +21,7 @@ from src.pipeline_config import load_pipeline_config, merge_phase_definitions
         "scripts/core/phase17_semantic_subcategory.py",
         "scripts/core/fill_aggregates_tables.py",
         "scripts/core/phase16_semantic_centrality.py",
+        "scripts/core/run_morphology.py",
     ],
 )
 def test_phase_entrypoint_exposes_help(script):

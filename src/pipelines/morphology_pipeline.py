@@ -29,7 +29,8 @@ class MorphologyPipeline:
         self,
         config: PipelineConfig,
         suffix_lengths: List[int] = None,
-        prefix_lengths: List[int] = None
+        prefix_lengths: List[int] = None,
+        persist_batch_size: int = 10000,
     ):
         """
         Initialize pipeline.
@@ -41,7 +42,8 @@ class MorphologyPipeline:
         """
         self.config = config
         self.suffix_lengths = suffix_lengths or [1, 2, 3]
-        self.prefix_lengths = prefix_lengths or [2, 3]
+        self.prefix_lengths = [2, 3] if prefix_lengths is None else prefix_lengths
+        self.persist_batch_size = persist_batch_size
         self.output_dir = Path(config.output_dir) / config.run_id
         self.output_dir.mkdir(parents=True, exist_ok=True)
 
@@ -82,7 +84,7 @@ class MorphologyPipeline:
                 suffix_lengths=self.suffix_lengths,
                 prefix_lengths=self.prefix_lengths,
                 region_levels=self.config.frequency.region_levels,
-                batch_size=10000
+                batch_size=self.persist_batch_size
             )
 
             # Done

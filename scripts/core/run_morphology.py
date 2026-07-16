@@ -31,6 +31,16 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 
+def _parse_int_csv(value: str) -> list[int]:
+    if value == "":
+        return []
+    return [int(item.strip()) for item in value.split(",") if item.strip()]
+
+
+def _parse_str_csv(value: str) -> list[str]:
+    return [item.strip() for item in value.split(",") if item.strip()]
+
+
 def main():
     parser = argparse.ArgumentParser(
         description='Run morphology pattern analysis and persist to database'
@@ -53,8 +63,20 @@ def main():
         default='results/morphology',
         help='Output directory for CSV results (default: results/morphology)'
     )
+    parser.add_argument('--suffix-lengths', default='1,2,3', help='Comma-separated suffix lengths')
+    parser.add_argument('--prefix-lengths', default='2,3', help='Comma-separated prefix lengths; empty disables prefixes')
+    parser.add_argument('--region-levels', default='city,county,township', help='Comma-separated region levels')
+    parser.add_argument('--chunk-size', type=int, default=10000, help='Village load chunk size')
+    parser.add_argument('--min-global-support', type=int, default=20, help='Minimum global support')
+    parser.add_argument('--min-regional-support', type=int, default=5, help='Minimum regional support')
+    parser.add_argument('--smoothing-alpha', type=float, default=1.0, help='Tendency smoothing alpha')
+    parser.add_argument('--no-z-score', action='store_true', help='Disable z-score calculation')
+    parser.add_argument('--persist-batch-size', type=int, default=10000, help='Rows to persist per batch')
 
     args = parser.parse_args()
+    suffix_lengths = _parse_int_csv(args.suffix_lengths)
+    prefix_lengths = _parse_int_csv(args.prefix_lengths)
+    region_levels = _parse_str_csv(args.region_levels)
 
     logger.info("=" * 60)
     logger.info("Morphology Pattern Analysis Phase")
@@ -68,8 +90,19 @@ def main():
         output_dir=args.output_dir,
         run_id=args.run_id
     )
+    config.frequency.region_levels = region_levels
+    config.frequency.chunk_size = args.chunk_size
+    config.tendency.min_global_support = args.min_global_support
+    config.tendency.min_regional_support = args.min_regional_support
+    config.tendency.smoothing_alpha = args.smoothing_alpha
+    config.tendency.compute_z_score = not args.no_z_score
 
-    pipeline = MorphologyPipeline(config)
+    pipeline = MorphologyPipeline(
+        config,
+        suffix_lengths=suffix_lengths,
+        prefix_lengths=prefix_lengths,
+        persist_batch_size=args.persist_batch_size,
+    )
     pipeline.run()
 
     logger.info("Morphology phase complete.")

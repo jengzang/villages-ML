@@ -13,6 +13,10 @@ from src.utils.logging_config import setup_logging
 from src.pipelines.frequency_pipeline import CharacterFrequencyPipeline
 
 
+def _split_csv_values(value: str):
+    return [item.strip() for item in value.split(",") if item.strip()]
+
+
 def main():
     """Main entry point."""
     parser = argparse.ArgumentParser(
@@ -52,6 +56,13 @@ def main():
         choices=['DEBUG', 'INFO', 'WARNING', 'ERROR'],
         help='Logging level (default: INFO)'
     )
+    parser.add_argument('--region-levels', default='city,county,township', help='Comma-separated region levels')
+    parser.add_argument('--chunk-size', type=int, default=10000, help='Village load chunk size')
+    parser.add_argument('--persist-batch-size', type=int, default=10000, help='Rows to persist per DB batch')
+    parser.add_argument('--min-global-support', type=int, default=20, help='Minimum global support')
+    parser.add_argument('--min-regional-support', type=int, default=5, help='Minimum regional support')
+    parser.add_argument('--smoothing-alpha', type=float, default=1.0, help='Tendency smoothing alpha')
+    parser.add_argument('--no-z-score', action='store_true', help='Disable z-score calculation')
 
     args = parser.parse_args()
 
@@ -66,6 +77,14 @@ def main():
             output_dir=args.output_dir,
             run_id=args.run_id
         )
+
+    config.frequency.region_levels = _split_csv_values(args.region_levels)
+    config.frequency.chunk_size = args.chunk_size
+    config.frequency.persist_batch_size = args.persist_batch_size
+    config.tendency.min_global_support = args.min_global_support
+    config.tendency.min_regional_support = args.min_regional_support
+    config.tendency.smoothing_alpha = args.smoothing_alpha
+    config.tendency.compute_z_score = not args.no_z_score
 
     # Validate configuration
     try:
