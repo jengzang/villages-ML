@@ -20,7 +20,8 @@ Important backend naming note:
 
 - `T.VILLAGES` maps to the preprocessed village table.
 - `T.VILLAGES_RAW` maps to the raw village table.
-- So `T.VILLAGES` usage is a compact blocker after preprocessed cleanup; `T.VILLAGES_RAW` usage is not a preprocessed-table blocker, but may still be too expensive for national online serving.
+- `T.VILLAGES` usage is a compact blocker after preprocessed cleanup.
+- `T.VILLAGES_RAW` usage is also a compact online-serving blocker. Raw tables are retained only for offline reruns/debugging, not as an API query source.
 
 ## APIs That Should Be Decoupled And Remain Supported
 
@@ -49,15 +50,32 @@ Phase12 already materializes:
 
 So the backend does not need to retain the preprocessed table for these APIs.
 
-## APIs That Already Avoid The Preprocessed Table
-
-These routes use raw or result tables rather than `T.VILLAGES`. They should not break merely because compact mode drops the preprocessed table.
+## APIs That Currently Read Raw Tables And Must Be Migrated
 
 | API group | Main current sources | Compact decision |
 | --- | --- | --- |
-| `GET /regional/aggregates/city` | `T.VILLAGES_RAW` + `semantic_indices` | Can keep, but consider moving basic counts/average length to `region_hierarchy_stats` or a future aggregate table for national serving |
-| `GET /regional/aggregates/county` | `T.VILLAGES_RAW` + `semantic_indices` | Can keep, same performance caveat |
-| `GET /regional/aggregates/town` | `T.VILLAGES_RAW` + `semantic_indices` | Can keep, same performance caveat |
+| `GET /regional/aggregates/city` | `T.VILLAGES_RAW` + `semantic_indices` | Must migrate off raw. Use `region_hierarchy_stats` for counts and `semantic_indices` for semantic percentages. If `avg_name_length` must remain in the response, materialize it into a small regional aggregate table; otherwise disable in compact. |
+| `GET /regional/aggregates/county` | `T.VILLAGES_RAW` + `semantic_indices` | Same as city. Must not scan raw in compact. |
+| `GET /regional/aggregates/town` | `T.VILLAGES_RAW` + `semantic_indices` | Same as city. Must not scan raw in compact. |
+| `GET /regional/vectors` | `semantic_indices` + `T.VILLAGES_RAW` for hierarchy filtering/reconstruction | Must migrate raw hierarchy lookup to `region_hierarchy_stats`. Keep supported after migration; disable in compact until migrated. |
+
+For `/regional/aggregates/*`, the existing compact-safe pieces are:
+
+- `region_hierarchy_stats.village_count` for region counts.
+- `semantic_indices.raw_intensity` and `semantic_indices.village_count` for semantic category percentages/counts.
+
+The current raw-table calculation of `avg_name_length` has no confirmed compact replacement table. Backend should either:
+
+- use a future small table such as `regional_basic_stats(region_level, city, county, township, region_name, village_count, avg_name_length)`;
+- or remove/return `null` for that field by explicit API contract change;
+- or disable these endpoints in compact mode.
+
+## APIs That Already Use Only Compact Result Tables
+
+These routes use retained result tables in their normal path and do not need raw/preprocessed village tables.
+
+| API group | Main current sources | Compact decision |
+| --- | --- | --- |
 | `GET /regional/spatial-aggregates` | `region_spatial_aggregates` | Keep supported |
 | `POST /regional/vectors/compare` | `semantic_indices` | Keep supported |
 | `POST /regional/vectors/compare/batch` | `semantic_indices` | Keep supported |
@@ -67,8 +85,6 @@ These routes use raw or result tables rather than `T.VILLAGES`. They should not 
 | `POST /compute/semantic/network` | `semantic_bigrams` or `semantic_bigrams_detailed` | Keep supported |
 | `POST /compute/clustering/character-tendency` | `char_regional_analysis` | Keep supported, but bound online clustering size/timeout |
 | `POST /compute/clustering/spatial-aware` | `spatial_clusters` JSON fields | Keep supported if `spatial_clusters` is retained |
-
-`GET /regional/vectors` is mixed: it reads `semantic_indices`, but also uses `T.VILLAGES_RAW` to validate/filter hierarchy and reconstruct region paths. This does not block preprocessed cleanup because raw is retained. For a stricter online-light backend, migrate that hierarchy lookup to `region_hierarchy_stats`.
 
 ## APIs To Disable In Compact Mode
 
@@ -100,6 +116,15 @@ Do not let these routes fail with raw SQLite errors like `no such table`.
 | `POST /compute/clustering/scan` | same as clustering run | Keep only if backend forbids fallback or compact profile guarantees aggregate tables exist; otherwise disable |
 | `POST /compute/clustering/sampled-villages` | village-level sampling | Disable |
 | `POST /compute/clustering/hierarchical` | currently uses `T.VILLAGES` for hierarchy and compute-engine data flows | Disable until rewritten against `region_hierarchy_stats` and result tables |
+
+Raw-table routes are conditional compact blockers:
+
+| API | Current dependency | Decision |
+| --- | --- | --- |
+| `GET /regional/aggregates/city` | `T.VILLAGES_RAW` | Disable in compact until migrated to compact small/result tables |
+| `GET /regional/aggregates/county` | `T.VILLAGES_RAW` | Disable in compact until migrated to compact small/result tables |
+| `GET /regional/aggregates/town` | `T.VILLAGES_RAW` | Disable in compact until migrated to compact small/result tables |
+| `GET /regional/vectors` | `T.VILLAGES_RAW` for hierarchy | Disable in compact until hierarchy lookup uses `region_hierarchy_stats` |
 
 ## APIs That Should Stay Supported
 
@@ -159,9 +184,9 @@ These API families query compact-retained result tables and do not need preproce
 
    The route should fail early with an intentional compact-mode message before constructing SQL against missing tables.
 
-5. Treat raw-table realtime regional APIs as a second optimization wave.
+5. Migrate or disable raw-table realtime regional APIs.
 
-   These APIs are not blocked by preprocessed cleanup because raw is retained, but for national data they can still scan a large table. Prefer `region_hierarchy_stats`, `semantic_indices`, and other regional result tables where possible.
+   These APIs must not query raw in compact mode. Migrate `/regional/aggregates/*` to `region_hierarchy_stats` + `semantic_indices` plus a small materialized replacement for `avg_name_length` if that field remains required. Migrate `/regional/vectors` hierarchy validation/reconstruction to `region_hierarchy_stats`.
 
 ## Compact API Disable List For Backend Coordination
 
@@ -187,10 +212,14 @@ POST /api/villages/compute/clustering/hierarchical
 Conditional compact gates:
 
 ```text
+GET  /api/villages/regional/aggregates/city
+GET  /api/villages/regional/aggregates/county
+GET  /api/villages/regional/aggregates/town
+GET  /api/villages/regional/vectors
 POST /api/villages/compute/clustering/run
 POST /api/villages/compute/clustering/scan
 ```
 
-These two may remain enabled only when the backend guarantees they read regional aggregate tables and do not fall back to `village_features`.
+The regional routes may remain enabled only after they stop querying `T.VILLAGES_RAW`. The clustering routes may remain enabled only when the backend guarantees they read regional aggregate tables and do not fall back to `village_features`.
 
 Keep `GET /api/villages/compute/clustering/cache-stats` and `DELETE /api/villages/compute/clustering/cache` if the compute router remains mounted; they do not require village tables by themselves.
