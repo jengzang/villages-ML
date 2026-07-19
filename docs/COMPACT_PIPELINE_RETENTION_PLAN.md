@@ -139,29 +139,31 @@ The backend currently queries these tables in village-detail, village-search, an
 
 ## Raw And Preprocessed Village Tables
 
-These two tables need a staged treatment:
+Compact mode keeps the raw village table but does not keep the preprocessed village table.
+
+Keep:
 
 - `广东省自然村`
+- `全国自然村`
+
+Drop or omit after derived outputs are built:
+
 - `广东省自然村_预处理`
+- `全国自然村_预处理`
 
-Initial compact implementation should keep them until a replacement regional metadata table exists, because some metadata and regional APIs still use them for counts, region lists, and region hierarchy.
+Rationale:
 
-Final compact implementation should replace their runtime role with a small regional catalog table:
+- Raw data is retained for manual reruns and debugging.
+- The preprocessed table is large and reproducible.
+- Metadata APIs do not need the preprocessed table after backend reads move to existing small tables.
 
-- `region_catalog`
+Existing compact metadata tables:
 
-Suggested `region_catalog` columns:
+- `metadata_overview_stats`
+- `region_hierarchy_stats`
+- `regional_centroids`
 
-- `region_level`
-- `region_name`
-- `city`
-- `county`
-- `township`
-- `village_count`
-- `centroid_lon`
-- `centroid_lat`
-
-After backend reads are migrated to `region_catalog`, compact mode can drop or omit `广东省自然村` and `广东省自然村_预处理`.
+`region_catalog` is no longer required for `/metadata/stats/*`. It may still be useful later as a richer unified region lookup, but it is optional and should not block preprocessed-table cleanup.
 
 ## National Profile Changes
 
@@ -227,41 +229,28 @@ Steps:
 - Add a dry-run display listing keep/drop tables.
 - Commit with message: `feat: apply compact retention cleanup`.
 
-### Task 4: Backend Degraded Responses For Dropped Village Tables
+### Task 4: Backend Compact API Gates And Decoupling
 
 **Files:**
 
 - Modify: `api/village/data.py`
 - Modify: `api/village/search.py`
 - Modify: `api/compute/subset.py`
+- Modify: `api/metadata/stats.py`
+- Modify: `api/character/tendency.py`
+- Modify: `api/regional/similarity.py`
 - Test: existing or new API unit tests under `tests/unit/`
 
 Steps:
 
-- Add table-existence checks before querying compact-dropped tables.
-- For missing `village_ngrams`, return `ngrams: null` or an empty ngram payload instead of a SQL error.
-- For missing `village_semantic_structure`, return `semantic_structure: null`.
-- For missing `village_features`, return a controlled `404` or `422` explaining that the compact database does not support village-level features/subset compute.
+- Move `/metadata/stats/overview` to `metadata_overview_stats`.
+- Move `/metadata/stats/regions` and region list/default-region selection to `region_hierarchy_stats`.
+- Move `/character/tendency/by-char` centroids to `regional_centroids`.
+- Add compact guards for village-detail and village-compute APIs.
+- Return a controlled `501` or `422` explaining that the compact database does not support village-level detail tables.
 - Commit with message: `feat: degrade village APIs for compact databases`.
 
-### Task 5: Add Region Catalog Replacement
-
-**Files:**
-
-- Create: `scripts/core/build_region_catalog.py`
-- Modify: `run_all_phases.py`
-- Modify: `api/metadata/stats.py`
-- Modify: relevant regional metadata reads after confirming exact call sites
-- Test: `tests/unit/test_region_catalog.py`
-
-Steps:
-
-- Build `region_catalog` from preprocessed villages.
-- Use it for region counts, hierarchy, and optional centroids.
-- Keep raw/preprocessed tables until this migration is complete.
-- Commit with message: `feat: add compact region catalog`.
-
-### Task 6: Enable Final Raw/Preprocessed Cleanup
+### Task 5: Enable Preprocessed Cleanup
 
 **Files:**
 
@@ -271,8 +260,9 @@ Steps:
 
 Steps:
 
-- Add a second-stage retention option for dropping `广东省自然村` and `广东省自然村_预处理`.
-- Keep this disabled until `region_catalog` covers the required backend reads.
+- Add retention targets for preprocessed tables only.
+- Keep raw tables out of compact cleanup targets.
+- Ensure cleanup is run only after selected phases finish successfully.
 - Commit with message: `feat: support final compact raw table cleanup`.
 
 ## Verification Commands
@@ -300,7 +290,7 @@ Run before final handoff:
 
 - `char_similarity` remains in compact mode.
 - Village-level derived tables are cleanup targets.
-- Raw and preprocessed village tables are not dropped in the first implementation.
-- `region_catalog` is required before final raw/preprocessed cleanup.
+- Raw village tables are kept.
+- Preprocessed village tables are cleanup targets after backend decoupling.
+- `metadata_overview_stats`, `region_hierarchy_stats`, and `regional_centroids` cover the known non-village-detail backend reads.
 - Guangdong full profile remains backward compatible.
-

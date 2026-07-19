@@ -1,0 +1,196 @@
+# Compact Mode Backend API Impact
+
+> Backend handoff document. Compact mode keeps analysis-result tables, keeps the raw village table for rerun/debugging, and does not keep the preprocessed village table or village-level derived tables.
+
+## Current Table Policy
+
+Compact mode should keep:
+
+- Raw village table: `广东省自然村` for Guangdong, `全国自然村` for national.
+- Small metadata tables generated during preprocessing: `metadata_overview_stats`, `region_hierarchy_stats`.
+- Global/regional analysis result tables, including `char_similarity`.
+- Regional centroid/result tables such as `regional_centroids`, `region_similarity`, `region_spatial_aggregates`, clustering summaries, semantic indices, n-gram summaries, and pattern summaries.
+
+Compact mode should not keep:
+
+- Preprocessed village table: `广东省自然村_预处理`, `全国自然村_预处理`.
+- Village-level derived tables: `village_ngrams`, `village_semantic_structure`, `village_features`, `village_spatial_features`, `village_cluster_assignments`.
+
+Important backend naming note:
+
+- `T.VILLAGES` maps to the preprocessed village table.
+- `T.VILLAGES_RAW` maps to the raw village table.
+- So `T.VILLAGES` usage is a compact blocker after preprocessed cleanup; `T.VILLAGES_RAW` usage is not a preprocessed-table blocker, but may still be too expensive for national online serving.
+
+## APIs That Should Be Decoupled And Remain Supported
+
+These APIs currently query `T.VILLAGES`, but they are not inherently village-detail APIs. They should be migrated to small/result tables so compact mode can keep supporting them.
+
+| API | Current dependency | Replacement source | Compact decision |
+| --- | --- | --- | --- |
+| `GET /metadata/stats/overview` | `api/metadata/stats.py` counts `T.VILLAGES` | `metadata_overview_stats`; keep DB size/mtime from file system | Keep supported |
+| `GET /metadata/stats/regions` | `api/metadata/stats.py` groups `T.VILLAGES` | `region_hierarchy_stats` | Keep supported |
+| `GET /character/tendency/by-char` | tendency rows come from `char_regional_analysis`, but centroid is computed by joining `T.VILLAGES` | `regional_centroids` on `region_level` + hierarchy/name | Keep supported |
+| `GET /regions/similarity/matrix` when `regions` is omitted | default top counties are selected from `T.VILLAGES` | `region_hierarchy_stats` where `level='county'`, ordered by `village_count DESC` | Keep supported |
+| `GET /regions/list` | lists regions from `T.VILLAGES` | `region_hierarchy_stats` filtered by level | Keep supported |
+
+### Why These Can Be Decoupled
+
+They only need region-level counts, hierarchy, or centroids. Those are already final analytical/metadata facts, not per-village details.
+
+Phase0 already materializes:
+
+- `metadata_overview_stats`: `total_villages`, `total_cities`, `total_counties`, `total_townships`, `unique_characters`, `generated_at`, `data_version`.
+- `region_hierarchy_stats`: `level`, `name`, `city`, `county`, `township`, `parent`, `village_count`, `sort_key`, `generated_at`, `data_version`.
+
+Phase12 already materializes:
+
+- `regional_centroids`: `region_level`, `city`, `county`, `township`, `region_name`, `centroid_lon`, `centroid_lat`, `village_count`.
+
+So the backend does not need to retain the preprocessed table for these APIs.
+
+## APIs That Already Avoid The Preprocessed Table
+
+These routes use raw or result tables rather than `T.VILLAGES`. They should not break merely because compact mode drops the preprocessed table.
+
+| API group | Main current sources | Compact decision |
+| --- | --- | --- |
+| `GET /regional/aggregates/city` | `T.VILLAGES_RAW` + `semantic_indices` | Can keep, but consider moving basic counts/average length to `region_hierarchy_stats` or a future aggregate table for national serving |
+| `GET /regional/aggregates/county` | `T.VILLAGES_RAW` + `semantic_indices` | Can keep, same performance caveat |
+| `GET /regional/aggregates/town` | `T.VILLAGES_RAW` + `semantic_indices` | Can keep, same performance caveat |
+| `GET /regional/spatial-aggregates` | `region_spatial_aggregates` | Keep supported |
+| `POST /regional/vectors/compare` | `semantic_indices` | Keep supported |
+| `POST /regional/vectors/compare/batch` | `semantic_indices` | Keep supported |
+| `POST /regional/vectors/reduce` | `semantic_indices` plus runtime PCA/t-SNE | Functionally supported; online compute cost should be bounded |
+| `POST /regional/vectors/cluster` | `semantic_indices` plus runtime clustering | Functionally supported; online compute cost should be bounded |
+| `POST /compute/semantic/cooccurrence` | `semantic_bigrams` or `semantic_bigrams_detailed` | Keep supported |
+| `POST /compute/semantic/network` | `semantic_bigrams` or `semantic_bigrams_detailed` | Keep supported |
+| `POST /compute/clustering/character-tendency` | `char_regional_analysis` | Keep supported, but bound online clustering size/timeout |
+| `POST /compute/clustering/spatial-aware` | `spatial_clusters` JSON fields | Keep supported if `spatial_clusters` is retained |
+
+`GET /regional/vectors` is mixed: it reads `semantic_indices`, but also uses `T.VILLAGES_RAW` to validate/filter hierarchy and reconstruct region paths. This does not block preprocessed cleanup because raw is retained. For a stricter online-light backend, migrate that hierarchy lookup to `region_hierarchy_stats`.
+
+## APIs To Disable In Compact Mode
+
+These APIs return or compute village-level data. Compact mode intentionally does not keep the tables needed to serve them.
+
+Recommended behavior: return a controlled response such as HTTP `501 Not Implemented` or `422 Unprocessable Entity` with a clear message:
+
+```text
+This compact database does not include village-level detail tables.
+```
+
+Do not let these routes fail with raw SQLite errors like `no such table`.
+
+| API | Required compact-missing tables | Decision |
+| --- | --- | --- |
+| `GET /village/search` | `T.VILLAGES` | Disable |
+| `GET /village/search/detail` | `T.VILLAGES`, `village_features`, `village_spatial_features`, `village_cluster_assignments` | Disable |
+| `GET /village/ngrams/{village_id}` | `T.VILLAGES`, `village_ngrams` | Disable |
+| `GET /village/semantic-structure/{village_id}` | `T.VILLAGES`, `village_semantic_structure` | Disable |
+| `GET /village/features/{village_id}` | `T.VILLAGES`, `village_features` | Disable |
+| `GET /village/spatial-features/{village_id}` | `T.VILLAGES`, `village_spatial_features`, `village_cluster_assignments` | Disable |
+| `GET /village/complete/{village_id}` | `T.VILLAGES`, `village_features`, `village_spatial_features`, `village_cluster_assignments`, `village_semantic_structure`, `village_ngrams` | Disable |
+| `POST /subset/filter` | `T.VILLAGES`, optionally `village_features`, `village_semantic_structure` | Disable |
+| `POST /compute/subset/cluster` | `village_features`; optionally `T.VILLAGES` for coordinates | Disable |
+| `POST /compute/subset/compare` | `village_features`; optionally `T.VILLAGES` for coordinates | Disable |
+| `POST /compute/features/extract` | `village_features`; optionally `T.VILLAGES` for coordinates | Disable |
+| `POST /compute/features/aggregate` | `village_features`, `village_semantic_structure`, optionally `village_cluster_assignments` | Disable unless rewritten to use compact regional result tables |
+| `POST /compute/clustering/run` | can read precomputed regional aggregate tables, but falls back to `village_features` if aggregate tables are missing/empty | Keep only if backend forbids fallback or compact profile guarantees aggregate tables exist; otherwise disable |
+| `POST /compute/clustering/scan` | same as clustering run | Keep only if backend forbids fallback or compact profile guarantees aggregate tables exist; otherwise disable |
+| `POST /compute/clustering/sampled-villages` | village-level sampling | Disable |
+| `POST /compute/clustering/hierarchical` | currently uses `T.VILLAGES` for hierarchy and compute-engine data flows | Disable until rewritten against `region_hierarchy_stats` and result tables |
+
+## APIs That Should Stay Supported
+
+These API families query compact-retained result tables and do not need preprocessed/village-level derived tables in their normal path:
+
+- `GET /character/frequency/global`
+- `GET /character/frequency/regional`
+- `GET /character/tendency/by-region`
+- `GET /character/embeddings/*`
+- `GET /character/significance/*`
+- `GET /semantic/category/*`
+- `GET /semantic/subcategory/*`
+- `GET /semantic/labels/*`
+- `GET /semantic/composition/*`
+- `GET /semantic/indices`
+- `GET /ngrams/frequency`
+- `GET /ngrams/regional`
+- `GET /ngrams/patterns`
+- `GET /ngrams/tendency`
+- `GET /ngrams/significance`
+- `GET /patterns/*`
+- `GET /clustering/assignments`
+- `GET /clustering/assignments/by-region`
+- `GET /clustering/profiles`
+- `GET /clustering/metrics`
+- `GET /clustering/metrics/best`
+- `GET /spatial/hotspots`
+- `GET /spatial/hotspots/{hotspot_id}`
+- `GET /spatial/clusters`
+- `GET /spatial/clusters/summary`
+- `GET /spatial/clusters/available-runs`
+- `GET /spatial/integration*`
+- `POST /compute/semantic/cooccurrence`
+- `POST /compute/semantic/network`
+- `POST /compute/clustering/character-tendency`
+- `POST /compute/clustering/spatial-aware`
+- `GET /metadata/stats/tables`
+- `GET /admin/run-ids/*`
+
+`GET /metadata/stats/tables` introspects SQLite metadata. It should remain supported and will naturally show that compact-disabled village-level tables are absent.
+
+## Backend Migration Recommendations
+
+1. Add a compact capability check in the backend.
+
+   Suggested implementation: detect absence of `T.VILLAGES` or presence of a future `query_policy_config` flag such as `profile='compact'`.
+
+2. Migrate small metadata reads first.
+
+   Update `/metadata/stats/overview`, `/metadata/stats/regions`, `/regions/list`, and `/regions/similarity/matrix` default region selection to use `metadata_overview_stats` and `region_hierarchy_stats`.
+
+3. Migrate centroid reads.
+
+   Update `/character/tendency/by-char` to use `regional_centroids` rather than joining the preprocessed table.
+
+4. Gate village-detail and online village-compute routes.
+
+   The route should fail early with an intentional compact-mode message before constructing SQL against missing tables.
+
+5. Treat raw-table realtime regional APIs as a second optimization wave.
+
+   These APIs are not blocked by preprocessed cleanup because raw is retained, but for national data they can still scan a large table. Prefer `region_hierarchy_stats`, `semantic_indices`, and other regional result tables where possible.
+
+## Compact API Disable List For Backend Coordination
+
+The backend team can use this as the initial route-level compact denylist:
+
+```text
+GET  /api/villages/village/search
+GET  /api/villages/village/search/detail
+GET  /api/villages/village/ngrams/{village_id}
+GET  /api/villages/village/semantic-structure/{village_id}
+GET  /api/villages/village/features/{village_id}
+GET  /api/villages/village/spatial-features/{village_id}
+GET  /api/villages/village/complete/{village_id}
+POST /api/villages/subset/filter
+POST /api/villages/compute/subset/cluster
+POST /api/villages/compute/subset/compare
+POST /api/villages/compute/features/extract
+POST /api/villages/compute/features/aggregate
+POST /api/villages/compute/clustering/sampled-villages
+POST /api/villages/compute/clustering/hierarchical
+```
+
+Conditional compact gates:
+
+```text
+POST /api/villages/compute/clustering/run
+POST /api/villages/compute/clustering/scan
+```
+
+These two may remain enabled only when the backend guarantees they read regional aggregate tables and do not fall back to `village_features`.
+
+Keep `GET /api/villages/compute/clustering/cache-stats` and `DELETE /api/villages/compute/clustering/cache` if the compute router remains mounted; they do not require village tables by themselves.
