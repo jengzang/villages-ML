@@ -80,3 +80,57 @@ def test_materialize_metadata_stats_creates_overview_and_hierarchy_tables():
     ]
     assert "total_villages" not in preprocessed_columns
     assert "village_count" not in preprocessed_columns
+
+
+def test_materialize_metadata_stats_creates_regional_basic_stats():
+    conn = sqlite3.connect(":memory:")
+    _create_preprocessed_sample(conn)
+
+    materialize_metadata_stats(conn, data_version="unit_test")
+
+    rows = conn.execute(
+        """
+        SELECT region_level, region_name, city, county, township,
+               village_count, ROUND(avg_name_length, 3), data_version
+        FROM regional_basic_stats
+        ORDER BY region_level, city, county, township
+        """
+    ).fetchall()
+
+    assert (
+        "city",
+        "广州市",
+        "广州市",
+        None,
+        None,
+        3,
+        2.0,
+        "unit_test",
+    ) in rows
+    assert (
+        "county",
+        "天河区",
+        "广州市",
+        "天河区",
+        None,
+        2,
+        2.0,
+        "unit_test",
+    ) in rows
+    assert (
+        "township",
+        "五山街道",
+        "广州市",
+        "天河区",
+        "五山街道",
+        2,
+        2.0,
+        "unit_test",
+    ) in rows
+    assert len(rows) == 8
+
+    indexes = {
+        row[1]
+        for row in conn.execute("PRAGMA index_list(regional_basic_stats)").fetchall()
+    }
+    assert "idx_regional_basic_stats_level_count" in indexes

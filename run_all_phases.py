@@ -408,7 +408,7 @@ PHASES = {
         "group": "core",
         "dependencies": [],
         "estimated_time": "2-5 min",
-        "output_tables": ["广东省自然村_预处理"],
+        "output_tables": ["广东省自然村_预处理", "metadata_overview_stats", "region_hierarchy_stats", "regional_basic_stats"],
         "critical": True,
         "use_run_id": False
     },

@@ -224,8 +224,91 @@ def materialize_metadata_stats(
         "CREATE INDEX idx_region_hierarchy_parent ON region_hierarchy_stats(level, parent)"
     )
 
+    cursor.execute("DROP TABLE IF EXISTS regional_basic_stats")
+    cursor.execute("""
+    CREATE TABLE regional_basic_stats (
+        region_level TEXT NOT NULL,
+        region_name TEXT NOT NULL,
+        city TEXT,
+        county TEXT,
+        township TEXT,
+        village_count INTEGER NOT NULL,
+        avg_name_length REAL,
+        generated_at REAL NOT NULL,
+        data_version TEXT NOT NULL,
+        PRIMARY KEY (region_level, city, county, township)
+    )
+    """)
+
+    cursor.execute(f"""
+        INSERT INTO regional_basic_stats (
+            region_level, region_name, city, county, township,
+            village_count, avg_name_length, generated_at, data_version
+        )
+        SELECT
+            'city',
+            {S.city_col},
+            {S.city_col},
+            NULL,
+            NULL,
+            COUNT(*),
+            AVG(LENGTH({S.village_name_col_normalized})),
+            ?,
+            ?
+        FROM {S.preprocessed_table}
+        WHERE {S.city_col} IS NOT NULL AND {S.city_col} != ''
+        GROUP BY {S.city_col}
+    """, (generated_at, data_version))
+
+    cursor.execute(f"""
+        INSERT INTO regional_basic_stats (
+            region_level, region_name, city, county, township,
+            village_count, avg_name_length, generated_at, data_version
+        )
+        SELECT
+            'county',
+            {S.county_col},
+            {S.city_col},
+            {S.county_col},
+            NULL,
+            COUNT(*),
+            AVG(LENGTH({S.village_name_col_normalized})),
+            ?,
+            ?
+        FROM {S.preprocessed_table}
+        WHERE {S.county_col} IS NOT NULL AND {S.county_col} != ''
+        GROUP BY {S.city_col}, {S.county_col}
+    """, (generated_at, data_version))
+
+    cursor.execute(f"""
+        INSERT INTO regional_basic_stats (
+            region_level, region_name, city, county, township,
+            village_count, avg_name_length, generated_at, data_version
+        )
+        SELECT
+            'township',
+            {S.township_col},
+            {S.city_col},
+            {S.county_col},
+            {S.township_col},
+            COUNT(*),
+            AVG(LENGTH({S.village_name_col_normalized})),
+            ?,
+            ?
+        FROM {S.preprocessed_table}
+        WHERE {S.township_col} IS NOT NULL AND {S.township_col} != ''
+        GROUP BY {S.city_col}, {S.county_col}, {S.township_col}
+    """, (generated_at, data_version))
+
+    cursor.execute(
+        "CREATE INDEX idx_regional_basic_stats_level_count ON regional_basic_stats(region_level, village_count DESC)"
+    )
+    cursor.execute(
+        "CREATE INDEX idx_regional_basic_stats_lookup ON regional_basic_stats(region_level, region_name)"
+    )
+
     conn.commit()
-    logger.info("Materialized metadata_overview_stats and region_hierarchy_stats")
+    logger.info("Materialized metadata_overview_stats, region_hierarchy_stats, and regional_basic_stats")
 
 
 def create_preprocessed_table(conn: sqlite3.Connection, schema: VillageTableSchema | None = None):
