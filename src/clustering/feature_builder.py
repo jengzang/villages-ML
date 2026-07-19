@@ -24,16 +24,18 @@ logger = logging.getLogger(__name__)
 class RegionFeatureBuilder:
     """Build region feature vectors from database."""
 
-    def __init__(self, conn: sqlite3.Connection):
+    def __init__(self, conn: sqlite3.Connection, semantic_lexicon_path: str = 'data/semantic_lexicon_v1.json'):
         """
         Initialize feature builder.
 
         Args:
             conn: Database connection
+            semantic_lexicon_path: Semantic lexicon used to choose semantic feature categories
         """
         self.conn = conn
         from src.semantic.lexicon_loader import SemanticLexicon
-        self._lexicon = SemanticLexicon('data/semantic_lexicon_v1.json')
+        self.semantic_lexicon_path = semantic_lexicon_path
+        self._lexicon = SemanticLexicon(semantic_lexicon_path)
 
     def build_semantic_features(
         self,
@@ -319,4 +321,3 @@ class RegionFeatureBuilder:
         query = f"SELECT COUNT(*) FROM {schema.raw_table} WHERE `{col_name}` = ?"
         cursor = self.conn.execute(query, (region_name,))
         return cursor.fetchone()[0]
-

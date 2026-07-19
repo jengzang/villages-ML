@@ -128,6 +128,47 @@ def main():
         help='Random seed for reproducibility (default: 42)'
     )
     parser.add_argument(
+        '--semantic-lexicon-path',
+        default='data/semantic_lexicon_v1.json',
+        help='Semantic lexicon used to choose semantic feature categories'
+    )
+    parser.add_argument(
+        '--use-semantic',
+        action='store_true',
+        default=True,
+        help='Include semantic features'
+    )
+    parser.add_argument(
+        '--no-semantic',
+        dest='use_semantic',
+        action='store_false',
+        help='Exclude semantic features'
+    )
+    parser.add_argument(
+        '--use-morphology',
+        action='store_true',
+        default=True,
+        help='Include morphology features'
+    )
+    parser.add_argument(
+        '--no-morphology',
+        dest='use_morphology',
+        action='store_false',
+        help='Exclude morphology features'
+    )
+    parser.add_argument(
+        '--use-diversity',
+        action='store_true',
+        default=True,
+        help='Include diversity/meta features'
+    )
+    parser.add_argument(
+        '--no-diversity',
+        dest='use_diversity',
+        action='store_false',
+        help='Exclude diversity/meta features'
+    )
+    parser.add_argument(
         '--output-dir',
         help='Output directory for CSV exports (default: results/<output_run_id>)'
     )
@@ -157,6 +198,10 @@ def main():
     logger.info(f"N init: {args.n_init}")
     logger.info(f"Max iter: {args.max_iter}")
     logger.info(f"Random state: {args.random_state}")
+    logger.info(f"Semantic lexicon path: {args.semantic_lexicon_path}")
+    logger.info(f"Use semantic features: {args.use_semantic}")
+    logger.info(f"Use morphology features: {args.use_morphology}")
+    logger.info(f"Use diversity features: {args.use_diversity}")
     logger.info(f"Output directory: {args.output_dir}")
     logger.info("=" * 80)
 
@@ -169,9 +214,9 @@ def main():
             output_run_id=args.output_run_id,
             region_level=args.region_level,
             k_range=args.k_range,
-            use_semantic=True,
-            use_morphology=True,
-            use_diversity=True,
+            use_semantic=args.use_semantic,
+            use_morphology=args.use_morphology,
+            use_diversity=args.use_diversity,
             top_n_suffix2=args.top_n_suffix2,
             top_n_suffix3=args.top_n_suffix3,
             use_pca=not args.no_pca,
@@ -179,6 +224,7 @@ def main():
             n_init=args.n_init,
             max_iter=args.max_iter,
             random_state=args.random_state,
+            semantic_lexicon_path=args.semantic_lexicon_path,
             output_dir=args.output_dir
         )
 

@@ -133,3 +133,36 @@ def test_national_profile_defines_args_for_every_pipeline_phase():
     for phase_id in PHASES:
         assert "args" in config["phases"][str(phase_id)]
         assert isinstance(config["phases"][str(phase_id)]["args"], dict)
+
+
+def test_national_profile_is_conservative_for_large_dataset():
+    config = load_pipeline_config("config/pipeline.national.json")
+
+    assert config["dataset"] == {
+        "key": "national",
+        "db_path": "data/villages_national.db",
+    }
+    assert config["run"]["run_id_prefix"] == "national"
+
+    phase1 = config["phases"]["1"]["args"]
+    assert phase1["precompute_similarities"] is False
+    assert phase1["top_k"] == 20
+
+    phase6 = config["phases"]["6"]["args"]
+    assert phase6["semantic_lexicon_path"] == "data/semantic_lexicon_v1.json"
+    assert phase6["use_semantic"] is True
+    assert phase6["use_morphology"] is True
+    assert phase6["use_diversity"] is True
+
+    phase12 = config["phases"]["12"]["args"]
+    assert phase12["n_values"] == [2]
+    assert phase12["regional_levels"] == ["city", "county"]
+    assert phase12["positions"] == ["all", "suffix"]
+    assert phase12["min_global_count_by_n"] == "2:200"
+
+    phase14 = config["phases"]["14"]["args"]
+    assert phase14["basic_lexicon_path"] == "data/semantic_lexicon_v1.json"
+    assert phase14["detailed_lexicon_path"] == "data/semantic_lexicon_v4.json"
+    assert phase14["conflict_threshold"] == 20
+    assert phase14["structure_progress_interval"] == 50000
+    assert phase14["region_levels"] == ["city", "county"]

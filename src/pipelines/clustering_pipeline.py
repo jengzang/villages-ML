@@ -50,6 +50,7 @@ def run_clustering_pipeline(
     n_init: int = 20,
     max_iter: int = 500,
     random_state: int = 42,
+    semantic_lexicon_path: str = 'data/semantic_lexicon_v1.json',
     output_dir: Optional[str] = None
 ) -> Dict[str, Any]:
     """
@@ -72,6 +73,7 @@ def run_clustering_pipeline(
         n_init: KMeans initialization count
         max_iter: KMeans max iterations
         random_state: Random seed
+        semantic_lexicon_path: Semantic lexicon used to choose semantic categories
         output_dir: Optional output directory for CSV exports
 
     Returns:
@@ -93,7 +95,7 @@ def run_clustering_pipeline(
 
         # Step 2: Build region feature vectors
         logger.info("Building region feature vectors...")
-        feature_builder = RegionFeatureBuilder(conn)
+        feature_builder = RegionFeatureBuilder(conn, semantic_lexicon_path=semantic_lexicon_path)
 
         region_df, feature_names = feature_builder.build_region_vectors(
             semantic_run_id=semantic_run_id,
@@ -191,6 +193,7 @@ def run_clustering_pipeline(
                 'use_diversity': use_diversity,
                 'top_n_suffix2': top_n_suffix2,
                 'top_n_suffix3': top_n_suffix3,
+                'semantic_lexicon_path': semantic_lexicon_path,
                 'use_pca': use_pca,
                 'pca_n_components': pca_n_components,
                 'n_features': len(feature_names),
@@ -255,4 +258,3 @@ def run_clustering_pipeline(
         raise
     finally:
         conn.close()
-

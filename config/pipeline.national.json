@@ -26,6 +26,7 @@
         "workers": 4,
         "negative": 5,
         "output_dir": "models/embeddings_national",
+        "precompute_similarities": false,
         "top_k": 20,
         "notes": "National conservative character embeddings"
       }
@@ -78,7 +79,11 @@
         "pca_components": 40,
         "n_init": 10,
         "max_iter": 300,
-        "random_state": 42
+        "random_state": 42,
+        "semantic_lexicon_path": "data/semantic_lexicon_v1.json",
+        "use_semantic": true,
+        "use_morphology": true,
+        "use_diversity": true
       }
     },
     "7": {
@@ -126,6 +131,10 @@
       "args": {
         "db_path": "data/villages_national.db",
         "lexicon_path": "data/semantic_lexicon_v4.json",
+        "basic_lexicon_path": "data/semantic_lexicon_v1.json",
+        "detailed_lexicon_path": "data/semantic_lexicon_v4.json",
+        "conflict_threshold": 20,
+        "structure_progress_interval": 50000,
         "region_levels": ["city", "county"]
       }
     },

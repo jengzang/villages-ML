@@ -80,7 +80,11 @@
         "pca_components": 50,
         "n_init": 20,
         "max_iter": 500,
-        "random_state": 42
+        "random_state": 42,
+        "semantic_lexicon_path": "data/semantic_lexicon_v1.json",
+        "use_semantic": true,
+        "use_morphology": true,
+        "use_diversity": true
       }
     },
     "7": {
@@ -128,6 +132,10 @@
       "args": {
         "db_path": "data/villages.db",
         "lexicon_path": "data/semantic_lexicon_v4.json",
+        "basic_lexicon_path": "data/semantic_lexicon_v1.json",
+        "detailed_lexicon_path": "data/semantic_lexicon_v4.json",
+        "conflict_threshold": 5,
+        "structure_progress_interval": 10000,
         "region_levels": ["city", "county", "township"]
       }
     },

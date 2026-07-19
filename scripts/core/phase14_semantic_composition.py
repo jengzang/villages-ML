@@ -47,7 +47,11 @@ def step1_create_tables(db_path: str):
     print("[OK] Tables created successfully")
 
 
-def step2_analyze_compositions(db_path: str):
+def step2_analyze_compositions(
+    db_path: str,
+    basic_lexicon_path: str,
+    detailed_lexicon_path: str,
+):
     """Step 2: Analyze all semantic compositions - Generate BOTH basic and detailed tables."""
     print("\n" + "="*60)
     print("Step 2: Analyzing Semantic Compositions (Dual Version)")
@@ -64,9 +68,7 @@ def step2_analyze_compositions(db_path: str):
     cursor.execute("DELETE FROM semantic_trigrams")
     conn.commit()
 
-    lexicon_v1 = project_root / 'data' / 'semantic_lexicon_v1.json'
-
-    with SemanticCompositionAnalyzer(db_path, lexicon_path=str(lexicon_v1)) as analyzer:
+    with SemanticCompositionAnalyzer(db_path, lexicon_path=basic_lexicon_path) as analyzer:
         print("Extracting semantic compositions (v1)...")
         compositions = analyzer.analyze_all_compositions()
 
@@ -131,9 +133,7 @@ def step2_analyze_compositions(db_path: str):
     cursor.execute("DELETE FROM semantic_trigrams_detailed")
     conn.commit()
 
-    lexicon_v4 = project_root / 'data' / 'semantic_lexicon_v4.json'
-
-    with SemanticCompositionAnalyzer(db_path, lexicon_path=str(lexicon_v4)) as analyzer:
+    with SemanticCompositionAnalyzer(db_path, lexicon_path=detailed_lexicon_path) as analyzer:
         print("Extracting semantic compositions (v4)...")
         compositions = analyzer.analyze_all_compositions()
 
@@ -362,7 +362,12 @@ def step4_detect_patterns(db_path: str):
     conn.close()
 
 
-def step5_detect_conflicts(db_path: str):
+def step5_detect_conflicts(
+    db_path: str,
+    basic_lexicon_path: str,
+    detailed_lexicon_path: str,
+    conflict_threshold: int,
+):
     """Step 5: Detect semantic conflicts — basic (v1) and detailed (v4)."""
     print("\n" + "="*60)
     print("Step 5: Detecting Semantic Conflicts (Dual Version)")
@@ -377,14 +382,12 @@ def step5_detect_conflicts(db_path: str):
     cursor.execute("DELETE FROM semantic_conflicts")
     conn.commit()
 
-    lexicon_v1 = str(project_root / 'data' / 'semantic_lexicon_v1.json')
-
-    with SemanticCompositionAnalyzer(db_path, lexicon_path=lexicon_v1) as analyzer:
+    with SemanticCompositionAnalyzer(db_path, lexicon_path=basic_lexicon_path) as analyzer:
         compositions = analyzer.analyze_all_compositions()
         sequences = compositions['sequences']
 
         print("Detecting unusual combinations (v1)...")
-        conflicts = analyzer.detect_semantic_conflicts(sequences, threshold=5)
+        conflicts = analyzer.detect_semantic_conflicts(sequences, threshold=conflict_threshold)
 
         for conflict in conflicts:
             sequence_str = json.dumps(conflict['sequence'])
@@ -419,14 +422,12 @@ def step5_detect_conflicts(db_path: str):
     cursor.execute("DELETE FROM semantic_conflicts_detailed")
     conn.commit()
 
-    lexicon_v4 = str(project_root / 'data' / 'semantic_lexicon_v4.json')
-
-    with SemanticCompositionAnalyzer(db_path, lexicon_path=lexicon_v4) as analyzer:
+    with SemanticCompositionAnalyzer(db_path, lexicon_path=detailed_lexicon_path) as analyzer:
         compositions = analyzer.analyze_all_compositions()
         sequences = compositions['sequences']
 
         print("Detecting unusual combinations (v4)...")
-        conflicts = analyzer.detect_semantic_conflicts(sequences, threshold=5)
+        conflicts = analyzer.detect_semantic_conflicts(sequences, threshold=conflict_threshold)
 
         for conflict in conflicts:
             sequence_str = json.dumps(conflict['sequence'])
@@ -447,7 +448,11 @@ def step5_detect_conflicts(db_path: str):
     conn.close()
 
 
-def step6_extract_village_structures(db_path: str):
+def step6_extract_village_structures(
+    db_path: str,
+    basic_lexicon_path: str,
+    progress_interval: int = 10000,
+):
     """Step 6: Extract per-village semantic structures."""
     print("\n" + "="*60)
     print("Step 6: Extracting Village Semantic Structures")
@@ -456,9 +461,7 @@ def step6_extract_village_structures(db_path: str):
     conn = sqlite3.connect(db_path)
     cursor = conn.cursor()
 
-    lexicon_v1 = str(project_root / 'data' / 'semantic_lexicon_v1.json')
-
-    with SemanticCompositionAnalyzer(db_path, lexicon_path=lexicon_v1) as analyzer:
+    with SemanticCompositionAnalyzer(db_path, lexicon_path=basic_lexicon_path) as analyzer:
         char_labels = analyzer.get_character_labels()
 
         cursor.execute("""
@@ -517,7 +520,7 @@ def step6_extract_village_structures(db_path: str):
             ))
 
             count += 1
-            if count % 10000 == 0:
+            if progress_interval > 0 and count % progress_interval == 0:
                 print(f"  Progress: {count:,} villages processed, {skipped:,} skipped")
                 conn.commit()
 
@@ -674,6 +677,28 @@ def parse_args():
         help="Path to semantic lexicon used for detailed indices",
     )
     parser.add_argument(
+        "--basic-lexicon-path",
+        default=str(project_root / "data" / "semantic_lexicon_v1.json"),
+        help="Path to basic semantic lexicon used for 9-category composition outputs",
+    )
+    parser.add_argument(
+        "--detailed-lexicon-path",
+        default=None,
+        help="Path to detailed semantic lexicon used for detailed composition outputs; defaults to --lexicon-path",
+    )
+    parser.add_argument(
+        "--conflict-threshold",
+        type=int,
+        default=5,
+        help="Minimum sequence count treated as common when detecting unusual semantic conflicts",
+    )
+    parser.add_argument(
+        "--structure-progress-interval",
+        type=int,
+        default=10000,
+        help="Commit and print progress every N village semantic structures; 0 disables interval commits",
+    )
+    parser.add_argument(
         "--region-levels",
         default="city,county,township",
         help="Comma-separated detailed semantic index region levels",
@@ -686,22 +711,40 @@ def main():
     args = parse_args()
     db_path = args.db_path
     region_levels = [level.strip() for level in args.region_levels.split(",") if level.strip()]
+    detailed_lexicon_path = args.detailed_lexicon_path or args.lexicon_path
 
     print("\n" + "="*60)
     print("Phase 14: Semantic Composition Analysis")
     print("="*60)
     print(f"Database: {db_path}")
+    print(f"Basic lexicon: {args.basic_lexicon_path}")
+    print(f"Detailed lexicon: {detailed_lexicon_path}")
+    print(f"Conflict threshold: {args.conflict_threshold}")
+    print(f"Structure progress interval: {args.structure_progress_interval}")
     print(f"Start time: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
 
     start_time = datetime.now()
 
     try:
         step1_create_tables(db_path)
-        step2_analyze_compositions(db_path)
+        step2_analyze_compositions(
+            db_path,
+            basic_lexicon_path=args.basic_lexicon_path,
+            detailed_lexicon_path=detailed_lexicon_path,
+        )
         step3_calculate_pmi(db_path)
         step4_detect_patterns(db_path)
-        step5_detect_conflicts(db_path)
-        step6_extract_village_structures(db_path)
+        step5_detect_conflicts(
+            db_path,
+            basic_lexicon_path=args.basic_lexicon_path,
+            detailed_lexicon_path=detailed_lexicon_path,
+            conflict_threshold=args.conflict_threshold,
+        )
+        step6_extract_village_structures(
+            db_path,
+            basic_lexicon_path=args.basic_lexicon_path,
+            progress_interval=args.structure_progress_interval,
+        )
         step7_generate_semantic_indices_detailed(
             db_path,
             run_id=args.run_id,

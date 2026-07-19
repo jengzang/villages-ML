@@ -91,3 +91,43 @@ def test_profile_only_emits_supported_phase_options(config_path):
             if option != "--help" and option not in help_text
         ]
         assert unsupported_options == [], f"Phase {phase_id} unsupported options: {unsupported_options}"
+
+
+def test_national_profile_emits_phase6_and_phase14_deep_config_options():
+    config = load_pipeline_config("config/pipeline.national.json")
+    phases = merge_phase_definitions(PHASES, config)
+
+    phase6_cmd = [
+        "python",
+        phases[6]["script"],
+        "--semantic-run-id",
+        "semantic_test",
+        "--morphology-run-id",
+        "morph_test",
+        "--output-run-id",
+        "cluster_test",
+    ]
+    phase6_cmd.extend(phases[6]["args"])
+
+    assert "--semantic-lexicon-path" in phase6_cmd
+    assert phase6_cmd[phase6_cmd.index("--semantic-lexicon-path") + 1] == "data/semantic_lexicon_v1.json"
+    assert "--use-semantic" in phase6_cmd
+    assert "--use-morphology" in phase6_cmd
+    assert "--use-diversity" in phase6_cmd
+
+    phase14_cmd, _, _ = build_phase_command(
+        14,
+        phases=phases,
+        run_id_prefix="national",
+        db_path="data/villages_national.db",
+        now_str="20260716_120000",
+    )
+
+    assert "--basic-lexicon-path" in phase14_cmd
+    assert phase14_cmd[phase14_cmd.index("--basic-lexicon-path") + 1] == "data/semantic_lexicon_v1.json"
+    assert "--detailed-lexicon-path" in phase14_cmd
+    assert phase14_cmd[phase14_cmd.index("--detailed-lexicon-path") + 1] == "data/semantic_lexicon_v4.json"
+    assert "--conflict-threshold" in phase14_cmd
+    assert phase14_cmd[phase14_cmd.index("--conflict-threshold") + 1] == "20"
+    assert "--structure-progress-interval" in phase14_cmd
+    assert phase14_cmd[phase14_cmd.index("--structure-progress-interval") + 1] == "50000"
