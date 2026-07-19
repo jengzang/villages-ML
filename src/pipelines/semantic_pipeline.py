@@ -18,7 +18,7 @@ from typing import List, Optional
 import numpy as np
 import pandas as pd
 
-from src.schema import DEFAULT_SCHEMA
+from src.schema import get_schema
 from src.semantic.lexicon_loader import SemanticLexicon
 from src.semantic.vtf_calculator import VTFCalculator
 from src.semantic.semantic_index import SemanticIndexCalculator
@@ -39,7 +39,8 @@ def run_semantic_analysis_pipeline(
     output_run_id: str,
     lexicon_path: str = 'data/semantic_lexicon_v1.json',
     region_levels: List[str] = None,
-    output_dir: Optional[str] = None
+    output_dir: Optional[str] = None,
+    schema_name: str = 'guangdong',
 ) -> None:
     """
     Run complete semantic analysis pipeline.
@@ -51,6 +52,7 @@ def run_semantic_analysis_pipeline(
         lexicon_path: Path to semantic lexicon JSON
         region_levels: List of region levels to analyze
         output_dir: Directory for CSV exports (optional)
+        schema_name: Village table schema name
     """
     if region_levels is None:
         region_levels = ['city', 'county', 'township']
@@ -60,6 +62,7 @@ def run_semantic_analysis_pipeline(
     logger.info(f"  Output run ID: {output_run_id}")
     logger.info(f"  Lexicon: {lexicon_path}")
     logger.info(f"  Region levels: {region_levels}")
+    logger.info(f"  Schema: {schema_name}")
 
     start_time = time.time()
 
@@ -129,7 +132,7 @@ def run_semantic_analysis_pipeline(
         logger.info("\\n=== Step 5b: Calculating semantic indices ===")
         index_calculator = SemanticIndexCalculator(lexicon)
 
-        S = DEFAULT_SCHEMA
+        S = get_schema(schema_name)
         villages_df = pd.read_sql_query(f"""
             SELECT {S.city_col}, {S.county_col}, {S.township_col},
                    {S.village_name_col_prefix_removed} as 自然村

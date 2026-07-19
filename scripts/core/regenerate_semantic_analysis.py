@@ -16,6 +16,7 @@ import sys
 from pathlib import Path
 import pandas as pd
 import logging
+import argparse
 
 # Add project root to path
 project_root = Path(__file__).parent.parent.parent
@@ -24,6 +25,7 @@ sys.path.insert(0, str(project_root))
 from src.semantic.lexicon_loader import SemanticLexicon
 from src.semantic.vtf_calculator import VTFCalculator
 from src.data.db_writer import write_semantic_regional_analysis
+from src.schema import get_schema
 
 logging.basicConfig(
     level=logging.INFO,
@@ -32,15 +34,32 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 
+def parse_args():
+    parser = argparse.ArgumentParser(description="Regenerate semantic regional analysis")
+    parser.add_argument("--db-path", default=str(project_root / "data" / "villages.db"))
+    parser.add_argument("--lexicon-path", default=str(project_root / "data" / "semantic_lexicon_v1.json"))
+    parser.add_argument("--schema", default="guangdong", help="Village schema profile name")
+    parser.add_argument(
+        "--region-levels",
+        default="city,county,township",
+        help="Comma-separated region levels to calculate",
+    )
+    return parser.parse_args()
+
+
 def main():
-    db_path = project_root / 'data' / 'villages.db'
-    lexicon_path = project_root / 'data' / 'semantic_lexicon_v1.json'
+    args = parse_args()
+    db_path = Path(args.db_path)
+    lexicon_path = Path(args.lexicon_path)
+    schema = get_schema(args.schema)
+    region_levels = [level.strip() for level in args.region_levels.split(",") if level.strip()]
 
     logger.info("=" * 80)
     logger.info("重新生成語義分析數據")
     logger.info("=" * 80)
     logger.info(f"Database: {db_path}")
     logger.info(f"Lexicon: {lexicon_path}")
+    logger.info(f"Schema: {args.schema} ({schema.preprocessed_table})")
 
     # Step 1: Load semantic lexicon
     logger.info("\n[Step 1/4] Loading semantic lexicon...")
@@ -54,7 +73,7 @@ def main():
     # Get actual global total villages
     cursor = conn.cursor()
     global_total_villages = cursor.execute(
-        "SELECT COUNT(*) FROM 广东省自然村_预处理"
+        f"SELECT COUNT(*) FROM {schema.preprocessed_table}"
     ).fetchone()[0]
     logger.info(f"Global total villages: {global_total_villages:,}")
 
@@ -97,7 +116,7 @@ def main():
 
     # Regional VTF for each level
     all_regional_vtf_dfs = []
-    for level in ['city', 'county', 'township']:
+    for level in region_levels:
         logger.info(f"\nCalculating VTF for {level} level...")
         regional_vtf_df = vtf_calc.calculate_regional_vtf(regional_char_df, level)
         all_regional_vtf_dfs.append(regional_vtf_df)

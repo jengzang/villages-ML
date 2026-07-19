@@ -80,6 +80,12 @@ def main():
         default=['city', 'county', 'township'],
         help='Region levels to analyze (default: city county township)'
     )
+    parser.add_argument(
+        '--schema',
+        default='guangdong',
+        choices=['guangdong', 'national'],
+        help='Village table schema',
+    )
 
     parser.add_argument(
         '--verbose',
@@ -104,7 +110,8 @@ def main():
             output_run_id=args.output_run_id,
             lexicon_path=args.lexicon_path,
             region_levels=args.region_levels,
-            output_dir=args.output_dir
+            output_dir=args.output_dir,
+            schema_name=args.schema,
         )
 
         logger.info("Semantic analysis pipeline completed successfully")

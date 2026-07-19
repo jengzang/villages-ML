@@ -13,7 +13,7 @@ from typing import Dict, List, Optional
 import pandas as pd
 import numpy as np
 
-from src.schema import VillageTableSchema, DEFAULT_SCHEMA
+from src.schema import VillageTableSchema, DEFAULT_SCHEMA, get_schema
 from src.features.feature_extractor import VillageFeatureExtractor
 from src.data.db_writer import (
     create_feature_materialization_tables,
@@ -163,7 +163,14 @@ def merge_cluster_assignments(villages_df: pd.DataFrame, assignments: Dict[str, 
     return result_df
 
 
-def write_village_features(conn: sqlite3.Connection, run_id: str, df: pd.DataFrame, batch_size: int = 10000, lexicon_path: str = 'data/semantic_lexicon_v1.json'):
+def write_village_features(
+    conn: sqlite3.Connection,
+    run_id: str,
+    df: pd.DataFrame,
+    batch_size: int = 10000,
+    lexicon_path: str = 'data/semantic_lexicon_v1.json',
+    schema: VillageTableSchema = DEFAULT_SCHEMA,
+):
     """
     Write village features to database.
 
@@ -180,7 +187,7 @@ def write_village_features(conn: sqlite3.Connection, run_id: str, df: pd.DataFra
 
     # Get village_id mapping from preprocessed table
     logger.info("Loading village_id mapping from preprocessed table...")
-    S = DEFAULT_SCHEMA
+    S = schema
     id_mapping_query = f"""
     SELECT
         {S.city_col}, {S.county_col}, {S.township_col},
@@ -257,7 +264,8 @@ def run_feature_materialization_pipeline(
     run_id: str,
     clustering_run_id: Optional[str] = None,
     lexicon_path: str = 'data/semantic_lexicon_v1.json',
-    output_dir: Optional[str] = None
+    output_dir: Optional[str] = None,
+    schema_name: str = 'guangdong',
 ) -> Dict[str, any]:
     """
     Run feature materialization pipeline.
@@ -274,6 +282,7 @@ def run_feature_materialization_pipeline(
     """
     logger.info(f"Starting feature materialization pipeline: run_id={run_id}")
     start_time = time.time()
+    schema = get_schema(schema_name)
 
     # Connect to database
     conn = sqlite3.connect(db_path)
@@ -281,11 +290,11 @@ def run_feature_materialization_pipeline(
     try:
         # Create tables
         logger.info("Creating feature materialization tables")
-        create_feature_materialization_tables(conn)
-        create_feature_materialization_indexes(conn)
+        create_feature_materialization_tables(conn, lexicon_path=lexicon_path)
+        create_feature_materialization_indexes(conn, lexicon_path=lexicon_path)
 
         # Load villages
-        villages_df = load_villages(conn)
+        villages_df = load_villages(conn, schema=schema)
 
         # Initialize feature extractor
         extractor = VillageFeatureExtractor(lexicon_path)
@@ -302,7 +311,7 @@ def run_feature_materialization_pipeline(
             result_df = merge_cluster_assignments(result_df, assignments)
 
         # Write to database
-        write_village_features(conn, run_id, result_df, lexicon_path=lexicon_path)
+        write_village_features(conn, run_id, result_df, lexicon_path=lexicon_path, schema=schema)
 
         # Compute and write region aggregates
         logger.info("Computing region aggregates")
@@ -334,6 +343,5 @@ def run_feature_materialization_pipeline(
 
     finally:
         conn.close()
-
 
 

@@ -22,7 +22,7 @@ import sys
 project_root = Path(__file__).parent.parent.parent
 sys.path.insert(0, str(project_root))
 
-from src.schema import DEFAULT_SCHEMA as S
+from src.schema import VillageTableSchema, get_schema
 from src.preprocessing.text_cleaner import normalize_village_name
 from src.preprocessing.prefix_cleaner import batch_clean_prefixes
 from src.preprocessing.numbered_village_normalizer import (
@@ -44,6 +44,12 @@ def parse_args():
         "--db-path",
         default=str(project_root / "data" / "villages.db"),
         help="Path to SQLite database",
+    )
+    parser.add_argument(
+        "--schema",
+        default="guangdong",
+        choices=["guangdong", "national"],
+        help="Village table schema",
     )
     parser.add_argument(
         "--prefix-min-length",
@@ -68,8 +74,10 @@ def parse_args():
 def materialize_metadata_stats(
     conn: sqlite3.Connection,
     data_version: str = "phase0_preprocessing",
+    schema: VillageTableSchema | None = None,
 ):
     """Materialize small metadata tables for overview and region list APIs."""
+    S = schema or get_schema("guangdong")
     cursor = conn.cursor()
     generated_at = time.time()
 
@@ -220,8 +228,9 @@ def materialize_metadata_stats(
     logger.info("Materialized metadata_overview_stats and region_hierarchy_stats")
 
 
-def create_preprocessed_table(conn: sqlite3.Connection):
+def create_preprocessed_table(conn: sqlite3.Connection, schema: VillageTableSchema | None = None):
     """Create the preprocessed table schema (optimized with only 12 essential columns)."""
+    S = schema or get_schema("guangdong")
     cursor = conn.cursor()
 
     # Drop if exists
@@ -259,6 +268,7 @@ def create_preprocessed_table(conn: sqlite3.Connection):
 def main():
     """Main preprocessing pipeline."""
     args = parse_args()
+    S = get_schema(args.schema)
     db_path = Path(args.db_path)
 
     if not db_path.exists():
@@ -269,7 +279,7 @@ def main():
     conn = sqlite3.connect(str(db_path))
 
     # Create preprocessed table
-    create_preprocessed_table(conn)
+    create_preprocessed_table(conn, schema=S)
 
     # Load raw data
     logger.info("Loading raw village data...")
@@ -405,7 +415,7 @@ def main():
 
     # Materialize lightweight metadata tables for backend overview/regions APIs.
     logger.info("Materializing metadata stats...")
-    materialize_metadata_stats(conn, data_version=args.metadata_version)
+    materialize_metadata_stats(conn, data_version=args.metadata_version, schema=S)
 
     # Verify
     cursor.execute(f"SELECT COUNT(*) FROM {S.preprocessed_table}")

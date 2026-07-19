@@ -66,19 +66,27 @@ class PipelineConfig:
     run_id: str
     db_path: str
     output_dir: str
+    schema_name: str = "guangdong"
     cleaning: CleaningConfig = field(default_factory=CleaningConfig)
     frequency: FrequencyConfig = field(default_factory=FrequencyConfig)
     tendency: TendencyConfig = field(default_factory=TendencyConfig)
 
     @classmethod
-    def create_default(cls, db_path: str, output_dir: str, run_id: Optional[str] = None):
+    def create_default(
+        cls,
+        db_path: str,
+        output_dir: str,
+        run_id: Optional[str] = None,
+        schema_name: str = "guangdong",
+    ):
         """Create default configuration with auto-generated run_id."""
         if run_id is None:
             run_id = f"run_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
         return cls(
             run_id=run_id,
             db_path=db_path,
-            output_dir=output_dir
+            output_dir=output_dir,
+            schema_name=schema_name,
         )
 
     def validate(self):
@@ -109,6 +117,7 @@ class PipelineConfig:
             run_id=data['run_id'],
             db_path=data['db_path'],
             output_dir=data['output_dir'],
+            schema_name=data.get('schema_name', 'guangdong'),
             cleaning=CleaningConfig(**data.get('cleaning', {})),
             frequency=FrequencyConfig(**data.get('frequency', {})),
             tendency=TendencyConfig(**data.get('tendency', {}))

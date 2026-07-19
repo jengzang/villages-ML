@@ -16,8 +16,8 @@ import sys
 import json
 from pathlib import Path
 
-# Add src to path
-sys.path.insert(0, str(Path(__file__).parent.parent))
+# Add project root to path
+sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 
 from src.pipelines.feature_materialization_pipeline import run_feature_materialization_pipeline
 
@@ -68,6 +68,13 @@ def main():
     )
 
     parser.add_argument(
+        '--schema',
+        default='guangdong',
+        choices=['guangdong', 'national'],
+        help='Village table schema'
+    )
+
+    parser.add_argument(
         '--output-dir',
         type=str,
         default=None,
@@ -103,7 +110,8 @@ def main():
             run_id=args.run_id,
             clustering_run_id=args.clustering_run_id,
             lexicon_path=args.lexicon_path,
-            output_dir=args.output_dir
+            output_dir=args.output_dir,
+            schema_name=args.schema
         )
 
         # Print summary
@@ -139,4 +147,3 @@ def main():
 
 if __name__ == '__main__':
     sys.exit(main())
-

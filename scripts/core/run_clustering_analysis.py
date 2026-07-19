@@ -42,7 +42,6 @@ def _parse_k_range(values):
         result.extend(int(item.strip()) for item in str(value).split(",") if item.strip())
     return result
 
-
 def main():
     parser = argparse.ArgumentParser(
         description='Run clustering analysis on region-level features',
@@ -82,9 +81,9 @@ def main():
     parser.add_argument(
         '--k-range',
         nargs='+',
-        type=int,
+        type=str,
         default=[4, 6, 8, 10, 12, 15, 18, 20],
-        help='List of k values to try (default: 4 6 8 10 12 15 18 20)'
+        help='List of k values to try, separated by spaces or commas (default: 4 6 8 10 12 15 18 20)'
     )
     parser.add_argument(
         '--top-n-suffix2',

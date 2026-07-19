@@ -66,6 +66,7 @@ def main():
     parser.add_argument('--suffix-lengths', default='1,2,3', help='Comma-separated suffix lengths')
     parser.add_argument('--prefix-lengths', default='2,3', help='Comma-separated prefix lengths; empty disables prefixes')
     parser.add_argument('--region-levels', default='city,county,township', help='Comma-separated region levels')
+    parser.add_argument('--schema', default='guangdong', choices=['guangdong', 'national'], help='Village table schema')
     parser.add_argument('--chunk-size', type=int, default=10000, help='Village load chunk size')
     parser.add_argument('--min-global-support', type=int, default=20, help='Minimum global support')
     parser.add_argument('--min-regional-support', type=int, default=5, help='Minimum regional support')
@@ -88,7 +89,8 @@ def main():
     config = PipelineConfig.create_default(
         db_path=args.db_path,
         output_dir=args.output_dir,
-        run_id=args.run_id
+        run_id=args.run_id,
+        schema_name=args.schema,
     )
     config.frequency.region_levels = region_levels
     config.frequency.chunk_size = args.chunk_size

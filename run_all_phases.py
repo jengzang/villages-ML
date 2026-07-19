@@ -109,6 +109,7 @@ from pathlib import Path
 from typing import Dict, List, Optional
 
 from src.pipeline_config import load_pipeline_config, merge_phase_definitions
+from src.schema import get_schema
 
 
 # ========== HELPER FUNCTIONS ==========
@@ -740,7 +741,7 @@ def build_phase_command(
     run_id = None
     output_run_id = None
     timestamp = now_str or datetime.now().strftime('%Y%m%d_%H%M%S')
-    cmd = ["python", phase['script']]
+    cmd = [sys.executable, phase['script']]
 
     if phase.get('special_run_id_handling') and phase_id in (3, 6):
         return cmd, run_id, output_run_id
@@ -804,7 +805,7 @@ def run_phase(phase_id, run_id_prefix="run", dry_run=False, db_path="data/villag
 
     # Handle special run ID cases (e.g., Phase 3 needs --char-run-id and --output-run-id)
     if phase.get('special_run_id_handling') and phase_id == 3:
-        cmd = ["python", phase['script']]
+        cmd = [sys.executable, phase['script']]
         if dry_run:
             char_run_id = f"{run_id_prefix}_01_DRYRUN"
             output_run_id = f"{run_id_prefix}_{phase_id:02d}_DRYRUN"
@@ -837,7 +838,7 @@ def run_phase(phase_id, run_id_prefix="run", dry_run=False, db_path="data/villag
                 return False
     # Handle Phase 6 (Clustering) - needs semantic-run-id and morphology-run-id
     elif phase.get('special_run_id_handling') and phase_id == 6:
-        cmd = ["python", phase['script']]
+        cmd = [sys.executable, phase['script']]
         if dry_run:
             semantic_run_id = f"{run_id_prefix}_03_DRYRUN"
             morphology_run_id = f"{run_id_prefix}_18_DRYRUN"
@@ -1058,6 +1059,8 @@ def main():
         args.db_path = pipeline_config.get("dataset", {}).get("db_path", "data/villages.db")
     if args.run_id_prefix is None:
         args.run_id_prefix = pipeline_config.get("run", {}).get("run_id_prefix", "run")
+    schema_name = pipeline_config.get("dataset", {}).get("schema", "guangdong")
+    raw_table_to_keep = get_schema(schema_name).raw_table
 
     # Handle information queries
     if args.list:
@@ -1112,12 +1115,15 @@ def main():
     if args.clear and not args.dry_run:
         import sqlite3 as _sqlite3
         print("\n" + "=" * 60)
-        print("CLEAR MODE: 清除所有衍生表（保留广东省自然村）")
+        print(f"CLEAR MODE: 清除所有衍生表（保留 {raw_table_to_keep}）")
         print("=" * 60)
 
         _conn = _sqlite3.connect(args.db_path)
         _cursor = _conn.cursor()
-        _cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name != '广东省自然村' AND name NOT LIKE 'sqlite_%'")
+        _cursor.execute(
+            "SELECT name FROM sqlite_master WHERE type='table' AND name != ? AND name NOT LIKE 'sqlite_%'",
+            (raw_table_to_keep,),
+        )
         tables_to_drop = [r[0] for r in _cursor.fetchall()]
 
         if tables_to_drop:
@@ -1133,7 +1139,7 @@ def main():
                 for t in tables_to_drop:
                     _cursor.execute(f"DROP TABLE \"{t}\"")
                 _conn.commit()
-                print(f"[OK] 已删除 {len(tables_to_drop)} 张表，保留 广东省自然村")
+                print(f"[OK] 已删除 {len(tables_to_drop)} 张表，保留 {raw_table_to_keep}")
             else:
                 print("已取消。")
                 _conn.close()
@@ -1145,9 +1151,12 @@ def main():
         import sqlite3 as _sqlite3
         _conn = _sqlite3.connect(args.db_path)
         _cursor = _conn.cursor()
-        _cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name != '广东省自然村' AND name NOT LIKE 'sqlite_%'")
+        _cursor.execute(
+            "SELECT name FROM sqlite_master WHERE type='table' AND name != ? AND name NOT LIKE 'sqlite_%'",
+            (raw_table_to_keep,),
+        )
         tables_to_drop = [r[0] for r in _cursor.fetchall()]
-        print(f"\n🔍 --clear (dry-run): 将会删除 {len(tables_to_drop)} 张衍生表，保留 广东省自然村")
+        print(f"\n🔍 --clear (dry-run): 将会删除 {len(tables_to_drop)} 张衍生表，保留 {raw_table_to_keep}")
         _conn.close()
 
     # Confirm execution (unless dry-run)

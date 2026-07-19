@@ -21,6 +21,13 @@ GUANGDONG_BOUNDS = {
     'lat_max': 25.60
 }
 
+CHINA_BOUNDS = {
+    'lon_min': 73.0,
+    'lon_max': 135.5,
+    'lat_min': 18.0,
+    'lat_max': 54.0
+}
+
 
 class CoordinateLoader:
     """Load and validate village coordinates."""

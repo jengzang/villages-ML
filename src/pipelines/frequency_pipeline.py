@@ -18,7 +18,7 @@ from ..analysis.char_frequency import (
     calculate_lift
 )
 from ..analysis.regional_analysis import compute_regional_tendency
-from src.schema import DEFAULT_SCHEMA
+from src.schema import get_schema
 from ..analysis.diagnostic_reports import create_comprehensive_report
 
 logger = logging.getLogger(__name__)
@@ -35,6 +35,7 @@ class CharacterFrequencyPipeline:
             config: Pipeline configuration
         """
         self.config = config
+        self.schema = get_schema(config.schema_name)
         self.output_dir = Path(config.output_dir) / config.run_id
         self.output_dir.mkdir(parents=True, exist_ok=True)
 
@@ -100,17 +101,17 @@ class CharacterFrequencyPipeline:
         conn = get_db_connection(self.config.db_path)
 
         # Validate schema
-        if not validate_database_schema(conn):
+        if not validate_database_schema(conn, schema=self.schema):
             raise ValueError("Database schema validation failed")
 
         # Get total count
-        total_count = get_total_village_count(conn)
+        total_count = get_total_village_count(conn, schema=self.schema)
 
         # Load and process in chunks
         all_chunks = []
         chunk_num = 0
 
-        for chunk in load_villages(conn, chunk_size=self.config.frequency.chunk_size):
+        for chunk in load_villages(conn, chunk_size=self.config.frequency.chunk_size, schema=self.schema):
             chunk_num += 1
             logger.info(f"Processing chunk {chunk_num} ({len(chunk)} villages)...")
 
@@ -298,7 +299,7 @@ class CharacterFrequencyPipeline:
 
             # Regional statistics
             for level in self.config.frequency.region_levels:
-                col = DEFAULT_SCHEMA.level_map[level]
+                col = self.schema.level_map[level]
                 n_regions = villages_df[col].nunique()
                 f.write(f"Number of {level} regions: {n_regions:,}\n")
 

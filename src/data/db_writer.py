@@ -1398,7 +1398,10 @@ def write_clustering_metrics(conn: sqlite3.Connection, run_id: str, metrics_dict
     logger.info(f"Saved {len(data)} clustering metrics for run_id={run_id}")
 
 
-def create_feature_materialization_tables(conn: sqlite3.Connection) -> None:
+def create_feature_materialization_tables(
+    conn: sqlite3.Connection,
+    lexicon_path: str = 'data/semantic_lexicon_v1.json',
+) -> None:
     """
     Create tables for materialized village features.
 
@@ -1415,7 +1418,7 @@ def create_feature_materialization_tables(conn: sqlite3.Connection) -> None:
 
     # Load lexicon for dynamic column generation
     from src.semantic.lexicon_loader import SemanticLexicon
-    lexicon = SemanticLexicon('data/semantic_lexicon_v1.json')
+    lexicon = SemanticLexicon(lexicon_path)
     sem_col_defs = ',\n            '.join(
         f'sem_{cat} INTEGER NOT NULL DEFAULT 0'
         for cat in lexicon.list_categories()
@@ -1461,7 +1464,10 @@ def create_feature_materialization_tables(conn: sqlite3.Connection) -> None:
     logger.info("Feature materialization tables created successfully")
 
 
-def create_feature_materialization_indexes(conn: sqlite3.Connection) -> None:
+def create_feature_materialization_indexes(
+    conn: sqlite3.Connection,
+    lexicon_path: str = 'data/semantic_lexicon_v1.json',
+) -> None:
     """
     Create indexes for feature materialization tables.
 
@@ -1479,7 +1485,7 @@ def create_feature_materialization_indexes(conn: sqlite3.Connection) -> None:
 
     # Semantic category indexes (dynamic from lexicon)
     from src.semantic.lexicon_loader import SemanticLexicon
-    lexicon = SemanticLexicon('data/semantic_lexicon_v1.json')
+    lexicon = SemanticLexicon(lexicon_path)
     for cat in lexicon.list_categories():
         col_name = f'sem_{cat}'
         cursor.execute(f"CREATE INDEX IF NOT EXISTS idx_village_features_{col_name} ON village_features({col_name})")
@@ -2239,5 +2245,4 @@ def upsert_active_run_id(
             updated_at = excluded.updated_at
     """, (analysis_type, run_id, table_name))
     conn.commit()
-
 

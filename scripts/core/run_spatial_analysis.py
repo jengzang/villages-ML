@@ -22,6 +22,7 @@ project_root = Path(__file__).parent.parent.parent
 sys.path.insert(0, str(project_root))
 
 from src.pipelines.spatial_pipeline import run_spatial_analysis_pipeline
+from src.spatial.coordinate_loader import CHINA_BOUNDS, GUANGDONG_BOUNDS
 
 # Predefined multi-resolution configurations
 MULTI_RESOLUTION_CONFIGS = [
@@ -57,6 +58,26 @@ def parse_multi_resolution_configs(value: str):
     if not configs:
         raise argparse.ArgumentTypeError("At least one multi-resolution config is required")
     return configs
+
+
+def parse_coordinate_bounds(value: str):
+    if value == "guangdong":
+        return GUANGDONG_BOUNDS
+    if value == "china":
+        return CHINA_BOUNDS
+
+    parts = [part.strip() for part in value.split(",") if part.strip()]
+    if len(parts) != 4:
+        raise argparse.ArgumentTypeError(
+            "Coordinate bounds must be 'guangdong', 'china', or lon_min,lon_max,lat_min,lat_max"
+        )
+    lon_min, lon_max, lat_min, lat_max = map(float, parts)
+    return {
+        "lon_min": lon_min,
+        "lon_max": lon_max,
+        "lat_min": lat_min,
+        "lat_max": lat_max,
+    }
 
 
 def setup_logging(verbose: bool = False):
@@ -101,6 +122,18 @@ Examples:
         type=str,
         default='data/villages.db',
         help='Path to SQLite database (default: data/villages.db)'
+    )
+    parser.add_argument(
+        '--schema',
+        default='guangdong',
+        choices=['guangdong', 'national'],
+        help='Village table schema'
+    )
+    parser.add_argument(
+        '--coordinate-bounds',
+        type=parse_coordinate_bounds,
+        default=GUANGDONG_BOUNDS,
+        help="Coordinate bounds: guangdong, china, or lon_min,lon_max,lat_min,lat_max"
     )
 
     parser.add_argument(
@@ -207,6 +240,8 @@ Examples:
                     feature_run_id=args.feature_run_id,
                     output_dir=args.output_dir,
                     generate_maps=args.generate_maps and (i == len(multi_resolution_configs) - 1),
+                    schema_name=args.schema,
+                    coordinate_bounds=args.coordinate_bounds,
                 )
                 logger.info(f"Config {cfg['run_id']} complete: "
                            f"{stats['n_clusters']} clusters, "
@@ -267,7 +302,9 @@ Examples:
                 method=args.method,
                 feature_run_id=args.feature_run_id,
                 output_dir=args.output_dir,
-                generate_maps=args.generate_maps
+                generate_maps=args.generate_maps,
+                schema_name=args.schema,
+                coordinate_bounds=args.coordinate_bounds,
             )
 
             logger.info("\nSpatial analysis complete!")

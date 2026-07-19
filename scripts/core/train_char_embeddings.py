@@ -28,16 +28,22 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 
 from src.nlp import CharacterEmbeddingTrainer, EmbeddingStorage
+from src.schema import get_schema
 
 
-def load_villages(db_path: str) -> pd.DataFrame:
+def load_villages(db_path: str, schema_name: str = "guangdong") -> pd.DataFrame:
     """Load village data from database."""
     print(f"Loading villages from {db_path}...")
+    schema = get_schema(schema_name)
     conn = sqlite3.connect(db_path)
     # Use preprocessed table with prefix-cleaned names
     df = pd.read_sql_query(
-        "SELECT 自然村_去前缀 as 自然村 FROM 广东省自然村_预处理 WHERE 字符数量 > 0",
-        conn
+        f"""
+        SELECT {schema.village_name_col_prefix_removed} as 自然村
+        FROM {schema.preprocessed_table}
+        WHERE {schema.char_count_col} > 0
+        """,
+        conn,
     )
     conn.close()
     print(f"Loaded {len(df)} valid villages (prefix-cleaned)")
@@ -50,6 +56,7 @@ def main():
     # Required arguments
     parser.add_argument("--run-id", required=True, help="Unique run identifier")
     parser.add_argument("--db-path", required=True, help="Path to villages database")
+    parser.add_argument("--schema", default="guangdong", choices=["guangdong", "national"], help="Village table schema")
 
     # Model hyperparameters
     parser.add_argument("--vector-size", type=int, default=100,
@@ -82,7 +89,7 @@ def main():
     os.makedirs(args.output_dir, exist_ok=True)
 
     # Load villages
-    villages_df = load_villages(args.db_path)
+    villages_df = load_villages(args.db_path, schema_name=args.schema)
 
     # Initialize trainer
     sg = 1 if args.model_type == "skipgram" else 0

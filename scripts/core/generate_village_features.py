@@ -22,6 +22,7 @@ sys.path.insert(0, str(project_root))
 from src.features.feature_extractor import VillageFeatureExtractor
 from src.data.db_writer import create_feature_materialization_tables
 from src.pipelines.feature_materialization_pipeline import write_village_features
+from src.schema import get_schema
 
 # Configure logging
 logging.basicConfig(
@@ -32,7 +33,7 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 
-def load_villages_from_preprocessed(conn: sqlite3.Connection) -> pd.DataFrame:
+def load_villages_from_preprocessed(conn: sqlite3.Connection, schema_name: str = "guangdong") -> pd.DataFrame:
     """
     Load villages from preprocessed table.
 
@@ -43,17 +44,18 @@ def load_villages_from_preprocessed(conn: sqlite3.Connection) -> pd.DataFrame:
         DataFrame with village data
     """
     logger.info("Loading villages from preprocessed table")
+    schema = get_schema(schema_name)
 
-    query = """
+    query = f"""
     SELECT
-        市级 as city,
-        区县级 as county,
-        乡镇级 as town,
-        村委会 as village_committee,
-        自然村_去前缀 as village_name,
-        village_id
-    FROM 广东省自然村_预处理
-    WHERE 自然村_去前缀 IS NOT NULL
+        {schema.city_col} as city,
+        {schema.county_col} as county,
+        {schema.township_col} as town,
+        {schema.committee_col_preprocessed} as village_committee,
+        {schema.village_name_col_prefix_removed} as village_name,
+        {schema.village_id_col} as village_id
+    FROM {schema.preprocessed_table}
+    WHERE {schema.village_name_col_prefix_removed} IS NOT NULL
     """
 
     df = pd.read_sql_query(query, conn)
@@ -70,6 +72,7 @@ def main():
     parser = argparse.ArgumentParser(description='Generate village_features table')
     parser.add_argument('--run-id', type=str, required=True, help='Run ID for this execution')
     parser.add_argument('--db-path', type=str, default='data/villages.db', help='Path to database')
+    parser.add_argument('--schema', default='guangdong', choices=['guangdong', 'national'], help='Village table schema')
     parser.add_argument(
         '--lexicon-path',
         type=str,
@@ -99,11 +102,11 @@ def main():
     try:
         # Step 1: Create tables
         logger.info("Creating village_features table...")
-        create_feature_materialization_tables(conn)
+        create_feature_materialization_tables(conn, lexicon_path=str(lexicon_path))
         logger.info("Table created successfully")
 
         # Step 2: Load villages
-        df = load_villages_from_preprocessed(conn)
+        df = load_villages_from_preprocessed(conn, schema_name=args.schema)
 
         # Step 3: Extract features
         logger.info("Extracting features...")

@@ -54,7 +54,7 @@ def test_profile_only_emits_supported_phase_options(config_path):
 
     for phase_id, phase in phases.items():
         if phase_id in {3, 6}:
-            command = ["python", phase["script"]]
+            command = [sys.executable, phase["script"]]
             if phase_id == 3:
                 command.extend(["--char-run-id", "char_test", "--output-run-id", "semantic_test"])
             else:
@@ -98,7 +98,7 @@ def test_national_profile_emits_phase6_and_phase14_deep_config_options():
     phases = merge_phase_definitions(PHASES, config)
 
     phase6_cmd = [
-        "python",
+        sys.executable,
         phases[6]["script"],
         "--semantic-run-id",
         "semantic_test",
@@ -110,7 +110,7 @@ def test_national_profile_emits_phase6_and_phase14_deep_config_options():
     phase6_cmd.extend(phases[6]["args"])
 
     assert "--semantic-lexicon-path" in phase6_cmd
-    assert phase6_cmd[phase6_cmd.index("--semantic-lexicon-path") + 1] == "data/semantic_lexicon_v1.json"
+    assert phase6_cmd[phase6_cmd.index("--semantic-lexicon-path") + 1] == "data/semantic_lexicon_national_v1.json"
     assert "--use-semantic" in phase6_cmd
     assert "--use-morphology" in phase6_cmd
     assert "--use-diversity" in phase6_cmd
@@ -124,10 +124,27 @@ def test_national_profile_emits_phase6_and_phase14_deep_config_options():
     )
 
     assert "--basic-lexicon-path" in phase14_cmd
-    assert phase14_cmd[phase14_cmd.index("--basic-lexicon-path") + 1] == "data/semantic_lexicon_v1.json"
+    assert phase14_cmd[phase14_cmd.index("--basic-lexicon-path") + 1] == "data/semantic_lexicon_national_v1.json"
     assert "--detailed-lexicon-path" in phase14_cmd
-    assert phase14_cmd[phase14_cmd.index("--detailed-lexicon-path") + 1] == "data/semantic_lexicon_v4.json"
+    assert phase14_cmd[phase14_cmd.index("--detailed-lexicon-path") + 1] == "data/semantic_lexicon_national_v4.json"
     assert "--conflict-threshold" in phase14_cmd
     assert phase14_cmd[phase14_cmd.index("--conflict-threshold") + 1] == "20"
     assert "--structure-progress-interval" in phase14_cmd
     assert phase14_cmd[phase14_cmd.index("--structure-progress-interval") + 1] == "50000"
+
+
+def test_national_profile_emits_phase4_schema_and_china_bounds():
+    config = load_pipeline_config("config/pipeline.national.json")
+    phases = merge_phase_definitions(PHASES, config)
+    phase4_cmd, _, _ = build_phase_command(
+        4,
+        phases=phases,
+        run_id_prefix="national",
+        db_path="data/villages_national.db",
+        now_str="20260716_120000",
+    )
+
+    assert "--schema" in phase4_cmd
+    assert phase4_cmd[phase4_cmd.index("--schema") + 1] == "national"
+    assert "--coordinate-bounds" in phase4_cmd
+    assert phase4_cmd[phase4_cmd.index("--coordinate-bounds") + 1] == "china"

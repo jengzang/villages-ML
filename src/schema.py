@@ -136,3 +136,19 @@ NATIONAL_SCHEMA = VillageTableSchema(
 )
 
 DEFAULT_SCHEMA = GUANGDONG_SCHEMA
+
+
+SCHEMAS = {
+    'guangdong': GUANGDONG_SCHEMA,
+    'national': NATIONAL_SCHEMA,
+}
+
+
+def get_schema(name: str | None = None) -> VillageTableSchema:
+    """Return a configured village table schema by profile name."""
+    schema_name = name or 'guangdong'
+    try:
+        return SCHEMAS[schema_name]
+    except KeyError as exc:
+        available = ', '.join(sorted(SCHEMAS))
+        raise ValueError(f"Unknown village schema: {schema_name}. Available: {available}") from exc

@@ -7,6 +7,7 @@ import pandas as pd
 from typing import List
 
 from ..utils.config import PipelineConfig
+from src.schema import get_schema
 from ..data.db_loader import (
     get_db_connection, validate_database_schema,
     load_villages, get_total_village_count
@@ -41,6 +42,7 @@ class MorphologyPipeline:
             prefix_lengths: List of prefix n-gram lengths (default: [2, 3])
         """
         self.config = config
+        self.schema = get_schema(config.schema_name)
         self.suffix_lengths = suffix_lengths or [1, 2, 3]
         self.prefix_lengths = [2, 3] if prefix_lengths is None else prefix_lengths
         self.persist_batch_size = persist_batch_size
@@ -104,18 +106,18 @@ class MorphologyPipeline:
         conn = get_db_connection(self.config.db_path)
 
         # Validate schema
-        if not validate_database_schema(conn):
+        if not validate_database_schema(conn, schema=self.schema):
             raise ValueError("Database schema validation failed")
 
         # Get total count
-        total_count = get_total_village_count(conn)
+        total_count = get_total_village_count(conn, schema=self.schema)
         logger.info(f"Total villages in database: {total_count:,}")
 
         # Load and process in chunks
         all_chunks = []
         chunk_num = 0
 
-        for chunk in load_villages(conn, chunk_size=self.config.frequency.chunk_size):
+        for chunk in load_villages(conn, chunk_size=self.config.frequency.chunk_size, schema=self.schema):
             chunk_num += 1
             logger.info(f"Processing chunk {chunk_num} ({len(chunk)} villages)...")
 

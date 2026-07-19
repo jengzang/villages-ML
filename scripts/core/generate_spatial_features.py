@@ -30,6 +30,7 @@ from src.data.db_writer import (
 )
 from src.spatial.coordinate_loader import CoordinateLoader
 from src.spatial.hotspot_detector import HotspotDetector
+from src.schema import get_schema
 
 # Configure logging
 logging.basicConfig(
@@ -43,6 +44,7 @@ logger = logging.getLogger(__name__)
 def parse_args():
     parser = argparse.ArgumentParser(description="Generate spatial features or hotspots")
     parser.add_argument("--db-path", default=str(project_root / "data" / "villages.db"))
+    parser.add_argument("--schema", default="guangdong", choices=["guangdong", "national"], help="Village table schema")
     parser.add_argument("--run-id", default=f"spatial_{int(time.time())}")
     parser.add_argument(
         "--mode",
@@ -61,7 +63,7 @@ def parse_args():
     return parser.parse_args()
 
 
-def load_villages_with_coordinates(conn: sqlite3.Connection) -> pd.DataFrame:
+def load_villages_with_coordinates(conn: sqlite3.Connection, schema_name: str = "guangdong") -> pd.DataFrame:
     """
     Load villages with valid coordinates from preprocessed table.
 
@@ -72,23 +74,24 @@ def load_villages_with_coordinates(conn: sqlite3.Connection) -> pd.DataFrame:
         DataFrame with village data and coordinates
     """
     logger.info("Loading villages with coordinates from preprocessed table")
+    schema = get_schema(schema_name)
 
-    query = """
+    query = f"""
     SELECT
-        village_id,
-        市级 as city,
-        区县级 as county,
-        乡镇级 as town,
-        村委会 as village_committee,
-        自然村_去前缀 as village_name,
-        longitude,
-        latitude
-    FROM 广东省自然村_预处理
-    WHERE village_id IS NOT NULL
-      AND longitude IS NOT NULL
-      AND latitude IS NOT NULL
-      AND longitude != ''
-      AND latitude != ''
+        {schema.village_id_col} as village_id,
+        {schema.city_col} as city,
+        {schema.county_col} as county,
+        {schema.township_col} as town,
+        {schema.committee_col_preprocessed} as village_committee,
+        {schema.village_name_col_prefix_removed} as village_name,
+        {schema.longitude_col} as longitude,
+        {schema.latitude_col} as latitude
+    FROM {schema.preprocessed_table}
+    WHERE {schema.village_id_col} IS NOT NULL
+      AND {schema.longitude_col} IS NOT NULL
+      AND {schema.latitude_col} IS NOT NULL
+      AND {schema.longitude_col} != ''
+      AND {schema.latitude_col} != ''
     """
 
     df = pd.read_sql_query(query, conn)
@@ -179,7 +182,7 @@ def run_hotspot_pipeline(args) -> None:
         create_spatial_analysis_indexes(conn)
 
         loader = CoordinateLoader()
-        coords_df = loader.load_coordinates(conn)
+        coords_df = loader.load_coordinates(conn, schema=get_schema(args.schema))
         coords = loader.get_coordinate_array(coords_df)
         if len(coords_df) == 0:
             logger.error("No villages with valid coordinates found!")
@@ -259,7 +262,7 @@ def run_feature_pipeline(args) -> None:
         logger.info("Table created successfully")
 
         # Step 2: Load villages with coordinates
-        df = load_villages_with_coordinates(conn)
+        df = load_villages_with_coordinates(conn, schema_name=args.schema)
 
         if len(df) == 0:
             logger.error("No villages with valid coordinates found!")

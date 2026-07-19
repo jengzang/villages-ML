@@ -35,6 +35,7 @@ from src.semantic_composition_schema import create_semantic_composition_tables
 from src.semantic.lexicon_loader import SemanticLexicon
 from src.semantic.semantic_index import SemanticIndexCalculator
 from src.config.semantic_roles import MODIFIER_CATEGORIES, HEAD_CATEGORIES
+from src.schema import VillageTableSchema, get_schema
 
 
 def step1_create_tables(db_path: str):
@@ -51,6 +52,7 @@ def step2_analyze_compositions(
     db_path: str,
     basic_lexicon_path: str,
     detailed_lexicon_path: str,
+    schema: VillageTableSchema | None = None,
 ):
     """Step 2: Analyze all semantic compositions - Generate BOTH basic and detailed tables."""
     print("\n" + "="*60)
@@ -68,7 +70,9 @@ def step2_analyze_compositions(
     cursor.execute("DELETE FROM semantic_trigrams")
     conn.commit()
 
-    with SemanticCompositionAnalyzer(db_path, lexicon_path=basic_lexicon_path) as analyzer:
+    S = schema or get_schema("guangdong")
+
+    with SemanticCompositionAnalyzer(db_path, lexicon_path=basic_lexicon_path, schema=S) as analyzer:
         print("Extracting semantic compositions (v1)...")
         compositions = analyzer.analyze_all_compositions()
 
@@ -133,7 +137,7 @@ def step2_analyze_compositions(
     cursor.execute("DELETE FROM semantic_trigrams_detailed")
     conn.commit()
 
-    with SemanticCompositionAnalyzer(db_path, lexicon_path=detailed_lexicon_path) as analyzer:
+    with SemanticCompositionAnalyzer(db_path, lexicon_path=detailed_lexicon_path, schema=S) as analyzer:
         print("Extracting semantic compositions (v4)...")
         compositions = analyzer.analyze_all_compositions()
 
@@ -170,7 +174,7 @@ def step2_analyze_compositions(
     conn.close()
 
 
-def step3_calculate_pmi(db_path: str):
+def step3_calculate_pmi(db_path: str, schema: VillageTableSchema | None = None):
     """Step 3: Calculate PMI scores for BOTH basic and detailed tables."""
     print("\n" + "="*60)
     print("Step 3: Calculating PMI Scores (Dual Version)")
@@ -186,7 +190,9 @@ def step3_calculate_pmi(db_path: str):
     cursor.execute("DELETE FROM semantic_pmi")
     conn.commit()
 
-    with SemanticCompositionAnalyzer(db_path) as analyzer:
+    S = schema or get_schema("guangdong")
+
+    with SemanticCompositionAnalyzer(db_path, schema=S) as analyzer:
         # Get bigrams from basic table
         cursor.execute("SELECT category1, category2, frequency FROM semantic_bigrams")
         bigrams = {(cat1, cat2): freq for cat1, cat2, freq in cursor.fetchall()}
@@ -234,7 +240,7 @@ def step3_calculate_pmi(db_path: str):
     cursor.execute("DELETE FROM semantic_pmi_detailed")
     conn.commit()
 
-    with SemanticCompositionAnalyzer(db_path) as analyzer:
+    with SemanticCompositionAnalyzer(db_path, schema=S) as analyzer:
         # Get bigrams from detailed table
         cursor.execute("SELECT category1, category2, frequency FROM semantic_bigrams_detailed")
         bigrams_detailed = {(cat1, cat2): freq for cat1, cat2, freq in cursor.fetchall()}
@@ -266,7 +272,7 @@ def step3_calculate_pmi(db_path: str):
     conn.close()
 
 
-def step4_detect_patterns(db_path: str):
+def step4_detect_patterns(db_path: str, schema: VillageTableSchema | None = None):
     """Step 4: Detect composition patterns for BOTH basic and detailed tables."""
     print("\n" + "="*60)
     print("Step 4: Detecting Composition Patterns (Dual Version)")
@@ -278,7 +284,9 @@ def step4_detect_patterns(db_path: str):
     # ========== Part 1: Detect patterns for BASIC tables (9 categories) ==========
     print("\n[Part 1] Detecting patterns for BASIC tables (9 categories)...")
 
-    with SemanticCompositionAnalyzer(db_path) as analyzer:
+    S = schema or get_schema("guangdong")
+
+    with SemanticCompositionAnalyzer(db_path, schema=S) as analyzer:
         # Get bigrams from basic table
         from collections import Counter
         cursor.execute("SELECT category1, category2, frequency FROM semantic_bigrams")
@@ -329,7 +337,7 @@ def step4_detect_patterns(db_path: str):
     cursor.execute("DELETE FROM semantic_composition_patterns_detailed")
     conn.commit()
 
-    with SemanticCompositionAnalyzer(db_path) as analyzer:
+    with SemanticCompositionAnalyzer(db_path, schema=S) as analyzer:
         # Get bigrams from detailed table
         cursor.execute("SELECT category1, category2, frequency FROM semantic_bigrams_detailed")
         bigrams_detailed = Counter({(cat1, cat2): freq for cat1, cat2, freq in cursor.fetchall()})
@@ -367,6 +375,7 @@ def step5_detect_conflicts(
     basic_lexicon_path: str,
     detailed_lexicon_path: str,
     conflict_threshold: int,
+    schema: VillageTableSchema | None = None,
 ):
     """Step 5: Detect semantic conflicts — basic (v1) and detailed (v4)."""
     print("\n" + "="*60)
@@ -382,7 +391,9 @@ def step5_detect_conflicts(
     cursor.execute("DELETE FROM semantic_conflicts")
     conn.commit()
 
-    with SemanticCompositionAnalyzer(db_path, lexicon_path=basic_lexicon_path) as analyzer:
+    S = schema or get_schema("guangdong")
+
+    with SemanticCompositionAnalyzer(db_path, lexicon_path=basic_lexicon_path, schema=S) as analyzer:
         compositions = analyzer.analyze_all_compositions()
         sequences = compositions['sequences']
 
@@ -422,7 +433,7 @@ def step5_detect_conflicts(
     cursor.execute("DELETE FROM semantic_conflicts_detailed")
     conn.commit()
 
-    with SemanticCompositionAnalyzer(db_path, lexicon_path=detailed_lexicon_path) as analyzer:
+    with SemanticCompositionAnalyzer(db_path, lexicon_path=detailed_lexicon_path, schema=S) as analyzer:
         compositions = analyzer.analyze_all_compositions()
         sequences = compositions['sequences']
 
@@ -452,6 +463,7 @@ def step6_extract_village_structures(
     db_path: str,
     basic_lexicon_path: str,
     progress_interval: int = 10000,
+    schema: VillageTableSchema | None = None,
 ):
     """Step 6: Extract per-village semantic structures."""
     print("\n" + "="*60)
@@ -460,13 +472,14 @@ def step6_extract_village_structures(
 
     conn = sqlite3.connect(db_path)
     cursor = conn.cursor()
+    S = schema or get_schema("guangdong")
 
-    with SemanticCompositionAnalyzer(db_path, lexicon_path=basic_lexicon_path) as analyzer:
+    with SemanticCompositionAnalyzer(db_path, lexicon_path=basic_lexicon_path, schema=S) as analyzer:
         char_labels = analyzer.get_character_labels()
 
-        cursor.execute("""
-            SELECT village_id, 村委会, 自然村_去前缀
-            FROM 广东省自然村_预处理
+        cursor.execute(f"""
+            SELECT {S.village_id_col}, {S.committee_col_preprocessed}, {S.village_name_col_prefix_removed}
+            FROM {S.preprocessed_table}
         """)
 
         # Fetch all rows into memory
@@ -536,6 +549,7 @@ def step7_generate_semantic_indices_detailed(
     run_id: str = "semantic_indices_detailed_001",
     lexicon_path: str | None = None,
     region_levels: list[str] | None = None,
+    schema: VillageTableSchema | None = None,
 ):
     """Step 7: Generate semantic_indices_detailed using v4 lexicon (53 subcategories)."""
     print("\n" + "="*60)
@@ -544,6 +558,7 @@ def step7_generate_semantic_indices_detailed(
 
     conn = sqlite3.connect(db_path)
     cursor = conn.cursor()
+    S = schema or get_schema("guangdong")
 
     # Create detailed table
     cursor.execute("""
@@ -575,9 +590,9 @@ def step7_generate_semantic_indices_detailed(
     print(f"Loaded v4 lexicon: {len(lexicon.list_categories())} categories")
 
     # Load villages
-    villages_df = pd.read_sql_query("""
-        SELECT 市级, 区县级, 乡镇级, 自然村_去前缀 as 自然村
-        FROM 广东省自然村_预处理
+    villages_df = pd.read_sql_query(f"""
+        SELECT {S.city_col}, {S.county_col}, {S.township_col}, {S.village_name_col_prefix_removed} as 自然村
+        FROM {S.preprocessed_table}
     """, conn)
     print(f"Loaded {len(villages_df):,} villages")
 
@@ -587,9 +602,9 @@ def step7_generate_semantic_indices_detailed(
     requested_levels = set(region_levels or ['city', 'county', 'township'])
 
     level_config = [
-        ('city', '市级', 'city'),
-        ('county', '区县级', 'county'),
-        ('township', '乡镇级', 'township'),
+        ('city', S.city_col, 'city'),
+        ('county', S.county_col, 'county'),
+        ('township', S.township_col, 'township'),
     ]
 
     for level, col_name, group_col in level_config:
@@ -597,14 +612,14 @@ def step7_generate_semantic_indices_detailed(
             continue
         print(f"\nProcessing {level} level...")
         if level == 'city':
-            level_df = villages_df[['市级', '自然村']].copy()
-            level_df = level_df.rename(columns={'市级': 'city'})
+            level_df = villages_df[[S.city_col, '自然村']].copy()
+            level_df = level_df.rename(columns={S.city_col: 'city'})
         elif level == 'county':
-            level_df = villages_df[['市级', '区县级', '自然村']].copy()
-            level_df = level_df.rename(columns={'市级': 'city', '区县级': 'county'})
+            level_df = villages_df[[S.city_col, S.county_col, '自然村']].copy()
+            level_df = level_df.rename(columns={S.city_col: 'city', S.county_col: 'county'})
         else:
-            level_df = villages_df[['市级', '区县级', '乡镇级', '自然村']].copy()
-            level_df = level_df.rename(columns={'市级': 'city', '区县级': 'county', '乡镇级': 'township'})
+            level_df = villages_df[[S.city_col, S.county_col, S.township_col, '自然村']].copy()
+            level_df = level_df.rename(columns={S.city_col: 'city', S.county_col: 'county', S.township_col: 'township'})
 
         level_df = level_df[level_df[group_col].notna()]
 
@@ -625,12 +640,14 @@ def step7_generate_semantic_indices_detailed(
     combined = pd.concat(all_indices, ignore_index=True)
 
     # Add village_count
-    col_name_map = {'city': '市级', 'county': '区县级', 'township': '乡镇级'}
+    col_name_map = {'city': S.city_col, 'county': S.county_col, 'township': S.township_col}
     village_counts = {}
     for (lvl, rname), grp in combined.groupby(['region_level', 'region_name']):
-        col = col_name_map.get(lvl, '市级')
+        if lvl not in col_name_map:
+            raise ValueError(f"Unsupported region level for village_count: {lvl}")
+        col = col_name_map[lvl]
         cursor.execute(
-            f'SELECT COUNT(*) FROM 广东省自然村_预处理 WHERE "{col}" = ?',
+            f'SELECT COUNT(*) FROM {S.preprocessed_table} WHERE "{col}" = ?',
             (rname,)
         )
         village_counts[(lvl, rname)] = cursor.fetchone()[0]
@@ -666,6 +683,7 @@ def step7_generate_semantic_indices_detailed(
 def parse_args():
     parser = argparse.ArgumentParser(description="Phase 14: Semantic Composition Analysis")
     parser.add_argument("--db-path", default="data/villages.db", help="Path to SQLite database")
+    parser.add_argument("--schema", default="guangdong", choices=["guangdong", "national"], help="Village table schema")
     parser.add_argument(
         "--run-id",
         default="semantic_indices_detailed_001",
@@ -712,6 +730,7 @@ def main():
     db_path = args.db_path
     region_levels = [level.strip() for level in args.region_levels.split(",") if level.strip()]
     detailed_lexicon_path = args.detailed_lexicon_path or args.lexicon_path
+    schema = get_schema(args.schema)
 
     print("\n" + "="*60)
     print("Phase 14: Semantic Composition Analysis")
@@ -731,25 +750,29 @@ def main():
             db_path,
             basic_lexicon_path=args.basic_lexicon_path,
             detailed_lexicon_path=detailed_lexicon_path,
+            schema=schema,
         )
-        step3_calculate_pmi(db_path)
-        step4_detect_patterns(db_path)
+        step3_calculate_pmi(db_path, schema=schema)
+        step4_detect_patterns(db_path, schema=schema)
         step5_detect_conflicts(
             db_path,
             basic_lexicon_path=args.basic_lexicon_path,
             detailed_lexicon_path=detailed_lexicon_path,
             conflict_threshold=args.conflict_threshold,
+            schema=schema,
         )
         step6_extract_village_structures(
             db_path,
             basic_lexicon_path=args.basic_lexicon_path,
             progress_interval=args.structure_progress_interval,
+            schema=schema,
         )
         step7_generate_semantic_indices_detailed(
             db_path,
             run_id=args.run_id,
             lexicon_path=args.lexicon_path,
             region_levels=region_levels,
+            schema=schema,
         )
 
         end_time = datetime.now()

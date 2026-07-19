@@ -34,6 +34,7 @@ sys.path.insert(0, str(project_root))
 
 from src.ngram_analysis import NgramExtractor, NgramAnalyzer, StructuralPatternDetector
 from src.ngram_schema import create_ngram_tables
+from src.schema import VillageTableSchema, get_schema
 
 # Make scripts/utils importable for the optional active_run_ids update.
 sys.path.insert(0, str(project_root / 'scripts'))
@@ -88,6 +89,7 @@ def step2_extract_global_ngrams(
     db_path: str,
     n_values: list[int] | None = None,
     positions: list[str] | None = None,
+    schema: VillageTableSchema | None = None,
 ):
     """Step 2: Extract global n-gram frequencies."""
     n_values = n_values or [2, 3, 4]
@@ -98,7 +100,7 @@ def step2_extract_global_ngrams(
     print("="*60)
 
     # Extract n-grams first (read-only operation)
-    with NgramExtractor(db_path) as extractor:
+    with NgramExtractor(db_path, schema=schema or get_schema("guangdong")) as extractor:
         ngram_data_by_n = {}
         for n in n_values:
             print(f"\nExtracting {n}-grams...")
@@ -139,6 +141,7 @@ def step3_extract_regional_ngrams(
     n_values: list[int] | None = None,
     regional_levels: list[str] | None = None,
     positions: list[str] | None = None,
+    schema: VillageTableSchema | None = None,
 ):
     """Step 3: Extract regional n-gram frequencies with hierarchical grouping.
 
@@ -155,7 +158,7 @@ def step3_extract_regional_ngrams(
     conn = sqlite3.connect(db_path, timeout=60.0)
     cursor = conn.cursor()
 
-    with NgramExtractor(db_path) as extractor:
+    with NgramExtractor(db_path, schema=schema or get_schema("guangdong")) as extractor:
         for level_en in regional_levels:
             level = LEVEL_NAME_MAP[level_en]
             print(f"\nProcessing level: {level}")
@@ -694,7 +697,7 @@ def step7_detect_patterns(
     print("\n[OK] Pattern detection complete")
 
 
-def step8_create_optimization_indexes(db_path: str):
+def step8_create_optimization_indexes(db_path: str, schema: VillageTableSchema | None = None):
     """Step 8: Create optimization indexes and regional centroids table."""
     print("\n" + "="*60)
     print("Step 8: Creating Optimization Indexes")
@@ -702,13 +705,14 @@ def step8_create_optimization_indexes(db_path: str):
 
     conn = sqlite3.connect(db_path, timeout=60.0)
     cursor = conn.cursor()
+    S = schema or get_schema("guangdong")
 
     # Part 1: Create indexes on village preprocessing table
     print("\n[1/3] Creating indexes on village preprocessing table...")
     village_indexes = [
-        ('idx_village_township', '广东省自然村_预处理', '乡镇级'),
-        ('idx_village_county', '广东省自然村_预处理', '区县级'),
-        ('idx_village_city', '广东省自然村_预处理', '市级')
+        ('idx_village_township', S.preprocessed_table, S.township_col),
+        ('idx_village_county', S.preprocessed_table, S.county_col),
+        ('idx_village_city', S.preprocessed_table, S.city_col)
     ]
 
     for idx_name, table, column in village_indexes:
@@ -756,50 +760,50 @@ def step8_create_optimization_indexes(db_path: str):
     # Populate data
     print("  Populating data...")
     cursor.execute('DELETE FROM regional_centroids')
-    cursor.execute('''
+    cursor.execute(f'''
     INSERT OR REPLACE INTO regional_centroids (region_level, city, county, township, region_name, centroid_lon, centroid_lat, village_count)
     SELECT
         'township' as region_level,
-        市级 as city,
-        区县级 as county,
-        乡镇级 as township,
-        乡镇级 as region_name,
-        AVG(CAST(longitude AS REAL)) as centroid_lon,
-        AVG(CAST(latitude AS REAL)) as centroid_lat,
+        {S.city_col} as city,
+        {S.county_col} as county,
+        {S.township_col} as township,
+        {S.township_col} as region_name,
+        AVG(CAST({S.longitude_col} AS REAL)) as centroid_lon,
+        AVG(CAST({S.latitude_col} AS REAL)) as centroid_lat,
         COUNT(*) as village_count
-    FROM 广东省自然村_预处理
-    WHERE 乡镇级 IS NOT NULL AND longitude IS NOT NULL AND latitude IS NOT NULL
-    GROUP BY 市级, 区县级, 乡镇级
+    FROM {S.preprocessed_table}
+    WHERE {S.township_col} IS NOT NULL AND {S.longitude_col} IS NOT NULL AND {S.latitude_col} IS NOT NULL
+    GROUP BY {S.city_col}, {S.county_col}, {S.township_col}
 
     UNION ALL
 
     SELECT
         'county' as region_level,
-        市级 as city,
-        区县级 as county,
+        {S.city_col} as city,
+        {S.county_col} as county,
         NULL as township,
-        区县级 as region_name,
-        AVG(CAST(longitude AS REAL)) as centroid_lon,
-        AVG(CAST(latitude AS REAL)) as centroid_lat,
+        {S.county_col} as region_name,
+        AVG(CAST({S.longitude_col} AS REAL)) as centroid_lon,
+        AVG(CAST({S.latitude_col} AS REAL)) as centroid_lat,
         COUNT(*) as village_count
-    FROM 广东省自然村_预处理
-    WHERE 区县级 IS NOT NULL AND longitude IS NOT NULL AND latitude IS NOT NULL
-    GROUP BY 市级, 区县级
+    FROM {S.preprocessed_table}
+    WHERE {S.county_col} IS NOT NULL AND {S.longitude_col} IS NOT NULL AND {S.latitude_col} IS NOT NULL
+    GROUP BY {S.city_col}, {S.county_col}
 
     UNION ALL
 
     SELECT
         'city' as region_level,
-        市级 as city,
+        {S.city_col} as city,
         NULL as county,
         NULL as township,
-        市级 as region_name,
-        AVG(CAST(longitude AS REAL)) as centroid_lon,
-        AVG(CAST(latitude AS REAL)) as centroid_lat,
+        {S.city_col} as region_name,
+        AVG(CAST({S.longitude_col} AS REAL)) as centroid_lon,
+        AVG(CAST({S.latitude_col} AS REAL)) as centroid_lat,
         COUNT(*) as village_count
-    FROM 广东省自然村_预处理
-    WHERE 市级 IS NOT NULL AND longitude IS NOT NULL AND latitude IS NOT NULL
-    GROUP BY 市级
+    FROM {S.preprocessed_table}
+    WHERE {S.city_col} IS NOT NULL AND {S.longitude_col} IS NOT NULL AND {S.latitude_col} IS NOT NULL
+    GROUP BY {S.city_col}
     ''')
 
     # Verify data
@@ -838,7 +842,7 @@ def step8_create_optimization_indexes(db_path: str):
     print("Note: Regional n-gram index uses region display key to limit index size")
 
 
-def step9_populate_village_ngrams(db_path: str):
+def step9_populate_village_ngrams(db_path: str, schema: VillageTableSchema | None = None):
     """Step 9: Populate village-level n-gram data for API endpoints.
 
     API endpoints that consume this table:
@@ -851,17 +855,18 @@ def step9_populate_village_ngrams(db_path: str):
 
     conn = sqlite3.connect(db_path, timeout=60.0)
     cursor = conn.cursor()
+    S = schema or get_schema("guangdong")
 
-    cursor.execute("""
-        SELECT COUNT(*) FROM 广东省自然村_预处理 WHERE 字符数量 > 0
+    cursor.execute(f"""
+        SELECT COUNT(*) FROM {S.preprocessed_table} WHERE {S.char_count_col} > 0
     """)
     total_villages = cursor.fetchone()[0]
     print(f"\nProcessing {total_villages:,} villages...")
 
-    cursor.execute("""
-        SELECT village_id, 村委会, 自然村_去前缀
-        FROM 广东省自然村_预处理
-        WHERE 字符数量 > 0
+    cursor.execute(f"""
+        SELECT {S.village_id_col}, {S.committee_col_preprocessed}, {S.village_name_col_prefix_removed}
+        FROM {S.preprocessed_table}
+        WHERE {S.char_count_col} > 0
     """)
     villages = cursor.fetchall()
     print(f"Loaded {len(villages):,} villages from database")
@@ -935,6 +940,7 @@ def main(argv=None):
     """Main execution function."""
     parser = argparse.ArgumentParser(description="Phase 12: N-gram Structure Analysis")
     parser.add_argument("--db-path", default="data/villages.db", help="Path to database")
+    parser.add_argument("--schema", default="guangdong", choices=["guangdong", "national"], help="Village table schema")
     parser.add_argument("--run-id", default=None, help="Run ID for active_run_ids metadata")
     parser.add_argument("--n-values", default="2,3", help="Comma-separated n values for regional analysis")
     parser.add_argument("--regional-levels", default="township", help="Comma-separated regional levels")
@@ -944,6 +950,7 @@ def main(argv=None):
     args = parser.parse_args(argv)
 
     db_path = args.db_path
+    schema = get_schema(args.schema)
     n_values = _parse_int_csv(args.n_values)
     regional_levels = _parse_str_csv(args.regional_levels)
     positions = _parse_str_csv(args.positions)
@@ -971,12 +978,13 @@ def main(argv=None):
 
     try:
         step1_create_tables(db_path)
-        step2_extract_global_ngrams(db_path, n_values=n_values, positions=positions)
+        step2_extract_global_ngrams(db_path, n_values=n_values, positions=positions, schema=schema)
         step3_extract_regional_ngrams(
             db_path,
             n_values=n_values,
             regional_levels=regional_levels,
             positions=positions,
+            schema=schema,
         )
         step3_5_calculate_regional_totals_raw(db_path)  # NEW: Calculate raw totals
         step4_calculate_tendency(db_path, regional_levels=regional_levels)
@@ -987,8 +995,8 @@ def main(argv=None):
             min_global_count_by_n=min_global_count_by_n,
         )  # NEW: Clean up non-significant data
         step7_detect_patterns(db_path, n_values=n_values)
-        step8_create_optimization_indexes(db_path)  # NEW: Create optimization indexes
-        step9_populate_village_ngrams(db_path)  # NEW: Per-village n-grams for API
+        step8_create_optimization_indexes(db_path, schema=schema)  # NEW: Create optimization indexes
+        step9_populate_village_ngrams(db_path, schema=schema)  # NEW: Per-village n-grams for API
 
         end_time = datetime.now()
         duration = (end_time - start_time).total_seconds()

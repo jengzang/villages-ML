@@ -13,15 +13,17 @@ import sqlite3
 import sys
 from pathlib import Path
 import json
+import argparse
 from tqdm import tqdm
 
 # Add src to path
 sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 
 from src.ngram_analysis import NgramExtractor
+from src.schema import get_schema
 
 
-def populate_village_ngrams(db_path: str = 'data/villages.db', batch_size: int = 1000):
+def populate_village_ngrams(db_path: str = 'data/villages.db', batch_size: int = 1000, schema_name: str = "guangdong"):
     """
     Populate village_ngrams table with per-village n-gram data.
 
@@ -33,21 +35,23 @@ def populate_village_ngrams(db_path: str = 'data/villages.db', batch_size: int =
     print("Populating village_ngrams Table")
     print("="*60)
 
+    schema = get_schema(schema_name)
     conn = sqlite3.connect(db_path)
     cursor = conn.cursor()
 
     # Get total count for progress bar
-    cursor.execute("""
-        SELECT COUNT(*) FROM 广东省自然村_预处理 WHERE 字符数量 > 0
+    cursor.execute(f"""
+        SELECT COUNT(*) FROM {schema.preprocessed_table}
+        WHERE {schema.char_count_col} > 0
     """)
     total_villages = cursor.fetchone()[0]
     print(f"\\nProcessing {total_villages:,} villages...")
 
     # Load villages in batches
-    cursor.execute("""
-        SELECT village_id, 村委会, 自然村_去前缀
-        FROM 广东省自然村_预处理
-        WHERE 字符数量 > 0
+    cursor.execute(f"""
+        SELECT {schema.village_id_col}, {schema.committee_col_preprocessed}, {schema.village_name_col_prefix_removed}
+        FROM {schema.preprocessed_table}
+        WHERE {schema.char_count_col} > 0
     """)
 
     # Fetch all villages first to avoid cursor issues
@@ -127,5 +131,14 @@ def populate_village_ngrams(db_path: str = 'data/villages.db', batch_size: int =
     conn.close()
 
 
+def parse_args():
+    parser = argparse.ArgumentParser(description="Populate village_ngrams table")
+    parser.add_argument("--db-path", default="data/villages.db")
+    parser.add_argument("--batch-size", type=int, default=1000)
+    parser.add_argument("--schema", default="guangdong", help="Village schema profile name")
+    return parser.parse_args()
+
+
 if __name__ == '__main__':
-    populate_village_ngrams()
+    args = parse_args()
+    populate_village_ngrams(args.db_path, args.batch_size, args.schema)

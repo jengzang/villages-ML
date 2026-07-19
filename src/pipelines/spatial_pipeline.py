@@ -26,6 +26,7 @@ from src.data.db_writer import (
     write_village_cluster_assignments,
     write_region_spatial_aggregates
 )
+from src.schema import get_schema
 
 logger = logging.getLogger(__name__)
 
@@ -38,7 +39,9 @@ def run_spatial_analysis_pipeline(
     method: str = 'dbscan',
     feature_run_id: Optional[str] = None,
     output_dir: Optional[str] = None,
-    generate_maps: bool = False
+    generate_maps: bool = False,
+    schema_name: str = 'guangdong',
+    coordinate_bounds: Optional[dict] = None
 ) -> Dict[str, Any]:
     """
     Run complete spatial analysis pipeline.
@@ -72,6 +75,7 @@ def run_spatial_analysis_pipeline(
     logger.info("="*80)
     logger.info(f"Run ID: {run_id}")
     logger.info(f"Database: {db_path}")
+    logger.info(f"Schema: {schema_name}")
     logger.info(f"Clustering: {method}, eps={eps_km}km, min_samples={min_samples}")
 
     start_time = time.time()
@@ -91,8 +95,8 @@ def run_spatial_analysis_pipeline(
         logger.info("\n" + "="*80)
         logger.info("Step 2: Loading coordinates")
         logger.info("="*80)
-        loader = CoordinateLoader()
-        coords_df = loader.load_coordinates(conn)
+        loader = CoordinateLoader(bounds=coordinate_bounds)
+        coords_df = loader.load_coordinates(conn, schema=get_schema(schema_name))
         coords = loader.get_coordinate_array(coords_df)
 
         n_villages = len(coords_df)

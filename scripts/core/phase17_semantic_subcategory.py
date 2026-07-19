@@ -23,12 +23,17 @@ import sqlite3
 import json
 import time
 import argparse
+import sys
 from pathlib import Path
 from typing import Dict, List, Tuple
 from collections import defaultdict
 
 # 项目根目录
 PROJECT_ROOT = Path(__file__).parent.parent.parent
+sys.path.insert(0, str(PROJECT_ROOT))
+
+from src.schema import VillageTableSchema, get_schema
+
 DB_PATH = PROJECT_ROOT / "data" / "villages.db"
 LEXICON_V4_PATH = PROJECT_ROOT / "data" / "semantic_lexicon_v4.json"
 
@@ -194,20 +199,21 @@ def populate_subcategory_labels(conn: sqlite3.Connection, v4: Dict):
         print(f"  {parent}: {count} 个字符")
 
 
-def calculate_subcategory_vtf_global(conn: sqlite3.Connection):
+def calculate_subcategory_vtf_global(conn: sqlite3.Connection, schema: VillageTableSchema | None = None):
     """计算全局子类别虚拟词频"""
     print("\n" + "=" * 60)
     print("Step 4: 计算全局子类别 VTF")
     print("=" * 60)
 
     cursor = conn.cursor()
+    S = schema or get_schema("guangdong")
 
     # 清空旧数据
     cursor.execute("DELETE FROM semantic_subcategory_vtf_global")
 
     # 计算每个子类别的 VTF
     # VTF = 子类别各字符 village_count 之和（与父类 VTF 同口径）
-    cursor.execute("""
+    cursor.execute(f"""
         INSERT INTO semantic_subcategory_vtf_global
         (subcategory, parent_category, char_count, village_count, vtf, percentage)
         SELECT
@@ -216,9 +222,9 @@ def calculate_subcategory_vtf_global(conn: sqlite3.Connection):
             COUNT(DISTINCT sl.char) as char_count,
             SUM(cf.village_count) as village_count,
             CAST(SUM(cf.village_count) AS REAL) /
-                (SELECT COUNT(*) FROM 广东省自然村_预处理) as vtf,
+                (SELECT COUNT(*) FROM {S.preprocessed_table}) as vtf,
             CAST(SUM(cf.village_count) AS REAL) /
-                (SELECT COUNT(*) FROM 广东省自然村_预处理) as percentage
+                (SELECT COUNT(*) FROM {S.preprocessed_table}) as percentage
         FROM semantic_subcategory_labels sl
         JOIN char_frequency_global cf ON sl.char = cf.char
         GROUP BY sl.subcategory, sl.parent_category
@@ -391,6 +397,7 @@ def parse_args():
     parser = argparse.ArgumentParser(description="Phase 17: Semantic subcategory VTF analysis")
     parser.add_argument("--run-id", default=None, help="Accepted for pipeline run tracking")
     parser.add_argument("--db-path", default=str(DB_PATH), help="Path to SQLite database")
+    parser.add_argument("--schema", default="guangdong", choices=["guangdong", "national"], help="Village table schema")
     parser.add_argument("--lexicon-path", default=str(LEXICON_V4_PATH), help="Path to v4 semantic lexicon")
     return parser.parse_args()
 
@@ -400,6 +407,7 @@ def main():
     args = parse_args()
     db_path = Path(args.db_path)
     lexicon_path = Path(args.lexicon_path)
+    schema = get_schema(args.schema)
 
     print("\n" + "=" * 60)
     print("Phase 17: 语义子类别细化（v4 词典：9 父类, 53 子类）")
@@ -437,7 +445,7 @@ def main():
         populate_subcategory_labels(conn, v4)
 
         # Step 4: 计算全局 VTF
-        calculate_subcategory_vtf_global(conn)
+        calculate_subcategory_vtf_global(conn, schema=schema)
 
         # Step 5: 计算区域 VTF
         calculate_subcategory_vtf_regional(conn)
