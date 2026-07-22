@@ -1088,6 +1088,11 @@ def main():
         phases_to_run = parse_phase_list(args.phases)
         if phases_to_run is None:
             return 1
+    elif args.vacuum:
+        if args.dry_run:
+            print(f"\n🔍 --vacuum (dry-run): would run ANALYZE, PRAGMA optimize, and VACUUM on {args.db_path}")
+            return 0
+        return 0 if run_database_maintenance(args.db_path, run_vacuum=True) else 1
     else:
         parser.print_help()
         return 1

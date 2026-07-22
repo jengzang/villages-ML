@@ -5,6 +5,7 @@ Run with: pytest tests/test_spatial_basic.py -v
 """
 
 import pytest
+import sqlite3
 import numpy as np
 import pandas as pd
 import sys
@@ -17,6 +18,7 @@ from src.spatial.coordinate_loader import CoordinateLoader
 from src.spatial.distance_calculator import DistanceCalculator
 from src.spatial.spatial_clustering import SpatialClusterer
 from src.spatial.hotspot_detector import HotspotDetector
+from src.schema import get_schema
 
 
 class TestCoordinateLoader:
@@ -58,6 +60,36 @@ class TestCoordinateLoader:
         assert coords.shape == (2, 2)
         assert coords[0, 0] == 23.0  # First row, latitude
         assert coords[0, 1] == 113.0  # First row, longitude
+
+    def test_load_coordinates_does_not_require_language_column(self):
+        """Coordinate loading should only require fields used by spatial analysis."""
+        conn = sqlite3.connect(":memory:")
+        conn.execute("""
+            CREATE TABLE 广东省自然村_预处理 (
+                village_id TEXT,
+                市级 TEXT,
+                区县级 TEXT,
+                乡镇级 TEXT,
+                村委会 TEXT,
+                自然村_规范名 TEXT,
+                自然村_去前缀 TEXT,
+                longitude REAL,
+                latitude REAL
+            )
+        """)
+        conn.execute("""
+            INSERT INTO 广东省自然村_预处理
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+        """, (
+            "v_1", "广州市", "番禺区", "南村镇", "测试村委会",
+            "水口", "水口", 113.0, 23.0,
+        ))
+
+        df = CoordinateLoader().load_coordinates(conn, schema=get_schema("guangdong"))
+
+        assert len(df) == 1
+        assert "language_distribution" not in df.columns
+        assert df.loc[0, "village_name"] == "水口"
 
 
 class TestDistanceCalculator:

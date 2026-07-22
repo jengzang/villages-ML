@@ -110,7 +110,40 @@ python run_all_phases.py --phases 0,1,2,3
 python run_all_phases.py --group core        # 核心阶段 (0-7)
 python run_all_phases.py --group statistical # 统计阶段 (8-10)
 python run_all_phases.py --group advanced    # 高级阶段 (11-17)
+
+# 单独执行数据库维护并压缩数据库（ANALYZE + optimize + VACUUM）
+python run_all_phases.py --vacuum
+
+# 运行阶段结束后额外压缩数据库（VACUUM）
+python run_all_phases.py --phases 13 --vacuum
+python run_all_phases.py --all --vacuum
 ```
+
+### 数据库维护与 `--vacuum`
+
+`run_all_phases.py` 每次实际执行阶段后，默认会在最后运行一次轻量数据库维护：
+
+- `ANALYZE`
+- `PRAGMA optimize`
+
+`--vacuum` 有两种用法：
+
+```bash
+# 1. 单独使用：不运行任何分析阶段，只执行 ANALYZE / optimize / VACUUM
+python run_all_phases.py --vacuum
+
+# 2. 和执行模式组合：阶段结束后执行 ANALYZE / optimize / VACUUM
+python run_all_phases.py --phases 13 --vacuum
+python run_all_phases.py --all --vacuum
+```
+
+如果只是想预览执行计划，`--dry-run` 不会执行数据库维护，也不会执行 `VACUUM`：
+
+```bash
+python run_all_phases.py --all --dry-run --vacuum
+```
+
+注意：`VACUUM` 会重建 SQLite 数据库文件，耗时更久，并且需要额外磁盘空间；通常只在大量删除表、清理旧结果、或需要压缩数据库文件时使用。
 
 ### 分析阶段概览
 
@@ -1258,6 +1291,4 @@ python scripts/test_query_policy.py
 TBD
 
 </details>
-
-
 
