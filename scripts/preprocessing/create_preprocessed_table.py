@@ -227,6 +227,7 @@ def materialize_metadata_stats(
     cursor.execute("DROP TABLE IF EXISTS regional_basic_stats")
     cursor.execute("""
     CREATE TABLE regional_basic_stats (
+        region_key TEXT PRIMARY KEY,
         region_level TEXT NOT NULL,
         region_name TEXT NOT NULL,
         city TEXT,
@@ -235,17 +236,17 @@ def materialize_metadata_stats(
         village_count INTEGER NOT NULL,
         avg_name_length REAL,
         generated_at REAL NOT NULL,
-        data_version TEXT NOT NULL,
-        PRIMARY KEY (region_level, city, county, township)
+        data_version TEXT NOT NULL
     )
     """)
 
     cursor.execute(f"""
         INSERT INTO regional_basic_stats (
-            region_level, region_name, city, county, township,
+            region_key, region_level, region_name, city, county, township,
             village_count, avg_name_length, generated_at, data_version
         )
         SELECT
+            'city|' || {S.city_col},
             'city',
             {S.city_col},
             {S.city_col},
@@ -262,10 +263,11 @@ def materialize_metadata_stats(
 
     cursor.execute(f"""
         INSERT INTO regional_basic_stats (
-            region_level, region_name, city, county, township,
+            region_key, region_level, region_name, city, county, township,
             village_count, avg_name_length, generated_at, data_version
         )
         SELECT
+            'county|' || {S.city_col} || '|' || {S.county_col},
             'county',
             {S.county_col},
             {S.city_col},
@@ -282,10 +284,11 @@ def materialize_metadata_stats(
 
     cursor.execute(f"""
         INSERT INTO regional_basic_stats (
-            region_level, region_name, city, county, township,
+            region_key, region_level, region_name, city, county, township,
             village_count, avg_name_length, generated_at, data_version
         )
         SELECT
+            'township|' || {S.city_col} || '|' || {S.county_col} || '|' || {S.township_col},
             'township',
             {S.township_col},
             {S.city_col},

@@ -90,7 +90,7 @@ def test_materialize_metadata_stats_creates_regional_basic_stats():
 
     rows = conn.execute(
         """
-        SELECT region_level, region_name, city, county, township,
+        SELECT region_key, region_level, region_name, city, county, township,
                village_count, ROUND(avg_name_length, 3), data_version
         FROM regional_basic_stats
         ORDER BY region_level, city, county, township
@@ -98,6 +98,7 @@ def test_materialize_metadata_stats_creates_regional_basic_stats():
     ).fetchall()
 
     assert (
+        "city|广州市",
         "city",
         "广州市",
         "广州市",
@@ -108,6 +109,7 @@ def test_materialize_metadata_stats_creates_regional_basic_stats():
         "unit_test",
     ) in rows
     assert (
+        "county|广州市|天河区",
         "county",
         "天河区",
         "广州市",
@@ -118,6 +120,7 @@ def test_materialize_metadata_stats_creates_regional_basic_stats():
         "unit_test",
     ) in rows
     assert (
+        "township|广州市|天河区|五山街道",
         "township",
         "五山街道",
         "广州市",
@@ -134,3 +137,4 @@ def test_materialize_metadata_stats_creates_regional_basic_stats():
         for row in conn.execute("PRAGMA index_list(regional_basic_stats)").fetchall()
     }
     assert "idx_regional_basic_stats_level_count" in indexes
+    assert "idx_regional_basic_stats_lookup" in indexes
