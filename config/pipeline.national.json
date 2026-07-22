@@ -7,6 +7,17 @@
   "run": {
     "run_id_prefix": "national"
   },
+  "retention": {
+    "enabled": true,
+    "drop_tables": [
+      "全国自然村_预处理",
+      "village_ngrams",
+      "village_semantic_structure",
+      "village_features",
+      "village_spatial_features",
+      "village_cluster_assignments"
+    ]
+  },
   "phases": {
     "0": {
       "args": {

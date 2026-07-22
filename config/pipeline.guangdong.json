@@ -7,6 +7,10 @@
   "run": {
     "run_id_prefix": "run"
   },
+  "retention": {
+    "enabled": false,
+    "drop_tables": []
+  },
   "phases": {
     "0": {
       "args": {

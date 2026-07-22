@@ -109,6 +109,7 @@ from pathlib import Path
 from typing import Dict, List, Optional
 
 from src.pipeline_config import load_pipeline_config, merge_phase_definitions
+from src.pipeline_retention import apply_retention_policy, retention_policy_from_config
 from src.schema import get_schema
 
 
@@ -1051,6 +1052,7 @@ def main():
     try:
         pipeline_config = load_pipeline_config(args.config)
         phases = merge_phase_definitions(PHASES, pipeline_config)
+        retention_policy = retention_policy_from_config(pipeline_config)
     except ValueError as e:
         print(f"❌ Error: {e}")
         return 1
@@ -1184,6 +1186,24 @@ def main():
 
     # Print summary
     print_summary(results, overall_start, args.dry_run, phases)
+
+    if retention_policy.enabled and results and all(results.values()):
+        retention_result = apply_retention_policy(args.db_path, retention_policy, dry_run=args.dry_run)
+        label = "Compact retention (dry-run)" if args.dry_run else "Compact retention"
+        print(f"\n{label}:")
+        if args.dry_run:
+            print(f"  Would drop {len(retention_policy.drop_tables) - len(retention_result.missing_tables)} configured table(s):")
+            for table in retention_policy.drop_tables:
+                if table not in retention_result.missing_tables:
+                    print(f"  - {table}")
+        else:
+            print(f"  Dropped {len(retention_result.dropped_tables)} table(s):")
+            for table in retention_result.dropped_tables:
+                print(f"  - {table}")
+        if retention_result.missing_tables:
+            print(f"  Missing/skipped {len(retention_result.missing_tables)} configured table(s):")
+            for table in retention_result.missing_tables:
+                print(f"  - {table}")
 
     if not args.dry_run and results and not args.skip_maintenance:
         run_database_maintenance(args.db_path, run_vacuum=args.vacuum)
