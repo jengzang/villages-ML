@@ -83,31 +83,37 @@ SEMANTIC_COMPOSITION_SCHEMA = {
 
 # Indexes
 SEMANTIC_COMPOSITION_INDEXES = [
-    "CREATE INDEX IF NOT EXISTS idx_semantic_bigrams_freq ON semantic_bigrams(frequency DESC)",
-    "CREATE INDEX IF NOT EXISTS idx_semantic_bigrams_pmi ON semantic_bigrams(pmi DESC)",
-    "CREATE INDEX IF NOT EXISTS idx_semantic_trigrams_freq ON semantic_trigrams(frequency DESC)",
-    "CREATE INDEX IF NOT EXISTS idx_semantic_patterns_type ON semantic_composition_patterns(pattern_type)",
-    "CREATE INDEX IF NOT EXISTS idx_semantic_patterns_freq ON semantic_composition_patterns(frequency DESC)",
-    "CREATE INDEX IF NOT EXISTS idx_semantic_conflicts_type ON semantic_conflicts(conflict_type)",
-    "CREATE INDEX IF NOT EXISTS idx_semantic_pmi_score ON semantic_pmi(pmi DESC)",
-    "CREATE INDEX IF NOT EXISTS idx_village_semantic_id ON village_semantic_structure(village_id)",
+    ("semantic_bigrams", "CREATE INDEX IF NOT EXISTS idx_semantic_bigrams_freq ON semantic_bigrams(frequency DESC)"),
+    ("semantic_bigrams", "CREATE INDEX IF NOT EXISTS idx_semantic_bigrams_pmi ON semantic_bigrams(pmi DESC)"),
+    ("semantic_trigrams", "CREATE INDEX IF NOT EXISTS idx_semantic_trigrams_freq ON semantic_trigrams(frequency DESC)"),
+    ("semantic_composition_patterns", "CREATE INDEX IF NOT EXISTS idx_semantic_patterns_type ON semantic_composition_patterns(pattern_type)"),
+    ("semantic_composition_patterns", "CREATE INDEX IF NOT EXISTS idx_semantic_patterns_freq ON semantic_composition_patterns(frequency DESC)"),
+    ("semantic_conflicts", "CREATE INDEX IF NOT EXISTS idx_semantic_conflicts_type ON semantic_conflicts(conflict_type)"),
+    ("semantic_pmi", "CREATE INDEX IF NOT EXISTS idx_semantic_pmi_score ON semantic_pmi(pmi DESC)"),
+    ("village_semantic_structure", "CREATE INDEX IF NOT EXISTS idx_village_semantic_id ON village_semantic_structure(village_id)"),
 ]
 
 
-def create_semantic_composition_tables(db_path: str = 'data/villages.db'):
+def create_semantic_composition_tables(db_path: str = 'data/villages.db', exclude_tables: set[str] | None = None):
     """Create all semantic composition analysis tables."""
     import sqlite3
 
+    exclude_tables = exclude_tables or set()
     conn = sqlite3.connect(db_path)
     cursor = conn.cursor()
 
     # Create tables
     for table_name, schema in SEMANTIC_COMPOSITION_SCHEMA.items():
+        if table_name in exclude_tables:
+            print(f"Skipping table: {table_name}")
+            continue
         print(f"Creating table: {table_name}")
         cursor.execute(schema)
 
     # Create indexes
-    for index_sql in SEMANTIC_COMPOSITION_INDEXES:
+    for table_name, index_sql in SEMANTIC_COMPOSITION_INDEXES:
+        if table_name in exclude_tables:
+            continue
         print(f"Creating index...")
         cursor.execute(index_sql)
 

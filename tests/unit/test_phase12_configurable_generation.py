@@ -112,3 +112,25 @@ def test_skip_village_ngrams_avoids_village_ngram_step(tmp_path, monkeypatch):
     ])
 
     assert called == []
+
+
+def test_skip_village_ngrams_does_not_create_empty_village_ngram_table(tmp_path):
+    db_path = tmp_path / "phase12.db"
+
+    phase12.step1_create_tables(str(db_path), exclude_tables={"village_ngrams"})
+
+    conn = sqlite3.connect(db_path)
+    tables = {
+        row[0]
+        for row in conn.execute("SELECT name FROM sqlite_master WHERE type = 'table'")
+    }
+    indexes = {
+        row[0]
+        for row in conn.execute("SELECT name FROM sqlite_master WHERE type = 'index'")
+        if row[0]
+    }
+    conn.close()
+
+    assert "village_ngrams" not in tables
+    assert "idx_village_ngrams_id" not in indexes
+    assert "ngram_frequency" in tables

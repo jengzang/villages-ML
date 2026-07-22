@@ -75,13 +75,13 @@ def _filter_positions(position_data: dict, positions: list[str]) -> dict:
     return {position: counter for position, counter in position_data.items() if position in requested}
 
 
-def step1_create_tables(db_path: str):
+def step1_create_tables(db_path: str, exclude_tables: set[str] | None = None):
     """Step 1: Create database tables."""
     print("\n" + "="*60)
     print("Step 1: Creating N-gram Analysis Tables")
     print("="*60)
 
-    create_ngram_tables(db_path)
+    create_ngram_tables(db_path, exclude_tables=exclude_tables)
     print("[OK] Tables created successfully")
 
 
@@ -982,7 +982,8 @@ def main(argv=None):
     print(f"Run ID: {run_id}")
 
     try:
-        step1_create_tables(db_path)
+        exclude_tables = {"village_ngrams"} if args.skip_village_ngrams else set()
+        step1_create_tables(db_path, exclude_tables=exclude_tables)
         step2_extract_global_ngrams(db_path, n_values=n_values, positions=positions, schema=schema)
         step3_extract_regional_ngrams(
             db_path,

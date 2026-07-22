@@ -38,13 +38,13 @@ from src.config.semantic_roles import MODIFIER_CATEGORIES, HEAD_CATEGORIES
 from src.schema import VillageTableSchema, get_schema
 
 
-def step1_create_tables(db_path: str):
+def step1_create_tables(db_path: str, exclude_tables: set[str] | None = None):
     """Step 1: Create database tables."""
     print("\n" + "="*60)
     print("Step 1: Creating Semantic Composition Tables")
     print("="*60)
 
-    create_semantic_composition_tables(db_path)
+    create_semantic_composition_tables(db_path, exclude_tables=exclude_tables)
     print("[OK] Tables created successfully")
 
 
@@ -750,7 +750,8 @@ def main(argv=None):
     start_time = datetime.now()
 
     try:
-        step1_create_tables(db_path)
+        exclude_tables = {"village_semantic_structure"} if args.skip_village_structures else set()
+        step1_create_tables(db_path, exclude_tables=exclude_tables)
         step2_analyze_compositions(
             db_path,
             basic_lexicon_path=args.basic_lexicon_path,
