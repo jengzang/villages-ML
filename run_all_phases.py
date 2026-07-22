@@ -1151,15 +1151,18 @@ def main():
         _conn.close()
     elif args.clear and args.dry_run:
         import sqlite3 as _sqlite3
-        _conn = _sqlite3.connect(args.db_path)
-        _cursor = _conn.cursor()
-        _cursor.execute(
-            "SELECT name FROM sqlite_master WHERE type='table' AND name != ? AND name NOT LIKE 'sqlite_%'",
-            (raw_table_to_keep,),
-        )
-        tables_to_drop = [r[0] for r in _cursor.fetchall()]
-        print(f"\n🔍 --clear (dry-run): 将会删除 {len(tables_to_drop)} 张衍生表，保留 {raw_table_to_keep}")
-        _conn.close()
+        if not Path(args.db_path).exists():
+            print(f"\n🔍 --clear (dry-run): 将会删除 0 张衍生表，保留 {raw_table_to_keep}")
+        else:
+            _conn = _sqlite3.connect(args.db_path)
+            _cursor = _conn.cursor()
+            _cursor.execute(
+                "SELECT name FROM sqlite_master WHERE type='table' AND name != ? AND name NOT LIKE 'sqlite_%'",
+                (raw_table_to_keep,),
+            )
+            tables_to_drop = [r[0] for r in _cursor.fetchall()]
+            print(f"\n🔍 --clear (dry-run): 将会删除 {len(tables_to_drop)} 张衍生表，保留 {raw_table_to_keep}")
+            _conn.close()
 
     # Confirm execution (unless dry-run)
     if not args.dry_run and len(phases_to_run) > 3:
