@@ -148,3 +148,17 @@ def test_national_profile_emits_phase4_schema_and_china_bounds():
     assert phase4_cmd[phase4_cmd.index("--schema") + 1] == "national"
     assert "--coordinate-bounds" in phase4_cmd
     assert phase4_cmd[phase4_cmd.index("--coordinate-bounds") + 1] == "china"
+
+
+def test_national_profile_skips_phase12_village_ngram_generation():
+    config = load_pipeline_config("config/pipeline.national.json")
+    phases = merge_phase_definitions(PHASES, config)
+    phase12_cmd, _, _ = build_phase_command(
+        12,
+        phases=phases,
+        run_id_prefix="national",
+        db_path="data/villages_national.db",
+        now_str="20260716_120000",
+    )
+
+    assert "--skip-village-ngrams" in phase12_cmd

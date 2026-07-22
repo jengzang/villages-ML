@@ -947,6 +947,11 @@ def main(argv=None):
     parser.add_argument("--positions", default="all,prefix,suffix,middle", help="Comma-separated positions")
     parser.add_argument("--min-regional-count-by-n", default="", help="Per-n thresholds, e.g. 2:3,3:2")
     parser.add_argument("--min-global-count-by-n", default="", help="Per-n thresholds, e.g. 2:10,3:5")
+    parser.add_argument(
+        "--skip-village-ngrams",
+        action="store_true",
+        help="Skip village_ngrams generation for compact profiles",
+    )
     args = parser.parse_args(argv)
 
     db_path = args.db_path
@@ -996,7 +1001,10 @@ def main(argv=None):
         )  # NEW: Clean up non-significant data
         step7_detect_patterns(db_path, n_values=n_values)
         step8_create_optimization_indexes(db_path, schema=schema)  # NEW: Create optimization indexes
-        step9_populate_village_ngrams(db_path, schema=schema)  # NEW: Per-village n-grams for API
+        if args.skip_village_ngrams:
+            print("\n[SKIP] village_ngrams generation disabled by --skip-village-ngrams")
+        else:
+            step9_populate_village_ngrams(db_path, schema=schema)  # NEW: Per-village n-grams for API
 
         end_time = datetime.now()
         duration = (end_time - start_time).total_seconds()

@@ -2,9 +2,12 @@ import sqlite3
 import sys
 from pathlib import Path
 
+import pytest
+
 project_root = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(project_root))
 
+from scripts.core import phase12_ngram_analysis as phase12
 from scripts.core.phase12_ngram_analysis import (
     step1_create_tables,
     step2_extract_global_ngrams,
@@ -69,3 +72,43 @@ def test_phase12_generation_honors_n_values_positions_and_region_levels(tmp_path
     assert conn.execute("SELECT DISTINCT level FROM ngram_tendency").fetchall() == [("city",)]
     assert conn.execute("SELECT DISTINCT n FROM structural_patterns").fetchall() == [(2,)]
     conn.close()
+
+
+def _make_minimal_db(path):
+    conn = sqlite3.connect(path)
+    conn.execute("CREATE TABLE ngram_significance (id INTEGER)")
+    conn.commit()
+    conn.close()
+
+
+def test_skip_village_ngrams_avoids_village_ngram_step(tmp_path, monkeypatch):
+    db_path = tmp_path / "phase12.db"
+    _make_minimal_db(db_path)
+    called = []
+
+    for name in [
+        "step1_create_tables",
+        "step2_extract_global_ngrams",
+        "step3_extract_regional_ngrams",
+        "step3_5_calculate_regional_totals_raw",
+        "step4_calculate_tendency",
+        "step5_calculate_significance",
+        "step6_cleanup_insignificant_data",
+        "step7_detect_patterns",
+        "step8_create_optimization_indexes",
+    ]:
+        monkeypatch.setattr(phase12, name, lambda *args, **kwargs: None)
+
+    def fail_if_called(*args, **kwargs):
+        called.append((args, kwargs))
+        pytest.fail("village_ngrams should be skipped")
+
+    monkeypatch.setattr(phase12, "step9_populate_village_ngrams", fail_if_called)
+
+    phase12.main([
+        "--db-path",
+        str(db_path),
+        "--skip-village-ngrams",
+    ])
+
+    assert called == []

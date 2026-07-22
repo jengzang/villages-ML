@@ -130,7 +130,8 @@
         "regional_levels": ["city", "county"],
         "positions": ["all", "suffix"],
         "min_regional_count_by_n": "2:20",
-        "min_global_count_by_n": "2:200"
+        "min_global_count_by_n": "2:200",
+        "skip_village_ngrams": true
       }
     },
     "13": {
