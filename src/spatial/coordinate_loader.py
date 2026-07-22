@@ -72,7 +72,6 @@ class CoordinateLoader:
             {S.committee_col_preprocessed} as village_committee,
             {S.village_name_col_normalized} as village_name_original,
             {S.village_name_col_prefix_removed} as village_name,
-            {S.language_col_preprocessed} as language_distribution,
             {S.longitude_col},
             {S.latitude_col}
         FROM {S.preprocessed_table}

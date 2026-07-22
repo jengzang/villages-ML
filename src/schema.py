@@ -110,7 +110,7 @@ GUANGDONG_SCHEMA = VillageTableSchema(
     longitude_col='longitude',
     latitude_col='latitude',
     language_col_raw='方言分布',
-    language_col_preprocessed='语言分布',
+    language_col_preprocessed='方言分布',
     pinyin_col='拼音',
 )
 
