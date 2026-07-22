@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from pathlib import Path
 import sqlite3
 from typing import Any
 
@@ -55,6 +56,17 @@ def apply_retention_policy(
     """
     if not policy.enabled:
         return RetentionResult(enabled=False, dry_run=dry_run, dropped_tables=[], missing_tables=[])
+
+    db_file = Path(db_path)
+    if not db_file.exists():
+        if dry_run:
+            return RetentionResult(
+                enabled=True,
+                dry_run=True,
+                dropped_tables=[],
+                missing_tables=list(policy.drop_tables),
+            )
+        raise FileNotFoundError(f"Database not found: {db_path}")
 
     conn = sqlite3.connect(db_path)
     try:

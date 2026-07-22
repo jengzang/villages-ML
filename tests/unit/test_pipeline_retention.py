@@ -1,5 +1,7 @@
 import sqlite3
 
+import pytest
+
 from src.pipeline_config import load_pipeline_config
 from src.pipeline_retention import apply_retention_policy, retention_policy_from_config
 
@@ -79,3 +81,22 @@ def test_apply_retention_policy_drops_targets_and_keeps_raw_and_similarity(tmp_p
     assert "char_similarity" in tables
     assert "全国自然村_预处理" not in tables
     assert "village_features" not in tables
+
+
+def test_apply_retention_policy_does_not_create_missing_database_in_dry_run(tmp_path):
+    db_path = tmp_path / "missing.db"
+    policy = retention_policy_from_config(load_pipeline_config("config/pipeline.national.json"))
+
+    result = apply_retention_policy(str(db_path), policy, dry_run=True)
+
+    assert result.dropped_tables == []
+    assert result.missing_tables == policy.drop_tables
+    assert not db_path.exists()
+
+
+def test_apply_retention_policy_rejects_missing_database_when_not_dry_run(tmp_path):
+    db_path = tmp_path / "missing.db"
+    policy = retention_policy_from_config(load_pipeline_config("config/pipeline.national.json"))
+
+    with pytest.raises(FileNotFoundError, match="Database not found"):
+        apply_retention_policy(str(db_path), policy, dry_run=False)
