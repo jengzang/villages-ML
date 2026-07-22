@@ -18,7 +18,7 @@ _DEFAULT_LOGICAL_ALIASES = {
     "villages": {
         "rowid": "ROWID",
         "village_id": "village_id",
-        "name": "自然村_规范名",
+        "name": "自然村_去前缀",
         "raw_name": "自然村",
         "committee": "村委会",
         "city": "市级",
