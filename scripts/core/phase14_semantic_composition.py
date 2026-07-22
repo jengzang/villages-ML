@@ -680,7 +680,7 @@ def step7_generate_semantic_indices_detailed(
     conn.close()
 
 
-def parse_args():
+def parse_args(argv=None):
     parser = argparse.ArgumentParser(description="Phase 14: Semantic Composition Analysis")
     parser.add_argument("--db-path", default="data/villages.db", help="Path to SQLite database")
     parser.add_argument("--schema", default="guangdong", choices=["guangdong", "national"], help="Village table schema")
@@ -717,16 +717,21 @@ def parse_args():
         help="Commit and print progress every N village semantic structures; 0 disables interval commits",
     )
     parser.add_argument(
+        "--skip-village-structures",
+        action="store_true",
+        help="Skip village_semantic_structure generation for compact profiles",
+    )
+    parser.add_argument(
         "--region-levels",
         default="city,county,township",
         help="Comma-separated detailed semantic index region levels",
     )
-    return parser.parse_args()
+    return parser.parse_args(argv)
 
 
-def main():
+def main(argv=None):
     """Main execution function."""
-    args = parse_args()
+    args = parse_args(argv)
     db_path = args.db_path
     region_levels = [level.strip() for level in args.region_levels.split(",") if level.strip()]
     detailed_lexicon_path = args.detailed_lexicon_path or args.lexicon_path
@@ -761,12 +766,15 @@ def main():
             conflict_threshold=args.conflict_threshold,
             schema=schema,
         )
-        step6_extract_village_structures(
-            db_path,
-            basic_lexicon_path=args.basic_lexicon_path,
-            progress_interval=args.structure_progress_interval,
-            schema=schema,
-        )
+        if args.skip_village_structures:
+            print("\n[SKIP] village_semantic_structure generation disabled by --skip-village-structures")
+        else:
+            step6_extract_village_structures(
+                db_path,
+                basic_lexicon_path=args.basic_lexicon_path,
+                progress_interval=args.structure_progress_interval,
+                schema=schema,
+            )
         step7_generate_semantic_indices_detailed(
             db_path,
             run_id=args.run_id,

@@ -162,3 +162,17 @@ def test_national_profile_skips_phase12_village_ngram_generation():
     )
 
     assert "--skip-village-ngrams" in phase12_cmd
+
+
+def test_national_profile_skips_phase14_village_structure_generation():
+    config = load_pipeline_config("config/pipeline.national.json")
+    phases = merge_phase_definitions(PHASES, config)
+    phase14_cmd, _, _ = build_phase_command(
+        14,
+        phases=phases,
+        run_id_prefix="national",
+        db_path="data/villages_national.db",
+        now_str="20260716_120000",
+    )
+
+    assert "--skip-village-structures" in phase14_cmd

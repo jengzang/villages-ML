@@ -158,7 +158,8 @@
         "detailed_lexicon_path": "data/semantic_lexicon_national_v4.json",
         "conflict_threshold": 20,
         "structure_progress_interval": 50000,
-        "region_levels": ["city", "county"]
+        "region_levels": ["city", "county"],
+        "skip_village_structures": true
       }
     },
     "15": {
