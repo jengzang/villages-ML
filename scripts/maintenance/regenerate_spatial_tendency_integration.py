@@ -212,8 +212,8 @@ def regenerate_spatial_tendency_integration():
         cursor.execute('''
             SELECT 'v_' || ROWID as village_id
             FROM 广东省自然村_预处理
-            WHERE 字符集 LIKE ?
-        ''', (f'%"{char}"%',))
+            WHERE 自然村_去前缀 LIKE ?
+        ''', (f'%{char}%',))
 
         villages_with_char = set(row[0] for row in cursor.fetchall())
 

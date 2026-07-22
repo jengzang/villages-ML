@@ -69,7 +69,64 @@ def parse_args():
         default="phase0_preprocessing",
         help="Data version stored in metadata materialization tables",
     )
-    return parser.parse_args()
+    parser.add_argument(
+        "--include-admin-villages",
+        action="store_true",
+        default=False,
+        help="Include deduplicated admin village names as additional rows",
+    )
+def _clean_admin_name(name: str) -> str:
+    """Strip administrative suffixes from an admin village name."""
+    ADMIN_SUFFIXES = [
+        "社区居民委员会", "村民委员会", "居民委员会", "社区居委会",
+        "村委会", "居委会", "行政村", "管理区", "社区", "村",
+    ]
+    for sfx in sorted(ADMIN_SUFFIXES, key=len, reverse=True):
+        if name.endswith(sfx) and len(name) > len(sfx):
+            core = name[:-len(sfx)]
+            if len(core) >= 2:
+                return core
+    return name
+
+
+def _insert_admin_village_rows(conn, S):
+    """Insert deduplicated admin village names as additional rows.
+
+    Admin rows have 村委会=NULL and coordinates=NULL, so they
+    naturally participate in character-level analysis but are
+    excluded from village-level and spatial analysis.
+    """
+    cursor = conn.cursor()
+
+    # Get unique admin names per township from the raw table
+    cursor.execute(f"""
+        SELECT DISTINCT {S.city_col}, {S.county_col}, {S.township_col}, {S.committee_col_raw}
+        FROM {S.raw_table}
+        WHERE {S.committee_col_raw} IS NOT NULL AND {S.committee_col_raw} != ''
+    """)
+
+    admin_names = cursor.fetchall()
+    logger.info(f"Found {len(admin_names)} unique admin village names")
+
+    inserted = 0
+    for city, county, township, admin_name in admin_names:
+        cleaned = _clean_admin_name(admin_name)
+        char_set = extract_char_set(cleaned)
+
+        cursor.execute(f"""
+            INSERT INTO {S.preprocessed_table} (
+                {S.city_col}, {S.county_col}, {S.township_col},
+                {S.committee_col_preprocessed},
+                {S.village_name_col_prefix_removed},
+                {S.longitude_col}, {S.latitude_col},
+                {S.char_count_col}
+            ) VALUES (?, ?, ?, NULL, ?, NULL, NULL, ?)
+        """, (city, county, township, cleaned, len(char_set)))
+
+        inserted += 1
+
+    conn.commit()
+    logger.info(f"Inserted {inserted} admin village rows")
 
 
 def materialize_metadata_stats(
@@ -489,6 +546,11 @@ def main():
     """)
     conn.commit()
     logger.info("village_id populated successfully")
+
+    # Optionally include admin village names for character-level analysis
+    if args.include_admin_villages:
+        logger.info("Including admin village names...")
+        _insert_admin_village_rows(conn, S)
 
     # Materialize lightweight metadata tables for backend overview/regions APIs.
     logger.info("Materializing metadata stats...")

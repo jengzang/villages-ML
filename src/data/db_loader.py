@@ -124,7 +124,7 @@ def load_villages(
 
     query = (
         f"SELECT {schema.city_col}, {schema.county_col}, {schema.township_col}, "
-        f"{village_col} as 自然村, {schema.char_set_col} FROM {table_name}"
+        f"{village_col} as 自然村 FROM {table_name}"
     )
     conditions = []
     params = []

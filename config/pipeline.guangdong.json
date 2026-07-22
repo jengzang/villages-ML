@@ -18,7 +18,8 @@
         "schema": "guangdong",
         "prefix_min_length": 2,
         "prefix_confidence_threshold": 0.7,
-        "metadata_version": "phase0_preprocessing"
+        "metadata_version": "phase0_preprocessing",
+        "include_admin_villages": false
       }
     },
     "1": {
