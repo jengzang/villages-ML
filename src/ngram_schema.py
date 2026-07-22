@@ -115,21 +115,45 @@ NGRAM_SCHEMA = {
 # Keep this list small: production storage is constrained, so each index should
 # match a stable backend query shape instead of covering speculative access.
 NGRAM_INDEXES = [
-    ("ngram_frequency", "CREATE INDEX IF NOT EXISTS idx_ngram_freq_ngram ON ngram_frequency(ngram)"),
-    ("ngram_frequency", "CREATE INDEX IF NOT EXISTS idx_ngram_freq_n_position_frequency ON ngram_frequency(n, position, frequency DESC)"),
-    ("regional_ngram_frequency", "CREATE INDEX IF NOT EXISTS idx_regional_ngram_level_n_region_freq ON regional_ngram_frequency(level, n, region, frequency DESC)"),
-    ("regional_ngram_frequency", "CREATE INDEX IF NOT EXISTS idx_regional_ngram_level ON regional_ngram_frequency(level)"),
-    ("regional_ngram_frequency", "CREATE INDEX IF NOT EXISTS idx_regional_ngram_region ON regional_ngram_frequency(region)"),
-    ("regional_ngram_frequency", "CREATE INDEX IF NOT EXISTS idx_regional_ngram_ngram ON regional_ngram_frequency(ngram)"),
-    ("ngram_tendency", "CREATE INDEX IF NOT EXISTS idx_ngram_tendency_level ON ngram_tendency(level)"),
-    ("ngram_tendency", "CREATE INDEX IF NOT EXISTS idx_ngram_tendency_level_region_lift ON ngram_tendency(level, region, lift DESC)"),
-    ("ngram_tendency", "CREATE INDEX IF NOT EXISTS idx_ngram_tendency_level_lift ON ngram_tendency(level, lift DESC)"),
-    ("ngram_tendency", "CREATE INDEX IF NOT EXISTS idx_ngram_tendency_zscore ON ngram_tendency(z_score DESC)"),
-    ("ngram_significance", "CREATE INDEX IF NOT EXISTS idx_ngram_sig_level ON ngram_significance(level)"),
-    ("ngram_significance", "CREATE INDEX IF NOT EXISTS idx_ngram_sig_pvalue ON ngram_significance(p_value)"),
-    ("structural_patterns", "CREATE INDEX IF NOT EXISTS idx_structural_patterns_type ON structural_patterns(pattern_type)"),
-    ("village_ngrams", "CREATE INDEX IF NOT EXISTS idx_village_ngrams_id ON village_ngrams(village_id)"),
+    "CREATE INDEX IF NOT EXISTS idx_ngram_freq_ngram ON ngram_frequency(ngram)",
+    "CREATE INDEX IF NOT EXISTS idx_ngram_freq_n_position_frequency ON ngram_frequency(n, position, frequency DESC)",
+    "CREATE INDEX IF NOT EXISTS idx_regional_ngram_level_n_region_freq ON regional_ngram_frequency(level, n, region, frequency DESC)",
+    "CREATE INDEX IF NOT EXISTS idx_regional_ngram_level ON regional_ngram_frequency(level)",
+    "CREATE INDEX IF NOT EXISTS idx_regional_ngram_region ON regional_ngram_frequency(region)",
+    "CREATE INDEX IF NOT EXISTS idx_regional_ngram_ngram ON regional_ngram_frequency(ngram)",
+    "CREATE INDEX IF NOT EXISTS idx_ngram_tendency_level ON ngram_tendency(level)",
+    "CREATE INDEX IF NOT EXISTS idx_ngram_tendency_level_region_lift ON ngram_tendency(level, region, lift DESC)",
+    "CREATE INDEX IF NOT EXISTS idx_ngram_tendency_level_lift ON ngram_tendency(level, lift DESC)",
+    "CREATE INDEX IF NOT EXISTS idx_ngram_tendency_zscore ON ngram_tendency(z_score DESC)",
+    "CREATE INDEX IF NOT EXISTS idx_ngram_sig_level ON ngram_significance(level)",
+    "CREATE INDEX IF NOT EXISTS idx_ngram_sig_pvalue ON ngram_significance(p_value)",
+    "CREATE INDEX IF NOT EXISTS idx_structural_patterns_type ON structural_patterns(pattern_type)",
+    "CREATE INDEX IF NOT EXISTS idx_village_ngrams_id ON village_ngrams(village_id)",
 ]
+
+_NGRAM_INDEX_TABLES = {
+    "idx_ngram_freq_ngram": "ngram_frequency",
+    "idx_ngram_freq_n_position_frequency": "ngram_frequency",
+    "idx_regional_ngram_level_n_region_freq": "regional_ngram_frequency",
+    "idx_regional_ngram_level": "regional_ngram_frequency",
+    "idx_regional_ngram_region": "regional_ngram_frequency",
+    "idx_regional_ngram_ngram": "regional_ngram_frequency",
+    "idx_ngram_tendency_level": "ngram_tendency",
+    "idx_ngram_tendency_level_region_lift": "ngram_tendency",
+    "idx_ngram_tendency_level_lift": "ngram_tendency",
+    "idx_ngram_tendency_zscore": "ngram_tendency",
+    "idx_ngram_sig_level": "ngram_significance",
+    "idx_ngram_sig_pvalue": "ngram_significance",
+    "idx_structural_patterns_type": "structural_patterns",
+    "idx_village_ngrams_id": "village_ngrams",
+}
+
+
+def _index_table(index_sql: str) -> str | None:
+    for index_name, table_name in _NGRAM_INDEX_TABLES.items():
+        if index_name in index_sql:
+            return table_name
+    return None
 
 
 def create_ngram_tables(db_path: str = 'data/villages.db', exclude_tables: set[str] | None = None):
@@ -149,7 +173,8 @@ def create_ngram_tables(db_path: str = 'data/villages.db', exclude_tables: set[s
         cursor.execute(schema)
 
     # Create indexes
-    for table_name, index_sql in NGRAM_INDEXES:
+    for index_sql in NGRAM_INDEXES:
+        table_name = _index_table(index_sql)
         if table_name in exclude_tables:
             continue
         print(f"Creating index...")

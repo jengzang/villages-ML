@@ -83,15 +83,33 @@ SEMANTIC_COMPOSITION_SCHEMA = {
 
 # Indexes
 SEMANTIC_COMPOSITION_INDEXES = [
-    ("semantic_bigrams", "CREATE INDEX IF NOT EXISTS idx_semantic_bigrams_freq ON semantic_bigrams(frequency DESC)"),
-    ("semantic_bigrams", "CREATE INDEX IF NOT EXISTS idx_semantic_bigrams_pmi ON semantic_bigrams(pmi DESC)"),
-    ("semantic_trigrams", "CREATE INDEX IF NOT EXISTS idx_semantic_trigrams_freq ON semantic_trigrams(frequency DESC)"),
-    ("semantic_composition_patterns", "CREATE INDEX IF NOT EXISTS idx_semantic_patterns_type ON semantic_composition_patterns(pattern_type)"),
-    ("semantic_composition_patterns", "CREATE INDEX IF NOT EXISTS idx_semantic_patterns_freq ON semantic_composition_patterns(frequency DESC)"),
-    ("semantic_conflicts", "CREATE INDEX IF NOT EXISTS idx_semantic_conflicts_type ON semantic_conflicts(conflict_type)"),
-    ("semantic_pmi", "CREATE INDEX IF NOT EXISTS idx_semantic_pmi_score ON semantic_pmi(pmi DESC)"),
-    ("village_semantic_structure", "CREATE INDEX IF NOT EXISTS idx_village_semantic_id ON village_semantic_structure(village_id)"),
+    "CREATE INDEX IF NOT EXISTS idx_semantic_bigrams_freq ON semantic_bigrams(frequency DESC)",
+    "CREATE INDEX IF NOT EXISTS idx_semantic_bigrams_pmi ON semantic_bigrams(pmi DESC)",
+    "CREATE INDEX IF NOT EXISTS idx_semantic_trigrams_freq ON semantic_trigrams(frequency DESC)",
+    "CREATE INDEX IF NOT EXISTS idx_semantic_patterns_type ON semantic_composition_patterns(pattern_type)",
+    "CREATE INDEX IF NOT EXISTS idx_semantic_patterns_freq ON semantic_composition_patterns(frequency DESC)",
+    "CREATE INDEX IF NOT EXISTS idx_semantic_conflicts_type ON semantic_conflicts(conflict_type)",
+    "CREATE INDEX IF NOT EXISTS idx_semantic_pmi_score ON semantic_pmi(pmi DESC)",
+    "CREATE INDEX IF NOT EXISTS idx_village_semantic_id ON village_semantic_structure(village_id)",
 ]
+
+_SEMANTIC_INDEX_TABLES = {
+    "idx_semantic_bigrams_freq": "semantic_bigrams",
+    "idx_semantic_bigrams_pmi": "semantic_bigrams",
+    "idx_semantic_trigrams_freq": "semantic_trigrams",
+    "idx_semantic_patterns_type": "semantic_composition_patterns",
+    "idx_semantic_patterns_freq": "semantic_composition_patterns",
+    "idx_semantic_conflicts_type": "semantic_conflicts",
+    "idx_semantic_pmi_score": "semantic_pmi",
+    "idx_village_semantic_id": "village_semantic_structure",
+}
+
+
+def _index_table(index_sql: str) -> str | None:
+    for index_name, table_name in _SEMANTIC_INDEX_TABLES.items():
+        if index_name in index_sql:
+            return table_name
+    return None
 
 
 def create_semantic_composition_tables(db_path: str = 'data/villages.db', exclude_tables: set[str] | None = None):
@@ -111,7 +129,8 @@ def create_semantic_composition_tables(db_path: str = 'data/villages.db', exclud
         cursor.execute(schema)
 
     # Create indexes
-    for table_name, index_sql in SEMANTIC_COMPOSITION_INDEXES:
+    for index_sql in SEMANTIC_COMPOSITION_INDEXES:
+        table_name = _index_table(index_sql)
         if table_name in exclude_tables:
             continue
         print(f"Creating index...")
