@@ -13,6 +13,8 @@ from pathlib import Path
 from typing import Any
 
 
+DEFAULT_PIPELINE_CONFIG_PATH = "config/pipeline.guangdong.json"
+
 _ARG_NAME_OVERRIDES = {
     "db_path": "db-path",
     "run_id": "run-id",
@@ -20,10 +22,17 @@ _ARG_NAME_OVERRIDES = {
 }
 
 
+def resolve_pipeline_config_path(config_path: str | None) -> str:
+    """Return the explicit profile path or the Guangdong default profile."""
+    return config_path or DEFAULT_PIPELINE_CONFIG_PATH
+
+
 def load_pipeline_config(config_path: str | None) -> dict[str, Any]:
     """Load a pipeline profile from JSON.
 
-    ``None`` returns an empty config so callers can merge unconditionally.
+    ``None`` returns an empty config so tests and callers can still merge
+    unconditionally. Pipeline entrypoints should call
+    ``resolve_pipeline_config_path`` first when they want the default profile.
     """
     if not config_path:
         return {}

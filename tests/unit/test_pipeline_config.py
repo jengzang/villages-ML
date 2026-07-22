@@ -7,7 +7,12 @@ import pytest
 sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 
 from run_all_phases import PHASES, build_phase_command
-from src.pipeline_config import load_pipeline_config, merge_phase_definitions
+from src.pipeline_config import (
+    DEFAULT_PIPELINE_CONFIG_PATH,
+    load_pipeline_config,
+    merge_phase_definitions,
+    resolve_pipeline_config_path,
+)
 
 
 def test_load_pipeline_config_reads_json_and_exposes_defaults(tmp_path):
@@ -36,6 +41,19 @@ def test_load_pipeline_config_reads_json_and_exposes_defaults(tmp_path):
     assert config["dataset"]["db_path"] == "data/national.db"
     assert config["run"]["run_id_prefix"] == "national"
     assert config["phases"]["12"]["args"]["regional_levels"] == ["county"]
+
+
+def test_default_pipeline_config_is_guangdong_profile_with_phase12_thresholds():
+    config_path = resolve_pipeline_config_path(None)
+    config = load_pipeline_config(config_path)
+    phases = merge_phase_definitions(PHASES, config)
+    phase12_args = phases[12]["args"]
+
+    assert config_path == DEFAULT_PIPELINE_CONFIG_PATH
+    assert "--min-regional-count-by-n" in phase12_args
+    assert phase12_args[phase12_args.index("--min-regional-count-by-n") + 1] == "2:3,3:2"
+    assert "--min-global-count-by-n" in phase12_args
+    assert phase12_args[phase12_args.index("--min-global-count-by-n") + 1] == "2:10,3:5"
 
 
 def test_merge_phase_definitions_overrides_phase_args_without_mutating_defaults():

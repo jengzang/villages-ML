@@ -108,7 +108,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import Dict, List, Optional
 
-from src.pipeline_config import load_pipeline_config, merge_phase_definitions
+from src.pipeline_config import load_pipeline_config, merge_phase_definitions, resolve_pipeline_config_path
 from src.pipeline_retention import apply_retention_policy, retention_policy_from_config
 from src.schema import get_schema
 
@@ -278,6 +278,7 @@ def print_execution_plan(phases_to_run: List[int], args, phases: Optional[Dict[i
 
     print(f"\n📋 Phases to run: {', '.join(str(p) for p in phases_to_run)}")
     print(f"📊 Total phases: {len(phases_to_run)}")
+    print(f"⚙️  Config profile: {args.config}")
     print(f"🗄️  Database: {args.db_path}")
     print(f"🏷️  Run ID prefix: {args.run_id_prefix}")
     print(f"🔍 Dry run: {'Yes' if args.dry_run else 'No'}")
@@ -1050,7 +1051,8 @@ def main():
     args = parser.parse_args()
 
     try:
-        pipeline_config = load_pipeline_config(args.config)
+        config_path = resolve_pipeline_config_path(args.config)
+        pipeline_config = load_pipeline_config(config_path)
         phases = merge_phase_definitions(PHASES, pipeline_config)
         retention_policy = retention_policy_from_config(pipeline_config)
     except ValueError as e:
@@ -1061,6 +1063,7 @@ def main():
         args.db_path = pipeline_config.get("dataset", {}).get("db_path", "data/villages.db")
     if args.run_id_prefix is None:
         args.run_id_prefix = pipeline_config.get("run", {}).get("run_id_prefix", "run")
+    args.config = config_path
     schema_name = pipeline_config.get("dataset", {}).get("schema", "guangdong")
     raw_table_to_keep = get_schema(schema_name).raw_table
 
