@@ -70,6 +70,9 @@ These tables must exist in compact mode when their generating phases are selecte
 - `embedding_runs`
 - `query_policy_config`
 - `query_logs`
+- `metadata_overview_stats`
+- `region_hierarchy_stats`
+- `regional_basic_stats`
 
 ### Character Analysis
 
@@ -161,6 +164,7 @@ Existing compact metadata tables:
 
 - `metadata_overview_stats`
 - `region_hierarchy_stats`
+- `regional_basic_stats`
 - `regional_centroids`
 
 `region_catalog` is no longer required for `/metadata/stats/*`. It may still be useful later as a richer unified region lookup, but it is optional and should not block preprocessed-table cleanup.
@@ -292,5 +296,5 @@ Run before final handoff:
 - Village-level derived tables are cleanup targets.
 - Raw village tables are kept.
 - Preprocessed village tables are cleanup targets after backend decoupling.
-- `metadata_overview_stats`, `region_hierarchy_stats`, and `regional_centroids` cover the known non-village-detail backend reads.
+- `metadata_overview_stats`, `region_hierarchy_stats`, `regional_basic_stats`, and `regional_centroids` cover the known non-village-detail backend reads.
 - Guangdong full profile remains backward compatible.
