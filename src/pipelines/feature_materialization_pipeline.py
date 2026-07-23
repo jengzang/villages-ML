@@ -345,3 +345,100 @@ def run_feature_materialization_pipeline(
         conn.close()
 
 
+def run_feature_generation_pipeline(
+    db_path: str,
+    run_id: str,
+    lexicon_path: str = 'data/semantic_lexicon_v1.json',
+    schema_name: str = 'guangdong',
+    batch_size: int = 10000,
+) -> dict[str, Any]:
+    """Generate village_features from preprocessed data.
+
+    Loads villages, extracts features, and writes to the village_features table.
+    """
+    logger.info("=" * 60)
+    logger.info("Village Feature Generation Pipeline")
+    logger.info(f"  Run ID: {run_id}")
+    logger.info("=" * 60)
+
+    start_time = time.time()
+    conn = sqlite3.connect(db_path)
+
+    try:
+        S = get_schema(schema_name)
+
+        create_feature_materialization_tables(conn, lexicon_path=lexicon_path)
+
+        logger.info("Loading villages from preprocessed table...")
+        query = f"""
+        SELECT
+            "{S.city_col}" as city,
+            "{S.county_col}" as county,
+            "{S.township_col}" as town,
+            "{S.committee_col_preprocessed}" as village_committee,
+            "{S.village_name_col_prefix_removed}" as village_name,
+            "{S.village_id_col}" as village_id
+        FROM "{S.preprocessed_table}"
+        WHERE "{S.village_name_col_prefix_removed}" IS NOT NULL
+        """
+        df = pd.read_sql_query(query, conn)
+        logger.info(f"Loaded {len(df):,} villages")
+
+        extractor = VillageFeatureExtractor(lexicon_path)
+        features_df = extractor.extract_batch(df, village_name_col='village_name')
+        logger.info(f"Extracted features for {len(features_df)} villages")
+
+        df = df.reset_index(drop=True)
+        features_df = features_df.reset_index(drop=True)
+        combined = pd.concat([df, features_df], axis=1)
+        combined['run_id'] = run_id
+
+        for col in ['kmeans_cluster_id', 'dbscan_cluster_id', 'gmm_cluster_id']:
+            if col not in combined.columns:
+                combined[col] = None
+
+        df_to_write = combined[combined['village_id'].notna()].copy()
+
+        cursor = conn.cursor()
+        columns_to_write = [
+            'village_id', 'run_id', REGION_LEVELS[0], REGION_LEVELS[1], REGION_LEVELS[2],
+            'village_committee', 'village_name', 'pinyin',
+            'name_length', 'suffix_1', 'suffix_2', 'suffix_3', 'prefix_1', 'prefix_2', 'prefix_3',
+            *extractor.lexicon.get_column_names(),
+            'has_valid_chars', 'kmeans_cluster_id', 'dbscan_cluster_id', 'gmm_cluster_id',
+        ]
+
+        for i in range(0, len(df_to_write), batch_size):
+            batch = df_to_write.iloc[i:i + batch_size]
+            values = [tuple(
+                row.get(col) for col in columns_to_write
+            ) for _, row in batch.iterrows()]
+            placeholders = '(' + ','.join(['?'] * len(columns_to_write)) + ')'
+            cursor.executemany(
+                f"INSERT OR REPLACE INTO village_features ({', '.join(columns_to_write)}) VALUES {placeholders}",
+                values,
+            )
+            if (i // batch_size + 1) % 10 == 0:
+                logger.info(f"  Batch {i // batch_size + 1}: {len(batch)} rows")
+
+        conn.commit()
+        cursor.execute("SELECT COUNT(*) FROM village_features")
+        count = cursor.fetchone()[0]
+        logger.info(f"village_features: {count:,} rows")
+
+        elapsed = time.time() - start_time
+        logger.info(f"Feature generation completed in {elapsed:.2f}s")
+
+        return {
+            'run_id': run_id,
+            'total_villages': len(df_to_write),
+            'features_count': len(columns_to_write),
+            'runtime_seconds': round(elapsed, 2),
+        }
+
+    except Exception:
+        logger.error("Error in feature generation", exc_info=True)
+        conn.rollback()
+        raise
+    finally:
+        conn.close()

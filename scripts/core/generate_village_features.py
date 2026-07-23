@@ -1,200 +1,44 @@
-"""
-Generate village_features table from preprocessed data.
+#!/usr/bin/env python
+"""Generate village_features table from preprocessed data.
 
-This script:
-1. Creates the village_features table
-2. Loads villages from the preprocessed table
-3. Extracts features for each village
-4. Writes features to the database
+Thin wrapper — delegates to src/pipelines/feature_materialization_pipeline.py.
 """
 
-import sqlite3
+import argparse
 import logging
 import sys
-import argparse
 from pathlib import Path
-import pandas as pd
 
-# Add project root to path
-project_root = Path(__file__).parent.parent.parent
-sys.path.insert(0, str(project_root))
+sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 
-from src.features.feature_extractor import VillageFeatureExtractor
-from src.data.db_writer import create_feature_materialization_tables
-from src.pipelines.feature_materialization_pipeline import write_village_features
-from src.schema import get_schema
-from src.schema import REGION_LEVELS
+from src.pipelines.feature_materialization_pipeline import run_feature_generation_pipeline
 
-# Configure logging
-logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
-)
-
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
-
-
-def load_villages_from_preprocessed(conn: sqlite3.Connection, schema_name: str = "guangdong") -> pd.DataFrame:
-    """
-    Load villages from preprocessed table.
-
-    Args:
-        conn: SQLite database connection
-
-    Returns:
-        DataFrame with village data
-    """
-    logger.info("Loading villages from preprocessed table")
-    schema = get_schema(schema_name)
-
-    query = f"""
-    SELECT
-        {schema.city_col} as city,
-        {schema.county_col} as county,
-        {schema.township_col} as town,
-        {schema.committee_col_preprocessed} as village_committee,
-        {schema.village_name_col_prefix_removed} as village_name,
-        {schema.village_id_col} as village_id
-    FROM {schema.preprocessed_table}
-    WHERE {schema.village_name_col_prefix_removed} IS NOT NULL
-    """
-
-    df = pd.read_sql_query(query, conn)
-
-    # Add pinyin column (empty for now, can be populated later if needed)
-    df['pinyin'] = ''
-
-    logger.info(f"Loaded {len(df)} villages")
-
-    return df
 
 
 def main():
     parser = argparse.ArgumentParser(description='Generate village_features table')
-    parser.add_argument('--run-id', type=str, required=True, help='Run ID for this execution')
-    parser.add_argument('--db-path', type=str, default='data/villages.db', help='Path to database')
-    parser.add_argument('--schema', default='guangdong', choices=['guangdong', 'national'], help='Village table schema')
-    parser.add_argument(
-        '--lexicon-path',
-        type=str,
-        default='data/semantic_lexicon_v1.json',
-        help='Path to semantic lexicon JSON',
-    )
-    parser.add_argument('--batch-size', type=int, default=10000, help='Rows to write per batch')
+    parser.add_argument('--run-id', type=str, required=True)
+    parser.add_argument('--db-path', type=str, default='data/villages.db')
+    parser.add_argument('--schema', default='guangdong', choices=['guangdong', 'national'])
+    parser.add_argument('--lexicon-path', type=str, default='data/semantic_lexicon_v1.json')
+    parser.add_argument('--batch-size', type=int, default=10000)
     args = parser.parse_args()
 
-    db_path = Path(args.db_path)
-    if not db_path.is_absolute():
-        db_path = project_root / db_path
-
-    lexicon_path = Path(args.lexicon_path)
-    if not lexicon_path.is_absolute():
-        lexicon_path = project_root / lexicon_path
-
-    logger.info("=" * 80)
-    logger.info("Generating village_features table")
-    logger.info("=" * 80)
-    logger.info(f"Database: {db_path}")
-    logger.info(f"Run ID: {args.run_id}")
-
-    # Connect to database
-    conn = sqlite3.connect(str(db_path))
-
     try:
-        # Step 1: Create tables
-        logger.info("Creating village_features table...")
-        create_feature_materialization_tables(conn, lexicon_path=str(lexicon_path))
-        logger.info("Table created successfully")
-
-        # Step 2: Load villages
-        df = load_villages_from_preprocessed(conn, schema_name=args.schema)
-
-        # Step 3: Extract features
-        logger.info("Extracting features...")
-        extractor = VillageFeatureExtractor(str(lexicon_path))
-        features_df = extractor.extract_batch(df, village_name_col='village_name')
-        logger.info(f"Extracted features for {len(features_df)} villages")
-
-        # Merge features with original data
-        logger.info("Merging features with original data...")
-        # Reset index to ensure proper merge
-        df_reset = df.reset_index(drop=True)
-        features_reset = features_df.reset_index(drop=True)
-
-        # Combine the dataframes
-        combined_df = pd.concat([df_reset, features_reset], axis=1)
-        logger.info(f"Combined dataframe has {len(combined_df)} rows and {len(combined_df.columns)} columns")
-
-        # Step 4: Write to database
-        logger.info("Writing features to database...")
-
-        # Add run_id column to dataframe
-        combined_df['run_id'] = args.run_id
-
-        # Prepare columns for insertion
-        columns_to_write = [
-            'village_id', 'run_id', 'city', 'county', 'town', 'village_committee', 'village_name', 'pinyin',
-            'name_length', 'suffix_1', 'suffix_2', 'suffix_3', 'prefix_1', 'prefix_2', 'prefix_3',
-            *extractor.lexicon.get_column_names(),
-            'has_valid_chars'
-        ]
-
-        # Add cluster columns if they exist (they won't for now)
-        for col in ['kmeans_cluster_id', 'dbscan_cluster_id', 'gmm_cluster_id']:
-            if col not in combined_df.columns:
-                combined_df[col] = None
-
-        # Filter to only include rows with village_id
-        df_to_write = combined_df[combined_df['village_id'].notna()].copy()
-        logger.info(f"Writing {len(df_to_write)} villages with valid village_id")
-
-        # Write in batches
-        cursor = conn.cursor()
-        batch_size = args.batch_size
-        total_batches = (len(df_to_write) + batch_size - 1) // batch_size
-
-        for i in range(0, len(df_to_write), batch_size):
-            batch = df_to_write.iloc[i:i+batch_size]
-            batch_num = i // batch_size + 1
-
-            # Prepare values for insertion
-            values = []
-            for _, row in batch.iterrows():
-                value_tuple = tuple(row[col] if col in row else None for col in columns_to_write + ['kmeans_cluster_id', 'dbscan_cluster_id', 'gmm_cluster_id'])
-                values.append(value_tuple)
-
-            # Insert batch
-            placeholders = ','.join(['?' * len(columns_to_write + ['kmeans_cluster_id', 'dbscan_cluster_id', 'gmm_cluster_id'])])
-            placeholders = '(' + ','.join(['?'] * len(columns_to_write + ['kmeans_cluster_id', 'dbscan_cluster_id', 'gmm_cluster_id'])) + ')'
-
-            cursor.executemany(f"""
-                INSERT OR REPLACE INTO village_features
-                ({', '.join(columns_to_write + ['kmeans_cluster_id', 'dbscan_cluster_id', 'gmm_cluster_id'])})
-                VALUES {placeholders}
-            """, values)
-
-            logger.info(f"Batch {batch_num}/{total_batches} written ({len(batch)} rows)")
-
-        conn.commit()
-        logger.info("Features written successfully")
-
-        # Step 5: Verify
-        cursor = conn.cursor()
-        cursor.execute("SELECT COUNT(*) FROM village_features")
-        count = cursor.fetchone()[0]
-        logger.info(f"Verification: village_features has {count} rows")
-
-        logger.info("=" * 80)
-        logger.info("village_features generation completed successfully!")
-        logger.info("=" * 80)
-
+        result = run_feature_generation_pipeline(
+            db_path=args.db_path,
+            run_id=args.run_id,
+            lexicon_path=args.lexicon_path,
+            schema_name=args.schema,
+            batch_size=args.batch_size,
+        )
+        logger.info(f"Done: {result['total_villages']} villages in {result['runtime_seconds']}s")
+        sys.exit(0)
     except Exception as e:
-        logger.error(f"Error: {e}", exc_info=True)
-        conn.rollback()
-        raise
-
-    finally:
-        conn.close()
+        logger.error(f"Feature generation failed: {e}", exc_info=True)
+        sys.exit(1)
 
 
 if __name__ == '__main__':
