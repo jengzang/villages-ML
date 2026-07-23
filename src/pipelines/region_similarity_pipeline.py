@@ -27,6 +27,7 @@ def run_region_similarity_pipeline(
     region_levels: list[str] | None = None,
     top_k_global: int = 100,
     z_score_threshold: float = 2.0,
+    summary_limit: int = 10,
 ) -> dict[str, Any]:
     """Compute pairwise region similarity from character frequency data.
 
@@ -125,22 +126,49 @@ def run_region_similarity_pipeline(
         conn.commit()
         total_pairs += len(records)
 
-        # Per-level summary statistics
-        level_pairs = [r for r in records]
-        if level_pairs:
-            avg_cos = sum(r['cosine_similarity'] for r in level_pairs) / len(level_pairs)
-            logger.info(f"  Avg cosine similarity: {avg_cos:.4f}")
+    # Step 8: Summary statistics
+    logger.info("=" * 60)
+    logger.info("Summary Statistics")
+    logger.info("=" * 60)
 
-    # Global summary across all levels
-    logger.info("---")
     cursor.execute("""
-        SELECT region_level, COUNT(*) as total_pairs,
-               AVG(cosine_similarity) as avg_cosine, AVG(jaccard_similarity) as avg_jaccard
+        SELECT
+            region_level,
+            COUNT(*) as total_pairs,
+            AVG(cosine_similarity) as avg_cosine,
+            MIN(cosine_similarity) as min_cosine,
+            MAX(cosine_similarity) as max_cosine,
+            AVG(jaccard_similarity) as avg_jaccard,
+            MIN(jaccard_similarity) as min_jaccard,
+            MAX(jaccard_similarity) as max_jaccard
         FROM region_similarity
-        GROUP BY region_level ORDER BY region_level
+        GROUP BY region_level
+        ORDER BY region_level
     """)
     for row in cursor.fetchall():
-        logger.info(f"  [{row[0]}] {row[1]} pairs, avg_cosine={row[2]:.4f}, avg_jaccard={row[3]:.4f}")
+        logger.info(f"[{row[0]}] {row[1]} pairs")
+        logger.info(f"  Cosine:  avg={row[2]:.4f}  min={row[3]:.4f}  max={row[4]:.4f}")
+        logger.info(f"  Jaccard: avg={row[5]:.4f}  min={row[6]:.4f}  max={row[7]:.4f}")
+
+    # Top-N most similar and most dissimilar pairs per level
+    for level in region_levels:
+        logger.info(f"--- Top {summary_limit} Most Similar ({level}) ---")
+        cursor.execute("""
+            SELECT region1, region2, cosine_similarity, jaccard_similarity
+            FROM region_similarity WHERE region_level = ?
+            ORDER BY cosine_similarity DESC LIMIT ?
+        """, (level, summary_limit))
+        for i, r in enumerate(cursor.fetchall(), 1):
+            logger.info(f"  {i}. {r[0]} <-> {r[1]}: cosine={r[2]:.4f}, jaccard={r[3]:.4f}")
+
+        logger.info(f"--- Top {summary_limit} Most Dissimilar ({level}) ---")
+        cursor.execute("""
+            SELECT region1, region2, cosine_similarity, jaccard_similarity
+            FROM region_similarity WHERE region_level = ?
+            ORDER BY cosine_similarity ASC LIMIT ?
+        """, (level, summary_limit))
+        for i, r in enumerate(cursor.fetchall(), 1):
+            logger.info(f"  {i}. {r[0]} <-> {r[1]}: cosine={r[2]:.4f}, jaccard={r[3]:.4f}")
 
     conn.close()
 

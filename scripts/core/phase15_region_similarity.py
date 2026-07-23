@@ -26,6 +26,7 @@ def main():
                         help="Comma-separated region levels to analyze")
     parser.add_argument("--top-k-global", type=int, default=100)
     parser.add_argument("--z-score-threshold", type=float, default=2.0)
+    parser.add_argument("--summary-limit", type=int, default=10)
 
     args = parser.parse_args()
     region_levels = [s.strip() for s in args.region_levels.split(",") if s.strip()]
@@ -36,6 +37,7 @@ def main():
             region_levels=region_levels,
             top_k_global=args.top_k_global,
             z_score_threshold=args.z_score_threshold,
+            summary_limit=args.summary_limit,
         )
         logger.info(f"Done: {result['total_pairs']} pairs in {result['runtime_seconds']}s")
         sys.exit(0)
