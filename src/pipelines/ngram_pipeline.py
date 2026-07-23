@@ -20,7 +20,7 @@ import time
 from collections import Counter
 from typing import Any
 
-from src.schema import REGION_LEVELS, DEFAULT_SCHEMA, VillageTableSchema
+from src.schema import REGION_LEVELS, DEFAULT_SCHEMA, VillageTableSchema, get_schema
 from src.ngram_analysis import NgramExtractor, NgramAnalyzer, StructuralPatternDetector
 from src.ngram_schema import create_ngram_tables
 
@@ -94,11 +94,11 @@ def run_ngram_pipeline(
 
         # Step 2: Global n-gram frequencies
         logger.info("Step 2: Extracting global n-grams...")
-        _extract_global_ngrams(conn, n_values, min_global_freq, batch_size)
+        _extract_global_ngrams(db_path, schema_name, n_values, min_global_freq, batch_size)
 
         # Step 3: Regional n-gram frequencies
         logger.info("Step 3: Extracting regional n-grams...")
-        _extract_regional_ngrams(conn, n_values, region_levels, positions,
+        _extract_regional_ngrams(db_path, schema_name, n_values, region_levels, positions,
                                  min_regional_freq, batch_size)
 
         # Step 3.5: Raw regional totals
@@ -107,12 +107,12 @@ def run_ngram_pipeline(
 
         # Step 4: Tendency
         logger.info("Step 4: Calculating tendency...")
-        _calculate_tendency(conn, n_values, region_levels, positions,
+        _calculate_tendency(conn, db_path, n_values, region_levels, positions,
                            min_tendency_support, batch_size)
 
         # Step 5: Significance
         logger.info("Step 5: Calculating significance...")
-        _calculate_significance(conn, region_levels, batch_size)
+        _calculate_significance(conn, db_path, region_levels, batch_size)
 
         # Step 6: Cleanup
         logger.info("Step 6: Cleaning up non-significant data...")
@@ -129,7 +129,7 @@ def run_ngram_pipeline(
         # Step 9: Village n-grams
         if not skip_village_ngrams:
             logger.info("Step 9: Populating village n-grams...")
-            _populate_village_ngrams(conn, n_values, batch_size)
+            _populate_village_ngrams(db_path, schema_name, n_values, batch_size)
 
         elapsed = time.time() - start_time
         logger.info(f"N-gram pipeline completed in {elapsed:.2f}s")
@@ -153,13 +153,13 @@ def run_ngram_pipeline(
 # ---------------------------------------------------------------------------
 
 
-def _extract_global_ngrams(conn, n_values, min_freq, batch_size):
-    extractor = NgramExtractor(conn)
-    for n in n_values:
-        logger.info(f"  Extracting {n}-grams...")
-        all_ngrams = extractor.extract_all_ngrams(n)
-        _insert_global_ngrams(conn, n, all_ngrams, min_freq, batch_size)
-    extractor.close()
+def _extract_global_ngrams(db_path, schema_name, n_values, min_freq, batch_size):
+    schema = get_schema(schema_name)
+    with NgramExtractor(db_path, schema) as extractor:
+        for n in n_values:
+            logger.info(f"  Extracting {n}-grams...")
+            all_ngrams = extractor.extract_all_ngrams(n)
+            _insert_global_ngrams(extractor.conn, n, all_ngrams, min_freq, batch_size)
 
 
 def _insert_global_ngrams(conn, n, all_ngrams, min_freq, batch_size):
@@ -180,15 +180,15 @@ def _insert_global_ngrams(conn, n, all_ngrams, min_freq, batch_size):
     logger.info(f"    Inserted {len(rows):,} rows")
 
 
-def _extract_regional_ngrams(conn, n_values, region_levels, positions, thresholds, batch_size):
-    extractor = NgramExtractor(conn)
-    pos_set = set(positions)
-    for level in region_levels:
-        for n in n_values:
-            logger.info(f"  Extracting {n}-grams for {level}...")
-            regional = extractor.extract_regional_ngrams(n, level)
-            _insert_regional_ngrams(conn, n, level, regional, pos_set, thresholds.get(n, 0), batch_size)
-    extractor.close()
+def _extract_regional_ngrams(db_path, schema_name, n_values, region_levels, positions, thresholds, batch_size):
+    schema = get_schema(schema_name)
+    with NgramExtractor(db_path, schema) as extractor:
+        pos_set = set(positions)
+        for level in region_levels:
+            for n in n_values:
+                logger.info(f"  Extracting {n}-grams for {level}...")
+                regional = extractor.extract_regional_ngrams(n, level)
+                _insert_regional_ngrams(extractor.conn, n, level, regional, pos_set, thresholds.get(n, 0), batch_size)
 
 
 def _insert_regional_ngrams(conn, n, level, regional, positions, min_freq, batch_size):
@@ -233,108 +233,106 @@ def _capture_regional_totals_raw(conn):
     logger.info("  Raw totals captured")
 
 
-def _calculate_tendency(conn, n_values, region_levels, positions, thresholds, batch_size):
+def _calculate_tendency(conn, db_path, n_values, region_levels, positions, thresholds, batch_size):
     cursor = conn.cursor()
-    analyzer = NgramAnalyzer(conn)
-    # Read global totals
-    global_totals = {}
-    for n in n_values:
-        for pos in _POSITIONS:
-            cursor.execute(
-                "SELECT SUM(frequency) FROM ngram_frequency WHERE n = ? AND position = ?", (n, pos)
-            )
-            row = cursor.fetchone()
-            global_totals[(n, pos)] = row[0] or 0
-
-    logger.info(f"  Global totals: {global_totals}")
-
-    # Query regional data joined with global
-    for level in region_levels:
+    with NgramAnalyzer(db_path) as analyzer:
+        # Read global totals
+        global_totals = {}
         for n in n_values:
-            if n not in thresholds:
-                continue
             for pos in _POSITIONS:
-                if pos not in positions:
+                cursor.execute(
+                    "SELECT SUM(frequency) FROM ngram_frequency WHERE n = ? AND position = ?", (n, pos)
+                )
+                row = cursor.fetchone()
+                global_totals[(n, pos)] = row[0] or 0
+
+        logger.info(f"  Global totals: {global_totals}")
+
+        # Query regional data joined with global
+        for level in region_levels:
+            for n in n_values:
+                if n not in thresholds:
                     continue
-                cursor.execute("""
-                    SELECT r.ngram, r.frequency as regional_count,
-                           r.region_name, r.city, r.county, r.township,
-                           COALESCE(rt.total_frequency, r.frequency) as regional_total,
-                           g.frequency as global_count
-                    FROM regional_ngram_frequency r
-                    JOIN ngram_frequency g ON g.n = r.n AND g.position = r.position AND g.ngram = r.ngram
-                    LEFT JOIN regional_totals_raw rt
-                        ON rt.region_level = r.region_level AND rt.n = r.n AND rt.position = r.position
-                        AND COALESCE(rt.city, '') = COALESCE(r.city, '')
-                        AND COALESCE(rt.county, '') = COALESCE(r.county, '')
-                        AND COALESCE(rt.township, '') = COALESCE(r.township, '')
-                    WHERE r.n = ? AND r.region_level = ? AND r.position = ?
-                """, (n, level, pos))
-
-                rows_to_insert = []
-                global_total = global_totals.get((n, pos), 0)
-                for row_data in cursor.fetchall():
-                    ngram, reg_count, reg_name, city_v, county_v, township_v, reg_total, glob_count = row_data
-                    if reg_count < thresholds[n]:
+                for pos in _POSITIONS:
+                    if pos not in positions:
                         continue
-                    tendency = analyzer.calculate_tendency(
-                        reg_count, reg_total, glob_count or 0, global_total
-                    )
-                    rows_to_insert.append((
-                        n, level, city_v, county_v, township_v, reg_name, pos,
-                        ngram, reg_count, reg_total, glob_count or 0, global_total,
-                        tendency['lift'], tendency['log_odds'], tendency['z_score'],
-                    ))
+                    cursor.execute("""
+                        SELECT r.ngram, r.frequency as regional_count,
+                               r.region_name, r.city, r.county, r.township,
+                               COALESCE(rt.total_frequency, r.frequency) as regional_total,
+                               g.frequency as global_count
+                        FROM regional_ngram_frequency r
+                        JOIN ngram_frequency g ON g.n = r.n AND g.position = r.position AND g.ngram = r.ngram
+                        LEFT JOIN regional_totals_raw rt
+                            ON rt.region_level = r.region_level AND rt.n = r.n AND rt.position = r.position
+                            AND COALESCE(rt.city, '') = COALESCE(r.city, '')
+                            AND COALESCE(rt.county, '') = COALESCE(r.county, '')
+                            AND COALESCE(rt.township, '') = COALESCE(r.township, '')
+                        WHERE r.n = ? AND r.region_level = ? AND r.position = ?
+                    """, (n, level, pos))
 
-                if rows_to_insert:
-                    for i in range(0, len(rows_to_insert), batch_size):
-                        batch = rows_to_insert[i:i + batch_size]
-                        cursor.executemany("""
-                            INSERT OR REPLACE INTO ngram_tendency
-                            (n, region_level, city, county, township, region_name, position,
-                             ngram, regional_count, regional_total, global_count, global_total,
-                             lift, log_odds, z_score)
-                            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-                        """, batch)
-                    conn.commit()
-                logger.info(f"    {level}/{n}-gram/{pos}: {len(rows_to_insert):,} rows")
-    analyzer.close()
+                    rows_to_insert = []
+                    global_total = global_totals.get((n, pos), 0)
+                    for row_data in cursor.fetchall():
+                        ngram, reg_count, reg_name, city_v, county_v, township_v, reg_total, glob_count = row_data
+                        if reg_count < thresholds[n]:
+                            continue
+                        tendency = analyzer.calculate_tendency(
+                            reg_count, reg_total, glob_count or 0, global_total
+                        )
+                        rows_to_insert.append((
+                            n, level, city_v, county_v, township_v, reg_name, pos,
+                            ngram, reg_count, reg_total, glob_count or 0, global_total,
+                            tendency['lift'], tendency['log_odds'], tendency['z_score'],
+                        ))
+
+                    if rows_to_insert:
+                        for i in range(0, len(rows_to_insert), batch_size):
+                            batch = rows_to_insert[i:i + batch_size]
+                            cursor.executemany("""
+                                INSERT OR REPLACE INTO ngram_tendency
+                                (n, region_level, city, county, township, region_name, position,
+                                 ngram, regional_count, regional_total, global_count, global_total,
+                                 lift, log_odds, z_score)
+                                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                            """, batch)
+                        conn.commit()
+                    logger.info(f"    {level}/{n}-gram/{pos}: {len(rows_to_insert):,} rows")
 
 
-def _calculate_significance(conn, region_levels, batch_size):
+def _calculate_significance(conn, db_path, region_levels, batch_size):
     cursor = conn.cursor()
-    analyzer = NgramAnalyzer(conn)
-    for level in region_levels:
-        cursor.execute("""
-            SELECT n, position, ngram, regional_count, regional_total,
-                   global_count, global_total, city, county, township, region_name
-            FROM ngram_tendency
-            WHERE region_level = ?
-        """, (level,))
-        rows_to_insert = []
-        for row_data in cursor.fetchall():
-            n_v, pos, ngram, reg_cnt, reg_tot, glob_cnt, glob_tot, *hier = row_data
-            sig = analyzer.calculate_significance(reg_cnt, reg_tot, glob_cnt, glob_tot)
-            if sig['p_value'] < 0.05:
-                city_v, county_v, township_v, reg_name = hier
-                rows_to_insert.append((
-                    n_v, level, city_v, county_v, township_v, reg_name, pos,
-                    ngram, reg_cnt, reg_tot, glob_cnt, glob_tot,
-                    sig['chi2'], sig['p_value'], sig['cramers_v'],
-                ))
-        if rows_to_insert:
-            for i in range(0, len(rows_to_insert), batch_size):
-                batch = rows_to_insert[i:i + batch_size]
-                cursor.executemany("""
-                    INSERT OR REPLACE INTO ngram_significance
-                    (n, region_level, city, county, township, region_name, position,
-                     ngram, regional_count, regional_total, global_count, global_total,
-                     chi2, p_value, cramers_v)
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-                """, batch)
-            conn.commit()
-        logger.info(f"    {level}: {len(rows_to_insert):,} significant (p<0.05)")
-    analyzer.close()
+    with NgramAnalyzer(db_path) as analyzer:
+        for level in region_levels:
+            cursor.execute("""
+                SELECT n, position, ngram, regional_count, regional_total,
+                       global_count, global_total, city, county, township, region_name
+                FROM ngram_tendency
+                WHERE region_level = ?
+            """, (level,))
+            rows_to_insert = []
+            for row_data in cursor.fetchall():
+                n_v, pos, ngram, reg_cnt, reg_tot, glob_cnt, glob_tot, *hier = row_data
+                sig = analyzer.calculate_significance(reg_cnt, reg_tot, glob_cnt, glob_tot)
+                if sig['p_value'] < 0.05:
+                    city_v, county_v, township_v, reg_name = hier
+                    rows_to_insert.append((
+                        n_v, level, city_v, county_v, township_v, reg_name, pos,
+                        ngram, reg_cnt, reg_tot, glob_cnt, glob_tot,
+                        sig['chi2'], sig['p_value'], sig['cramers_v'],
+                    ))
+            if rows_to_insert:
+                for i in range(0, len(rows_to_insert), batch_size):
+                    batch = rows_to_insert[i:i + batch_size]
+                    cursor.executemany("""
+                        INSERT OR REPLACE INTO ngram_significance
+                        (n, region_level, city, county, township, region_name, position,
+                         ngram, regional_count, regional_total, global_count, global_total,
+                         chi2, p_value, cramers_v)
+                        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    """, batch)
+                conn.commit()
+            logger.info(f"    {level}: {len(rows_to_insert):,} significant (p<0.05)")
 
 
 def _cleanup_insignificant(conn, n_values, thresholds):
@@ -467,38 +465,38 @@ def _create_indexes_and_centroids(conn, schema_name):
     logger.info("  Indexes and centroids created")
 
 
-def _populate_village_ngrams(conn, n_values, batch_size):
-    from src.schema import DEFAULT_SCHEMA as S
-    extractor = NgramExtractor(conn)
-    cursor = conn.cursor()
+def _populate_village_ngrams(db_path, schema_name, n_values, batch_size):
+    schema = get_schema(schema_name)
+    with NgramExtractor(db_path, schema) as extractor:
+        cursor = extractor.conn.cursor()
+        conn = extractor.conn
 
-    all_villages = extractor._cursor.execute(
-        f'SELECT "{S.committee_col_preprocessed}", "{S.village_name_col_prefix_removed}" FROM "{S.preprocessed_table}"'
-    ).fetchall()
+        all_villages = cursor.execute(
+            f'SELECT "{schema.committee_col_preprocessed}", "{schema.village_name_col_prefix_removed}" FROM "{schema.preprocessed_table}"'
+        ).fetchall()
 
-    rows = []
-    for committee, vname in all_villages:
-        if not vname:
-            continue
-        for n in n_values:
-            pos_ngrams = extractor.extract_positional_ngrams(vname, n)
-            for pos in _POSITIONS:
-                for ng in pos_ngrams.get(pos, []):
-                    rows.append((n, committee, vname, pos, ng))
-        if len(rows) >= batch_size:
+        rows = []
+        for committee, vname in all_villages:
+            if not vname:
+                continue
+            for n in n_values:
+                pos_ngrams = extractor.extract_positional_ngrams(vname, n)
+                for pos in _POSITIONS:
+                    for ng in pos_ngrams.get(pos, []):
+                        rows.append((n, committee, vname, pos, ng))
+            if len(rows) >= batch_size:
+                cursor.executemany(
+                    "INSERT OR REPLACE INTO village_ngrams (n, committee, village_name, position, ngram) VALUES (?, ?, ?, ?, ?)",
+                    rows,
+                )
+                conn.commit()
+                rows = []
+
+        if rows:
             cursor.executemany(
                 "INSERT OR REPLACE INTO village_ngrams (n, committee, village_name, position, ngram) VALUES (?, ?, ?, ?, ?)",
                 rows,
             )
             conn.commit()
-            rows = []
 
-    if rows:
-        cursor.executemany(
-            "INSERT OR REPLACE INTO village_ngrams (n, committee, village_name, position, ngram) VALUES (?, ?, ?, ?, ?)",
-            rows,
-        )
-        conn.commit()
-
-    extractor.close()
     logger.info(f"  Village n-grams populated")
