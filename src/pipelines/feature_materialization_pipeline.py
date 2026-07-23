@@ -9,7 +9,7 @@ import logging
 import time
 import json
 from pathlib import Path
-from typing import Dict, List, Optional
+from typing import Any, Dict, List, Optional
 import pandas as pd
 import numpy as np
 
