@@ -3,7 +3,7 @@
 
 Usage:
     python scripts/core/phase12_ngram_analysis.py --schema guangdong
-    python scripts/core/phase12_ngram_analysis.py --n-values 2,3,4 --regional-levels city,county
+    python scripts/core/phase12_ngram_analysis.py --n-values 2,3,4 --region-levels city,county
 """
 
 import argparse
@@ -45,7 +45,7 @@ def main():
                         help="Village table schema")
     parser.add_argument("--run-id", default=None, help="Run ID for metadata")
     parser.add_argument("--n-values", default="2,3", help="Comma-separated n values")
-    parser.add_argument("--regional-levels", default=",".join(REGION_LEVELS[:3]),
+    parser.add_argument("--region-levels", default=",".join(REGION_LEVELS[:3]),
                         help="Comma-separated regional levels")
     parser.add_argument("--positions", default="prefix,suffix,middle",
                         help="Comma-separated positions")
@@ -63,7 +63,7 @@ def main():
     args = parser.parse_args()
 
     n_values = tuple(_parse_int_csv(args.n_values))
-    region_levels = _parse_str_csv(args.regional_levels)
+    region_levels = _parse_str_csv(args.region_levels)
     positions = tuple(_parse_str_csv(args.positions))
     min_regional_freq = _parse_thresholds(args.min_regional_count_by_n) or {2: 3, 3: 2}
     min_tendency_support = _parse_thresholds(args.min_tendency_support_by_n) or {2: 5, 3: 3}

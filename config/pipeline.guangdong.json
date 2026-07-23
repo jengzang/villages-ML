@@ -126,7 +126,7 @@
         "region_levels": [3],
         "positions": ["all", "prefix", "suffix", "middle"],
         "min_regional_count_by_n": "2:3,3:2",
-        "min_global_count_by_n": "2:10,3:5"
+        "min_global_count": 10
       }
     },
     "13": {
