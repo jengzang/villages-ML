@@ -23,6 +23,7 @@ project_root = Path(__file__).parent.parent.parent
 sys.path.insert(0, str(project_root))
 
 from src.spatial.coordinate_loader import CoordinateLoader
+from src.schema import REGION_LEVELS
 
 
 @dataclass(frozen=True)
@@ -106,8 +107,8 @@ def cluster_hotspots(
         )
         radius_km = distances.max() * 111.0
 
-        city_mode = cluster_df["city"].mode()
-        county_mode = cluster_df["county"].mode()
+        city_mode = cluster_df[REGION_LEVELS[0]].mode()
+        county_mode = cluster_df[REGION_LEVELS[1]].mode()
 
         hotspots.append(
             {
@@ -118,8 +119,8 @@ def cluster_hotspots(
                 "sample_candidate_count": len(cluster_df),
                 "village_count": len(cluster_df),
                 "radius_km": radius_km,
-                "city": city_mode.iloc[0] if len(city_mode) else None,
-                "county": county_mode.iloc[0] if len(county_mode) else None,
+                REGION_LEVELS[0]: city_mode.iloc[0] if len(city_mode) else None,
+                REGION_LEVELS[1]: county_mode.iloc[0] if len(county_mode) else None,
             }
         )
 
@@ -191,9 +192,9 @@ def summarize_hotspots(config: HotspotScanConfig, density: np.ndarray, sample_in
     radii = [h["radius_km"] for h in hotspots]
     scores = [h["density_score"] for h in hotspots]
 
-    city_counts = Counter(h["city"] for h in hotspots if h["city"])
+    city_counts = Counter(h[REGION_LEVELS[0]] for h in hotspots if h[REGION_LEVELS[0]])
     county_counts = Counter(
-        f"{h['city']} > {h['county']}" for h in hotspots if h["city"] and h["county"]
+        f"{h[REGION_LEVELS[0]]} > {h[REGION_LEVELS[1]]}" for h in hotspots if h[REGION_LEVELS[0]] and h[REGION_LEVELS[1]]
     )
 
     return {
@@ -271,8 +272,8 @@ def format_result(result: dict) -> str:
             f"{hotspot['full_count_5km']:>8} | "
             f"{hotspot['radius_km']:>9.3f} | "
             f"{hotspot['density_score']:>7.4f} | "
-            f"{hotspot['city']} | "
-            f"{hotspot['county']} | "
+            f"{hotspot[REGION_LEVELS[0]]} | "
+            f"{hotspot[REGION_LEVELS[1]]} | "
             f"{hotspot['center_lon']:.6f} | "
             f"{hotspot['center_lat']:.6f}"
         )

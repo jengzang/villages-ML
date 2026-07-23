@@ -51,6 +51,7 @@ project_root = Path(__file__).parent.parent.parent
 sys.path.insert(0, str(project_root))
 
 from src.data.db_writer import (
+from src.schema import REGION_LEVELS
     create_spatial_tendency_table,
     create_spatial_tendency_indexes,
     write_spatial_tendency_integration
@@ -66,7 +67,7 @@ logger = logging.getLogger(__name__)
 def load_tendency_results(
     conn: sqlite3.Connection,
     tendency_run_id: str,
-    region_level: str = 'county'
+    region_level: str = REGION_LEVELS[1]
 ) -> pd.DataFrame:
     """
     Load tendency analysis results from database.
@@ -74,7 +75,7 @@ def load_tendency_results(
     Args:
         conn: Database connection
         tendency_run_id: Run ID for tendency analysis
-        region_level: Region level ('city', 'county', 'township')
+        region_level: Region level tuple(REGION_LEVELS[:3])
 
     Returns:
         DataFrame with tendency results including significance
@@ -177,7 +178,7 @@ def load_villages_with_chars(
             区县级 as county,
             乡镇级 as town
         FROM 广东省自然村_预处理
-        WHERE 字符数量 > 0
+        WHERE char_count > 0
     """
 
     df = pd.read_sql_query(query, conn)
@@ -392,7 +393,7 @@ def main():
         '--region-level',
         type=str,
         default='county',
-        choices=['city', 'county', 'township'],
+        choices=REGION_LEVELS[:3],
         help='Region level for tendency analysis (default: county)'
     )
     parser.add_argument(

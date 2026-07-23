@@ -6,6 +6,7 @@ Calculates semantic intensity indices for regions based on village name composit
 
 import pandas as pd
 import numpy as np
+from src.schema import REGION_LEVELS
 from typing import Set
 from .lexicon_loader import SemanticLexicon
 
@@ -57,28 +58,28 @@ class SemanticIndexCalculator:
 
             scores = {'village_name': village_name}
 
-            if 'city' in row:
-                scores['city'] = row['city']
+            if REGION_LEVELS[0] in row:
+                scores[REGION_LEVELS[0]] = row[REGION_LEVELS[0]]
             elif '市级' in row:
-                scores['city'] = row['市级']
+                scores[REGION_LEVELS[0]] = row['市级']
 
-            if 'county' in row:
-                scores['county'] = row['county']
+            if REGION_LEVELS[1] in row:
+                scores[REGION_LEVELS[1]] = row[REGION_LEVELS[1]]
             elif '区县级' in row:
-                scores['county'] = row['区县级']
+                scores[REGION_LEVELS[1]] = row['区县级']
 
-            if 'township' in row:
-                scores['township'] = row['township']
+            if REGION_LEVELS[2] in row:
+                scores[REGION_LEVELS[2]] = row[REGION_LEVELS[2]]
             elif '乡镇级' in row:
-                scores['township'] = row['乡镇级']
+                scores[REGION_LEVELS[2]] = row['乡镇级']
 
             # Determine region_name
-            if 'city' in scores:
-                scores['region_name'] = scores['city']
-            elif 'county' in scores:
-                scores['region_name'] = scores['county']
-            elif 'township' in scores:
-                scores['region_name'] = scores['township']
+            if REGION_LEVELS[0] in scores:
+                scores['region_name'] = scores[REGION_LEVELS[0]]
+            elif REGION_LEVELS[1] in scores:
+                scores['region_name'] = scores[REGION_LEVELS[1]]
+            elif REGION_LEVELS[2] in scores:
+                scores['region_name'] = scores[REGION_LEVELS[2]]
             elif '市级' in row:
                 scores['region_name'] = row['市级']
             elif '区县级' in row:
@@ -139,12 +140,12 @@ class SemanticIndexCalculator:
         group_cols = [level_column]
         hierarchy_cols = []
 
-        if 'city' in village_scores.columns:
-            hierarchy_cols.append('city')
-        if 'county' in village_scores.columns:
-            hierarchy_cols.append('county')
-        if 'township' in village_scores.columns:
-            hierarchy_cols.append('township')
+        if REGION_LEVELS[0] in village_scores.columns:
+            hierarchy_cols.append(REGION_LEVELS[0])
+        if REGION_LEVELS[1] in village_scores.columns:
+            hierarchy_cols.append(REGION_LEVELS[1])
+        if REGION_LEVELS[2] in village_scores.columns:
+            hierarchy_cols.append(REGION_LEVELS[2])
 
         # If we have hierarchy columns, group by them instead of just region_name
         if hierarchy_cols:

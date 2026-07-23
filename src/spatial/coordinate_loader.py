@@ -9,7 +9,7 @@ import numpy as np
 from typing import Optional
 import logging
 
-from src.schema import VillageTableSchema, DEFAULT_SCHEMA
+from src.schema import REGION_LEVELS, VillageTableSchema, DEFAULT_SCHEMA
 
 logger = logging.getLogger(__name__)
 
@@ -80,7 +80,7 @@ class CoordinateLoader:
         logger.info(f"Loaded {len(df)} total villages")
 
         # Keep only needed columns (including village_id for uniqueness)
-        df = df[['village_id', 'village_name', 'city', 'county', 'town', 'longitude', 'latitude']]
+        df = df[['village_id', 'village_name', REGION_LEVELS[0], REGION_LEVELS[1], REGION_LEVELS[2], 'longitude', 'latitude']]
 
         # Convert coordinates to numeric
         df['longitude'] = pd.to_numeric(df['longitude'], errors='coerce')

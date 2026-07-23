@@ -11,7 +11,7 @@ import numpy as np
 from typing import Dict, List, Optional, Tuple
 import json
 
-from src.schema import VillageTableSchema, DEFAULT_SCHEMA
+from src.schema import REGION_LEVELS, VillageTableSchema, DEFAULT_SCHEMA
 from ..data.db_query import (
     get_semantic_vtf_regional,
     get_pattern_frequency_regional,
@@ -54,7 +54,7 @@ class RegionFeatureBuilder:
 
         Args:
             run_id: Semantic analysis run ID
-            region_level: 'city', 'county', or 'town'
+            region_level: REGION_LEVELS[0], REGION_LEVELS[1], or REGION_LEVELS[2]
 
         Returns:
             DataFrame with columns: region_name, sem_*_intensity, sem_*_coverage, sem_*_lift
@@ -122,7 +122,7 @@ class RegionFeatureBuilder:
 
         Args:
             run_id: Morphology analysis run ID
-            region_level: 'city', 'county', or 'town'
+            region_level: REGION_LEVELS[0], REGION_LEVELS[1], or REGION_LEVELS[2]
             top_n_suffix2: Number of top bigram suffixes to use
             top_n_suffix3: Number of top trigram suffixes to use
 
@@ -249,7 +249,7 @@ class RegionFeatureBuilder:
         Args:
             semantic_run_id: Semantic analysis run ID
             morphology_run_id: Morphology analysis run ID
-            region_level: 'city', 'county', or 'town'
+            region_level: REGION_LEVELS[0], REGION_LEVELS[1], or REGION_LEVELS[2]
             use_semantic: Include semantic features
             use_morphology: Include morphology features
             use_diversity: Include diversity features

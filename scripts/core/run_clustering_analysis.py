@@ -26,6 +26,7 @@ project_root = Path(__file__).parent.parent.parent
 sys.path.insert(0, str(project_root))
 
 from src.pipelines.clustering_pipeline import run_clustering_pipeline
+from src.schema import REGION_LEVELS
 
 # Configure logging
 logging.basicConfig(
@@ -74,8 +75,8 @@ def main():
     )
     parser.add_argument(
         '--region-level',
-        default='county',
-        choices=['city', 'county', 'town'],
+        default='county',  # index 2 in REGION_LEVELS,
+        choices=[REGION_LEVELS[0], REGION_LEVELS[1], REGION_LEVELS[2]],
         help='Region level for clustering (default: county)'
     )
     parser.add_argument(

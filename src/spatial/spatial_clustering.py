@@ -9,6 +9,7 @@ import pandas as pd
 from sklearn.cluster import DBSCAN
 from typing import Dict, List
 import logging
+from src.schema import REGION_LEVELS
 
 logger = logging.getLogger(__name__)
 
@@ -130,10 +131,10 @@ class SpatialClusterer:
             cluster_size = mask.sum()
 
             # Get dominant region
-            city_mode = cluster_df['city'].mode()
+            city_mode = cluster_df[REGION_LEVELS[0]].mode()
             dominant_city = city_mode.iloc[0] if len(city_mode) > 0 else None
 
-            county_mode = cluster_df['county'].mode()
+            county_mode = cluster_df[REGION_LEVELS[1]].mode()
             dominant_county = county_mode.iloc[0] if len(county_mode) > 0 else None
 
             # Calculate average density (avg distance to centroid)

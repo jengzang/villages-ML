@@ -49,9 +49,9 @@ def _parse_str_csv(value: str) -> list[str]:
 
 
 LEVEL_NAME_MAP = {
-    'city': '市级',
-    'county': '区县级',
-    'township': '乡镇级',
+    REGION_LEVELS[0]: '市级',
+    REGION_LEVELS[1]: '区县级',
+    REGION_LEVELS[2]: '乡镇级',
 }
 
 
@@ -148,7 +148,7 @@ def step3_extract_regional_ngrams(
     Each row contains full hierarchical path to handle duplicate place names.
     """
     n_values = n_values or [2, 3]
-    regional_levels = regional_levels or ['township']
+    regional_levels = regional_levels or [REGION_LEVELS[2]]
     positions = positions or ['all', 'prefix', 'suffix', 'middle']
 
     print("\n" + "="*60)
@@ -169,7 +169,7 @@ def step3_extract_regional_ngrams(
 
                 for hierarchical_key, position_data in ngram_data.items():
                     city, county, township = hierarchical_key
-                    region_name = {'city': city, 'county': county, 'township': township}[level_en]
+                    region_name = {REGION_LEVELS[0]: city, REGION_LEVELS[1]: county, REGION_LEVELS[2]: township}[level_en]
 
                     for position, counter in _filter_positions(position_data, positions).items():
                         total = sum(counter.values())
@@ -177,7 +177,7 @@ def step3_extract_regional_ngrams(
                             percentage = (freq / total * 100) if total > 0 else 0
                             cursor.execute("""
                                 INSERT OR REPLACE INTO regional_ngram_frequency
-                                (level, city, county, township, region, ngram, n, position, frequency, total_count, percentage)
+                                (region_level, city, county, township, region_name, ngram, n, position, frequency, total_count, percentage)
                                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                             """, (level_en, city, county, township, region_name, ngram, n, position, freq, total, percentage))
 
@@ -200,14 +200,14 @@ def step3_5_calculate_regional_totals_raw(db_path: str):
     # Create temporary table to store raw totals
     cursor.execute("""
         CREATE TABLE IF NOT EXISTS temp_regional_totals_raw (
-            level TEXT NOT NULL,
+            region_level TEXT NOT NULL,
             city TEXT,
             county TEXT,
             township TEXT,
             n INTEGER NOT NULL,
             position TEXT NOT NULL,
             total_raw INTEGER NOT NULL,
-            PRIMARY KEY (level, city, county, township, n, position)
+            PRIMARY KEY (region_level, city, county, township, n, position)
         )
     """)
 
@@ -217,9 +217,9 @@ def step3_5_calculate_regional_totals_raw(db_path: str):
     # Calculate raw totals for each region-position combination
     cursor.execute("""
         INSERT INTO temp_regional_totals_raw
-        SELECT level, city, county, township, n, position, COUNT(*) as total_raw
+        SELECT region_level, city, county, township, n, position, COUNT(*) as total_raw
         FROM regional_ngram_frequency
-        GROUP BY level, city, county, township, n, position
+        GROUP BY region_level, city, county, township, n, position
     """)
 
     rows_inserted = cursor.rowcount
@@ -237,7 +237,7 @@ def step4_calculate_tendency(
 ):
     """Step 4: Calculate tendency scores with hierarchical grouping.
     """
-    regional_levels = regional_levels or ['township']
+    regional_levels = regional_levels or [REGION_LEVELS[2]]
 
     print("\n" + "="*60)
     print("Step 4: Calculating Tendency Scores")
@@ -255,7 +255,7 @@ def step4_calculate_tendency(
 
         cursor.execute("""
             SELECT
-                r.level, r.city, r.county, r.township, r.region, r.ngram, r.n, r.position,
+                r.region_level, r.city, r.county, r.township, r.region_name, r.ngram, r.n, r.position,
                 r.frequency as regional_count,
                 r.total_count as regional_total,
                 COALESCE(t.total_raw, r.total_count) as regional_total_raw,
@@ -263,7 +263,7 @@ def step4_calculate_tendency(
                 g.total_count as global_total
             FROM regional_ngram_frequency r
             LEFT JOIN temp_regional_totals_raw t
-                ON r.level = t.level
+                ON r.region_level = t.region_level
                 AND r.city IS t.city
                 AND r.county IS t.county
                 AND r.township IS t.township
@@ -273,7 +273,7 @@ def step4_calculate_tendency(
                 ON r.ngram = g.ngram
                 AND r.n = g.n
                 AND r.position = g.position
-            WHERE r.level = ?
+            WHERE r.region_level = ?
         """, (level_en,))
 
         rows = cursor.fetchall()
@@ -283,7 +283,7 @@ def step4_calculate_tendency(
         batch_size = 1000
         batch_data = []
 
-        for idx, (level_db, city, county, township, region, ngram, n, position,
+        for idx, (level_db, city, county, township, region_name, ngram, n, position,
                   regional_count, regional_total, regional_total_raw,
                   global_count, global_total) in enumerate(rows, 1):
 
@@ -299,7 +299,7 @@ def step4_calculate_tendency(
             )
 
             batch_data.append((
-                level_en, city, county, township, region, ngram, n, position,
+                level_en, city, county, township, region_name, ngram, n, position,
                 tendency['lift'], tendency['log_odds'], tendency['z_score'],
                 regional_count, regional_total, regional_total_raw, global_count, global_total
             ))
@@ -307,7 +307,7 @@ def step4_calculate_tendency(
             if len(batch_data) >= batch_size:
                 cursor.executemany("""
                     INSERT OR REPLACE INTO ngram_tendency
-                    (level, city, county, township, region, ngram, n, position, lift, log_odds, z_score,
+                    (region_level, city, county, township, region_name, ngram, n, position, lift, log_odds, z_score,
                      regional_count, regional_total, regional_total_raw, global_count, global_total)
                     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """, batch_data)
@@ -317,7 +317,7 @@ def step4_calculate_tendency(
         if batch_data:
             cursor.executemany("""
                 INSERT OR REPLACE INTO ngram_tendency
-                (level, city, county, township, region, ngram, n, position, lift, log_odds, z_score,
+                (region_level, city, county, township, region_name, ngram, n, position, lift, log_odds, z_score,
                  regional_count, regional_total, regional_total_raw, global_count, global_total)
                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """, batch_data)
@@ -362,10 +362,10 @@ def step5_calculate_significance(
 
         # Get all tendency records with hierarchical columns
         cursor.execute("""
-            SELECT level, city, county, township, region, ngram, n, position,
+            SELECT region_level, city, county, township, region_name, ngram, n, position,
                    regional_count, regional_total, global_count, global_total
             FROM ngram_tendency
-            WHERE level = ?
+            WHERE region_level = ?
         """, (level_en,))
 
         rows = cursor.fetchall()
@@ -376,7 +376,7 @@ def step5_calculate_significance(
             if idx % 1000 == 0:
                 print(f"  Progress: {idx}/{total_rows} ({significant_count} significant)")
 
-            level_db, city, county, township, region, ngram, n, position, regional_count, regional_total, global_count, global_total = row
+            level_db, city, county, township, region_name, ngram, n, position, regional_count, regional_total, global_count, global_total = row
 
             # Calculate significance
             sig = analyzer.calculate_significance(
@@ -392,7 +392,7 @@ def step5_calculate_significance(
                 cursor.execute("""
                     SELECT total_raw
                     FROM temp_regional_totals_raw
-                    WHERE level = ? AND city IS ? AND county IS ? AND township IS ?
+                    WHERE region_level = ? AND city IS ? AND county IS ? AND township IS ?
                       AND n = ? AND position = ?
                 """, (level_db, city, county, township, n, position))
 
@@ -401,10 +401,10 @@ def step5_calculate_significance(
 
                 cursor.execute("""
                     INSERT OR REPLACE INTO ngram_significance
-                    (level, city, county, township, region, ngram, n, position, chi2, p_value, cramers_v, is_significant, total_before_filter)
+                    (region_level, city, county, township, region_name, ngram, n, position, chi2, p_value, cramers_v, is_significant, total_before_filter)
                     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """, (
-                    level_db, city, county, township, region, ngram, n, position,
+                    level_db, city, county, township, region_name, ngram, n, position,
                     sig['chi2'], sig['p_value'], sig['cramers_v'], 1, total_before_filter
                 ))
                 significant_count += 1
@@ -492,7 +492,7 @@ def step6_cleanup_insignificant_data(
             DELETE FROM ngram_significance
             WHERE NOT EXISTS (
                 SELECT 1 FROM ngram_tendency nt
-                WHERE nt.level = ngram_significance.level
+                WHERE nt.region_level = ngram_significance.region_level
                 AND nt.city IS ngram_significance.city
                 AND nt.county IS ngram_significance.county
                 AND nt.township IS ngram_significance.township
@@ -512,13 +512,13 @@ def step6_cleanup_insignificant_data(
     tendency_deleted = 0
 
     # City level: only match city
-    cursor.execute("""
+    cursor.execute(f"""
         DELETE FROM ngram_tendency
-        WHERE level = 'city'
+        WHERE region_level = {REGION_LEVELS[0]}
         AND NOT EXISTS (
             SELECT 1 FROM ngram_significance
             WHERE ngram_significance.ngram = ngram_tendency.ngram
-            AND ngram_significance.level = ngram_tendency.level
+            AND ngram_significance.region_level = ngram_tendency.region_level
             AND ngram_significance.city = ngram_tendency.city
             AND ngram_significance.n = ngram_tendency.n
             AND ngram_significance.position = ngram_tendency.position
@@ -529,11 +529,11 @@ def step6_cleanup_insignificant_data(
     # County level: match city and county
     cursor.execute("""
         DELETE FROM ngram_tendency
-        WHERE level = 'county'
+        WHERE region_level = 'county'
         AND NOT EXISTS (
             SELECT 1 FROM ngram_significance
             WHERE ngram_significance.ngram = ngram_tendency.ngram
-            AND ngram_significance.level = ngram_tendency.level
+            AND ngram_significance.region_level = ngram_tendency.region_level
             AND ngram_significance.city = ngram_tendency.city
             AND ngram_significance.county = ngram_tendency.county
             AND ngram_significance.n = ngram_tendency.n
@@ -543,13 +543,13 @@ def step6_cleanup_insignificant_data(
     tendency_deleted += cursor.rowcount
 
     # Township level: match city, county and township
-    cursor.execute("""
+    cursor.execute(f"""
         DELETE FROM ngram_tendency
-        WHERE level = 'township'
+        WHERE region_level = {REGION_LEVELS[2]}
         AND NOT EXISTS (
             SELECT 1 FROM ngram_significance
             WHERE ngram_significance.ngram = ngram_tendency.ngram
-            AND ngram_significance.level = ngram_tendency.level
+            AND ngram_significance.region_level = ngram_tendency.region_level
             AND ngram_significance.city = ngram_tendency.city
             AND ngram_significance.county = ngram_tendency.county
             AND ngram_significance.township = ngram_tendency.township
@@ -570,11 +570,11 @@ def step6_cleanup_insignificant_data(
     # City level: only match city
     cursor.execute("""
         DELETE FROM regional_ngram_frequency
-        WHERE level = 'city'
+        WHERE region_level = 'city'
         AND NOT EXISTS (
             SELECT 1 FROM ngram_significance
             WHERE ngram_significance.ngram = regional_ngram_frequency.ngram
-            AND ngram_significance.level = regional_ngram_frequency.level
+            AND ngram_significance.region_level = regional_ngram_frequency.region_level
             AND ngram_significance.city = regional_ngram_frequency.city
             AND ngram_significance.n = regional_ngram_frequency.n
             AND ngram_significance.position = regional_ngram_frequency.position
@@ -583,13 +583,13 @@ def step6_cleanup_insignificant_data(
     frequency_deleted += cursor.rowcount
 
     # County level: match city and county
-    cursor.execute("""
+    cursor.execute(f"""
         DELETE FROM regional_ngram_frequency
-        WHERE level = 'county'
+        WHERE region_level = {REGION_LEVELS[1]}
         AND NOT EXISTS (
             SELECT 1 FROM ngram_significance
             WHERE ngram_significance.ngram = regional_ngram_frequency.ngram
-            AND ngram_significance.level = regional_ngram_frequency.level
+            AND ngram_significance.region_level = regional_ngram_frequency.region_level
             AND ngram_significance.city = regional_ngram_frequency.city
             AND ngram_significance.county = regional_ngram_frequency.county
             AND ngram_significance.n = regional_ngram_frequency.n
@@ -601,11 +601,11 @@ def step6_cleanup_insignificant_data(
     # Township level: match city, county and township
     cursor.execute("""
         DELETE FROM regional_ngram_frequency
-        WHERE level = 'township'
+        WHERE region_level = 'township'
         AND NOT EXISTS (
             SELECT 1 FROM ngram_significance
             WHERE ngram_significance.ngram = regional_ngram_frequency.ngram
-            AND ngram_significance.level = regional_ngram_frequency.level
+            AND ngram_significance.region_level = regional_ngram_frequency.region_level
             AND ngram_significance.city = regional_ngram_frequency.city
             AND ngram_significance.county = regional_ngram_frequency.county
             AND ngram_significance.township = regional_ngram_frequency.township
@@ -698,7 +698,7 @@ def step7_detect_patterns(
 
 
 def step8_create_optimization_indexes(db_path: str, schema: VillageTableSchema | None = None):
-    """Step 8: Create optimization indexes and regional centroids table."""
+    """Step 8: Create optimization indexes and regional centroids table.f"""
     print("\n" + "="*60)
     print("Step 8: Creating Optimization Indexes")
     print("="*60)
@@ -726,7 +726,7 @@ def step8_create_optimization_indexes(db_path: str, schema: VillageTableSchema |
     print("\n[2/3] Creating regional centroids table...")
 
     required_centroid_cols = {
-        'region_level', 'city', 'county', 'township', 'region_name',
+        'region_level', REGION_LEVELS[0], REGION_LEVELS[1], REGION_LEVELS[2], 'region_name',
         'centroid_lon', 'centroid_lat', 'village_count'
     }
     cursor.execute('PRAGMA table_info(regional_centroids)')
@@ -738,7 +738,7 @@ def step8_create_optimization_indexes(db_path: str, schema: VillageTableSchema |
     # Create table
     cursor.execute('''
     CREATE TABLE IF NOT EXISTS regional_centroids (
-        region_level TEXT NOT NULL,
+        region_region_level TEXT NOT NULL,
         city TEXT,
         county TEXT,
         township TEXT,
@@ -763,7 +763,7 @@ def step8_create_optimization_indexes(db_path: str, schema: VillageTableSchema |
     cursor.execute(f'''
     INSERT OR REPLACE INTO regional_centroids (region_level, city, county, township, region_name, centroid_lon, centroid_lat, village_count)
     SELECT
-        'township' as region_level,
+        {REGION_LEVELS[2]} as region_level,
         {S.city_col} as city,
         {S.county_col} as county,
         {S.township_col} as township,
@@ -778,7 +778,7 @@ def step8_create_optimization_indexes(db_path: str, schema: VillageTableSchema |
     UNION ALL
 
     SELECT
-        'county' as region_level,
+        {REGION_LEVELS[1]} as region_level,
         {S.city_col} as city,
         {S.county_col} as county,
         NULL as township,
@@ -793,7 +793,7 @@ def step8_create_optimization_indexes(db_path: str, schema: VillageTableSchema |
     UNION ALL
 
     SELECT
-        'city' as region_level,
+        {REGION_LEVELS[0]} as region_level,
         {S.city_col} as city,
         NULL as county,
         NULL as township,
@@ -815,17 +815,17 @@ def step8_create_optimization_indexes(db_path: str, schema: VillageTableSchema |
         print(f"    - {level}: {count}")
 
     # Part 3: Create query-shaped n-gram indexes.
-    # PRIMARY KEY already covers: (level, city, county, township, ngram, n, position).
+    # PRIMARY KEY already covers: (region_level, city, county, township, ngram, n, position).
     # Keep this set intentionally small for space-constrained deployments.
     print("\n[3/3] Creating query-shaped n-gram indexes...")
     ngram_indexes = [
         ('idx_ngram_freq_n_position_frequency', 'ngram_frequency', 'n, position, frequency DESC'),
-        ('idx_regional_ngram_level_n_region_freq', 'regional_ngram_frequency', 'level, n, region, frequency DESC'),
-        ('idx_regional_ngram_level', 'regional_ngram_frequency', 'level'),
-        ('idx_regional_ngram_region', 'regional_ngram_frequency', 'region'),
-        ('idx_ngram_tendency_level_lift', 'ngram_tendency', 'level, lift DESC'),
-        ('idx_ngram_tendency_level_region_lift', 'ngram_tendency', 'level, region, lift DESC'),
-        ('idx_ngram_sig_level', 'ngram_significance', 'level'),
+        ('idx_regional_ngram_level_n_region_freq', 'regional_ngram_frequency', 'region_level, n, region_name, frequency DESC'),
+        ('idx_regional_ngram_level', 'regional_ngram_frequency', 'region_level'),
+        ('idx_regional_ngram_region', 'regional_ngram_frequency', 'region_name'),
+        ('idx_ngram_tendency_level_lift', 'ngram_tendency', 'region_level, lift DESC'),
+        ('idx_ngram_tendency_level_region_lift', 'ngram_tendency', 'region_level, region_name, lift DESC'),
+        ('idx_ngram_sig_level', 'ngram_significance', 'region_level'),
     ]
 
     for idx_name, table, columns in ngram_indexes:
@@ -914,7 +914,7 @@ def step9_populate_village_ngrams(db_path: str, schema: VillageTableSchema | Non
         if len(batch) >= 1000:
             insert_cursor.executemany("""
                 INSERT OR REPLACE INTO village_ngrams
-                (village_id, 村委会, 自然村, n, bigrams, trigrams, prefix_bigram, suffix_bigram, prefix_trigram, suffix_trigram)
+                (village_id, committee, village_name, n, bigrams, trigrams, prefix_bigram, suffix_bigram, prefix_trigram, suffix_trigram)
                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """, batch)
             conn.commit()
@@ -925,7 +925,7 @@ def step9_populate_village_ngrams(db_path: str, schema: VillageTableSchema | Non
     if batch:
         insert_cursor.executemany("""
             INSERT OR REPLACE INTO village_ngrams
-            (village_id, 村委会, 自然村, n, bigrams, trigrams, prefix_bigram, suffix_bigram, prefix_trigram, suffix_trigram)
+            (village_id, committee, village_name, n, bigrams, trigrams, prefix_bigram, suffix_bigram, prefix_trigram, suffix_trigram)
             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """, batch)
         conn.commit()
@@ -943,7 +943,7 @@ def main(argv=None):
     parser.add_argument("--schema", default="guangdong", choices=["guangdong", "national"], help="Village table schema")
     parser.add_argument("--run-id", default=None, help="Run ID for active_run_ids metadata")
     parser.add_argument("--n-values", default="2,3", help="Comma-separated n values for regional analysis")
-    parser.add_argument("--regional-levels", default="township", help="Comma-separated regional levels")
+    parser.add_argument("--regional-levels", default=REGION_LEVELS[2], help="Comma-separated regional levels")
     parser.add_argument("--positions", default="all,prefix,suffix,middle", help="Comma-separated positions")
     parser.add_argument("--min-regional-count-by-n", default="", help="Per-n thresholds, e.g. 2:3,3:2")
     parser.add_argument("--min-global-count-by-n", default="", help="Per-n thresholds, e.g. 2:10,3:5")

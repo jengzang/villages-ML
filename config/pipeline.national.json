@@ -18,6 +18,7 @@
       "village_cluster_assignments"
     ]
   },
+  "region_levels": ["city", "county"],
   "phases": {
     "0": {
       "args": {
@@ -51,7 +52,7 @@
         "schema": "national",
         "output_dir": "results_national",
         "log_level": "INFO",
-        "region_levels": ["city", "county"],
+        "region_levels": [1, 2],
         "chunk_size": 50000,
         "persist_batch_size": 50000,
         "min_global_support": 100,
@@ -64,7 +65,7 @@
         "db_path": "data/villages_national.db",
         "schema": "national",
         "lexicon_path": "data/semantic_lexicon_national_v1.json",
-        "region_levels": ["city", "county"]
+        "region_levels": [1, 2]
       }
     },
     "4": {
@@ -91,7 +92,7 @@
     "6": {
       "args": {
         "db_path": "data/villages_national.db",
-        "region_level": "county",
+        "region_level": 2,
         "k_range": [8, 12, 16, 20],
         "top_n_suffix2": 50,
         "top_n_suffix3": 30,
@@ -127,7 +128,7 @@
         "db_path": "data/villages_national.db",
         "schema": "national",
         "n_values": [2],
-        "regional_levels": ["city", "county"],
+        "region_levels": [1, 2],
         "positions": ["all", "suffix"],
         "min_regional_count_by_n": "2:20",
         "min_global_count_by_n": "2:200",
@@ -158,14 +159,14 @@
         "detailed_lexicon_path": "data/semantic_lexicon_national_v4.json",
         "conflict_threshold": 20,
         "structure_progress_interval": 50000,
-        "region_levels": ["city", "county"],
+        "region_levels": [1, 2],
         "skip_village_structures": true
       }
     },
     "15": {
       "args": {
         "db_path": "data/villages_national.db",
-        "region_levels": ["city", "county"],
+        "region_levels": [1, 2],
         "top_k_global": 150,
         "z_score_threshold": 2.5,
         "summary_limit": 10
@@ -190,7 +191,7 @@
         "output_dir": "results_national/morphology",
         "suffix_lengths": "2",
         "prefix_lengths": "",
-        "region_levels": ["city", "county"],
+        "region_levels": [1, 2],
         "chunk_size": 50000,
         "persist_batch_size": 50000,
         "min_global_support": 100,

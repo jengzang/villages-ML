@@ -3,6 +3,7 @@
 import logging
 import pandas as pd
 import numpy as np
+from src.schema import REGION_LEVELS
 from pathlib import Path
 from typing import Dict, List, Tuple
 
@@ -117,7 +118,7 @@ def create_comprehensive_report(
     Args:
         tendency_df: Regional tendency DataFrame
         output_path: Path to save report
-        region_level: 'city', 'county', or 'township'
+        region_level: REGION_LEVELS[0], REGION_LEVELS[1], or REGION_LEVELS[2]
     """
     logger.info(f"Generating diagnostic report for {region_level} level")
 

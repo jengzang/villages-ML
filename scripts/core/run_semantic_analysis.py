@@ -14,6 +14,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 
 from src.pipelines.semantic_pipeline import run_semantic_analysis_pipeline
+from src.schema import REGION_LEVELS
 
 
 def _split_csv_values(values):
@@ -77,7 +78,7 @@ def main():
         '--region-levels',
         type=str,
         nargs='+',
-        default=['city', 'county', 'township'],
+        default=REGION_LEVELS[:3],
         help='Region levels to analyze (default: city county township)'
     )
     parser.add_argument(

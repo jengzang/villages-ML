@@ -84,7 +84,7 @@ def main():
         '--region-levels',
         type=str,
         nargs='+',
-        default=['city', 'county', 'township'],
+        default=REGION_LEVELS[:3],
         help='Region levels to analyze (default: city county township)'
     )
 
@@ -125,24 +125,24 @@ def main():
             level_column = S.level_map[level]
 
             # Prepare data for this level - include hierarchy based on level
-            if level == 'city':
+            if level == REGION_LEVELS[0]:
                 level_df = villages_df[[S.city_col, '自然村']].copy()
-                level_df = level_df.rename(columns={S.city_col: 'city'})
+                level_df = level_df.rename(columns={S.city_col: REGION_LEVELS[0]})
                 level_df['自然村'] = villages_df['自然村']
-            elif level == 'county':
+            elif level == REGION_LEVELS[1]:
                 level_df = villages_df[[S.city_col, S.county_col, '自然村']].copy()
-                level_df = level_df.rename(columns={S.city_col: 'city', S.county_col: 'county'})
-            elif level == 'township':
+                level_df = level_df.rename(columns={S.city_col: REGION_LEVELS[0], S.county_col: REGION_LEVELS[1]})
+            elif level == REGION_LEVELS[2]:
                 level_df = villages_df[[S.city_col, S.county_col, S.township_col, '自然村']].copy()
-                level_df = level_df.rename(columns={S.city_col: 'city', S.county_col: 'county', S.township_col: 'township'})
+                level_df = level_df.rename(columns={S.city_col: REGION_LEVELS[0], S.county_col: REGION_LEVELS[1], S.township_col: REGION_LEVELS[2]})
 
             # Filter out NULL region names for the current level
-            if level == 'city':
-                level_df = level_df[level_df['city'].notna()]
-            elif level == 'county':
-                level_df = level_df[level_df['county'].notna()]
-            elif level == 'township':
-                level_df = level_df[level_df['township'].notna()]
+            if level == REGION_LEVELS[0]:
+                level_df = level_df[level_df[REGION_LEVELS[0]].notna()]
+            elif level == REGION_LEVELS[1]:
+                level_df = level_df[level_df[REGION_LEVELS[1]].notna()]
+            elif level == REGION_LEVELS[2]:
+                level_df = level_df[level_df[REGION_LEVELS[2]].notna()]
 
             logger.info(f"Processing {len(level_df)} villages with valid {level} names")
 
@@ -153,12 +153,12 @@ def main():
             # Calculate regional indices
             logger.info(f"Calculating regional indices...")
             # Determine which column to use for grouping based on level
-            if level == 'city':
-                group_column = 'city'
-            elif level == 'county':
-                group_column = 'county'
-            elif level == 'township':
-                group_column = 'township'
+            if level == REGION_LEVELS[0]:
+                group_column = REGION_LEVELS[0]
+            elif level == REGION_LEVELS[1]:
+                group_column = REGION_LEVELS[1]
+            elif level == REGION_LEVELS[2]:
+                group_column = REGION_LEVELS[2]
             else:
                 group_column = 'region_name'
 

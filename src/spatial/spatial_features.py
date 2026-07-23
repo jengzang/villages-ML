@@ -8,6 +8,7 @@ import numpy as np
 import pandas as pd
 from typing import Optional
 import logging
+from src.schema import REGION_LEVELS
 
 logger = logging.getLogger(__name__)
 
@@ -114,14 +115,14 @@ class SpatialFeatureExtractor:
     def aggregate_by_region(
         self,
         features_df: pd.DataFrame,
-        region_level: str = 'city'
+        region_level: str = REGION_LEVELS[0]
     ) -> pd.DataFrame:
         """
         Aggregate spatial features by region.
 
         Args:
             features_df: DataFrame with spatial features
-            region_level: Region level ('city', 'county', 'town')
+            region_level: Region level (REGION_LEVELS[0], REGION_LEVELS[1], REGION_LEVELS[2])
 
         Returns:
             DataFrame with regional aggregates

@@ -8,6 +8,7 @@ This module provides:
 """
 
 from typing import Dict, Any, Tuple, Optional
+from src.schema import REGION_LEVELS
 
 
 class PolicyViolationError(Exception):
@@ -78,7 +79,7 @@ class QueryPolicy:
 
     def _has_filter(self, query_params: Dict[str, Any]) -> bool:
         """Check if query has at least one filter (excluding run_id)."""
-        filter_keys = ['city', 'county', 'town', 'cluster_id', 'semantic_category', 'suffix', 'algorithm']
+        filter_keys = [REGION_LEVELS[0], REGION_LEVELS[1], REGION_LEVELS[2], 'cluster_id', 'semantic_category', 'suffix', 'algorithm']
         return any(query_params.get(key) is not None for key in filter_keys)
 
     def apply_limits(self, query_params: Dict[str, Any]) -> Dict[str, Any]:

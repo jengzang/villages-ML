@@ -292,9 +292,9 @@ def run_feature_pipeline(args) -> None:
                 values.append((
                     row['village_id'],
                     row['village_name'],
-                    row['city'],
-                    row['county'],
-                    row['town'],
+                    row[REGION_LEVELS[0]],
+                    row[REGION_LEVELS[1]],
+                    row[REGION_LEVELS[2]],
                     float(row['longitude']),
                     float(row['latitude']),
                     float(row['nn1_distance_km']),  # nn_distance_1

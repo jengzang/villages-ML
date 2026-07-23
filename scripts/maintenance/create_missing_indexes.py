@@ -58,7 +58,7 @@ def create_indexes_by_priority(db_path: str, priority: str = "all"):
 
         # N-grams (no run_id after optimization)
         "CREATE INDEX IF NOT EXISTS idx_ngram_frequency_lookup ON ngram_frequency(n, frequency DESC)",
-        "CREATE INDEX IF NOT EXISTS idx_regional_ngram_lookup ON regional_ngram_frequency(level, region, n, frequency DESC)",
+        "CREATE INDEX IF NOT EXISTS idx_regional_ngram_lookup ON regional_ngram_frequency(region_level, region_name, n, frequency DESC)",
 
         # Village-level (no run_id after optimization)
         "CREATE INDEX IF NOT EXISTS idx_village_features_lookup ON village_features(village_id)",

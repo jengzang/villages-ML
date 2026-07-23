@@ -11,6 +11,7 @@ sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 from src.utils.config import PipelineConfig
 from src.utils.logging_config import setup_logging
 from src.pipelines.frequency_pipeline import CharacterFrequencyPipeline
+from src.schema import REGION_LEVELS
 
 
 def _split_csv_values(value: str):
@@ -56,7 +57,7 @@ def main():
         choices=['DEBUG', 'INFO', 'WARNING', 'ERROR'],
         help='Logging level (default: INFO)'
     )
-    parser.add_argument('--region-levels', default='city,county,township', help='Comma-separated region levels')
+    parser.add_argument('--region-levels', default=','.join(REGION_LEVELS[:3]), help='Comma-separated region levels')
     parser.add_argument('--schema', default='guangdong', choices=['guangdong', 'national'], help='Village table schema')
     parser.add_argument('--chunk-size', type=int, default=10000, help='Village load chunk size')
     parser.add_argument('--persist-batch-size', type=int, default=10000, help='Rows to persist per DB batch')

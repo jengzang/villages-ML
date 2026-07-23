@@ -12,6 +12,8 @@ import json
 from pathlib import Path
 from typing import Any
 
+from src.schema import REGION_LEVELS, init_region_levels
+
 
 DEFAULT_PIPELINE_CONFIG_PATH = "config/pipeline.guangdong.json"
 
@@ -73,6 +75,37 @@ def phase_args_from_mapping(args_config: dict[str, Any]) -> list[str]:
     return args
 
 
+def _resolve_region_levels(args: dict[str, Any], top_levels: list[str]) -> dict[str, Any]:
+    """Resolve integer indices in ``region_levels`` / ``region_level`` to level names.
+
+    Pipeline config JSON can define a top-level ``region_levels`` list and reference
+    it by 1‑based index inside phase args: ``[1, 2, 3]`` → ``[REGION_LEVELS[0], REGION_LEVELS[1], REGION_LEVELS[2]]``.
+    """
+    if not top_levels:
+        return args
+
+    # Normalize the deprecated ``regional_levels`` key to ``region_levels``.
+    if 'regional_levels' in args:
+        args['region_levels'] = args.pop('regional_levels')
+
+    for key in ('region_levels', 'region_level'):
+        if key not in args:
+            continue
+        val = args[key]
+        if isinstance(val, list):
+            resolved = []
+            for item in val:
+                if isinstance(item, int):
+                    resolved.append(top_levels[item - 1])
+                else:
+                    resolved.append(item)
+            args[key] = resolved
+        elif isinstance(val, int):
+            args[key] = top_levels[val - 1]
+
+    return args
+
+
 def merge_phase_definitions(
     default_phases: dict[int, dict[str, Any]],
     config: dict[str, Any] | None,
@@ -81,6 +114,8 @@ def merge_phase_definitions(
     merged = copy.deepcopy(default_phases)
     config = config or {}
     phase_configs = config.get("phases", {})
+    top_levels = config.get("region_levels", REGION_LEVELS)
+    init_region_levels(top_levels)
 
     for phase_id_text, phase_config in phase_configs.items():
         phase_id = int(phase_id_text)
@@ -91,6 +126,7 @@ def merge_phase_definitions(
         for key, value in phase_config.items():
             if key == "args":
                 if isinstance(value, dict):
+                    value = _resolve_region_levels(value, top_levels)
                     merged[phase_id]["args"] = phase_args_from_mapping(value)
                 elif isinstance(value, list):
                     merged[phase_id]["args"] = [str(item) for item in value]

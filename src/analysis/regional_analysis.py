@@ -3,6 +3,7 @@
 import logging
 import numpy as np
 import pandas as pd
+from src.schema import REGION_LEVELS
 from typing import Optional
 from scipy import stats
 
@@ -293,21 +294,21 @@ def compute_regional_tendency(
 
     # Add ranks (within each region) based on normalization method
     # Use hierarchical grouping if columns exist, otherwise fall back to region_name
-    if 'city' in df.columns and 'county' in df.columns and 'township' in df.columns:
+    if REGION_LEVELS[0] in df.columns and REGION_LEVELS[1] in df.columns and REGION_LEVELS[2] in df.columns:
         # Determine grouping columns based on region_level
         if 'region_level' in df.columns:
             # Get unique region level (should be consistent within df)
-            region_level = df['region_level'].iloc[0] if len(df) > 0 else 'township'
+            region_level = df['region_level'].iloc[0] if len(df) > 0 else REGION_LEVELS[2]
 
-            if region_level == 'city':
-                rank_group_cols = ['city']
-            elif region_level == 'county':
-                rank_group_cols = ['city', 'county']
+            if region_level == REGION_LEVELS[0]:
+                rank_group_cols = [REGION_LEVELS[0]]
+            elif region_level == REGION_LEVELS[1]:
+                rank_group_cols = [REGION_LEVELS[0], REGION_LEVELS[1]]
             else:  # township
-                rank_group_cols = ['city', 'county', 'township']
+                rank_group_cols = [REGION_LEVELS[0], REGION_LEVELS[1], REGION_LEVELS[2]]
         else:
             # Default to full hierarchical grouping
-            rank_group_cols = ['city', 'county', 'township']
+            rank_group_cols = [REGION_LEVELS[0], REGION_LEVELS[1], REGION_LEVELS[2]]
 
         logger.info(f"Using hierarchical grouping for ranking: {rank_group_cols}")
     else:

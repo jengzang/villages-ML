@@ -11,6 +11,7 @@ from typing import Dict, List, Tuple, Optional
 from sklearn.metrics.pairwise import cosine_similarity, euclidean_distances
 from collections import defaultdict
 import json
+from src.schema import REGION_LEVELS
 
 
 class RegionSimilarityAnalyzer:
@@ -34,7 +35,7 @@ class RegionSimilarityAnalyzer:
 
     def load_regional_data(
         self,
-        region_level: str = 'county',
+        region_level: str = REGION_LEVELS[1],
         top_k_global: int = 100,
         z_score_threshold: float = 2.0
     ) -> pd.DataFrame:
@@ -42,7 +43,7 @@ class RegionSimilarityAnalyzer:
         Load character frequency data for regions.
 
         Args:
-            region_level: 'city', 'county', or 'township'
+            region_level: REGION_LEVELS[0], REGION_LEVELS[1], or REGION_LEVELS[2]
             top_k_global: Number of top global frequency characters to include
             z_score_threshold: Minimum |z_score| for high-tendency characters
 

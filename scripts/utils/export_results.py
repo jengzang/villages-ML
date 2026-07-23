@@ -16,6 +16,7 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from src.export.exporters import CSVExporter, JSONExporter, ExcelExporter, LaTeXExporter
 from src.data.db_query import (
+from src.schema import REGION_LEVELS
     get_global_frequency,
     get_regional_frequency,
     get_top_polarized_chars,
@@ -36,7 +37,7 @@ def main():
                        help='Export format')
     parser.add_argument('--output', required=True, help='Output file path')
     parser.add_argument('--top', type=int, help='Limit to top N results')
-    parser.add_argument('--level', choices=['city', 'county', 'town'],
+    parser.add_argument('--level', choices=[REGION_LEVELS[0], REGION_LEVELS[1], REGION_LEVELS[2]],
                        help='Region level (for regional queries)')
     parser.add_argument('--compress', action='store_true', help='Enable gzip compression')
     parser.add_argument('--db-path', default='data/villages.db', help='Database path')

@@ -18,6 +18,7 @@ project_root = Path(__file__).parent.parent.parent
 sys.path.insert(0, str(project_root))
 
 from src.spatial.coordinate_loader import CoordinateLoader
+from src.schema import REGION_LEVELS
 
 # Configure logging
 logging.basicConfig(
@@ -137,10 +138,10 @@ def calculate_cluster_profiles(coords: np.ndarray, coords_df: pd.DataFrame, labe
         avg_distance_km = avg_distance_deg * 111  # 粗略转换
 
         # 获取主要区域
-        city_mode = cluster_df['city'].mode()
+        city_mode = cluster_df[REGION_LEVELS[0]].mode()
         city = city_mode.iloc[0] if len(city_mode) > 0 else None
 
-        county_mode = cluster_df['county'].mode()
+        county_mode = cluster_df[REGION_LEVELS[1]].mode()
         county = county_mode.iloc[0] if len(county_mode) > 0 else None
 
         cluster_profiles.append({

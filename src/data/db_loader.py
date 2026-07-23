@@ -5,7 +5,7 @@ import logging
 from typing import Iterator, Dict, List, Optional, Tuple
 import pandas as pd
 
-from src.schema import VillageTableSchema, DEFAULT_SCHEMA
+from src.schema import REGION_LEVELS, VillageTableSchema, DEFAULT_SCHEMA
 
 logger = logging.getLogger(__name__)
 
@@ -213,7 +213,7 @@ def get_region_village_counts(
 
     Args:
         conn: Database connection
-        level: 'city', 'county', or 'township'
+        level: REGION_LEVELS[0], REGION_LEVELS[1], or REGION_LEVELS[2]
         use_preprocessed: If True, use preprocessed table; otherwise use original table
         schema: Table schema definition
 

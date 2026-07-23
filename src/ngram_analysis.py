@@ -21,7 +21,7 @@ from collections import Counter, defaultdict
 import numpy as np
 from scipy import stats
 
-from src.schema import VillageTableSchema, DEFAULT_SCHEMA
+from src.schema import REGION_LEVELS, VillageTableSchema, DEFAULT_SCHEMA
 
 
 class NgramExtractor:
@@ -132,13 +132,13 @@ class NgramExtractor:
             'middle': middle_counter
         }
 
-    def extract_regional_ngrams(self, n: int = 2, level: str = 'city') -> Dict[Tuple, Dict[str, Counter]]:
+    def extract_regional_ngrams(self, n: int = 2, level: str = REGION_LEVELS[0]) -> Dict[Tuple, Dict[str, Counter]]:
         """
         Extract n-grams by region with hierarchical grouping.
 
         Args:
             n: N-gram size
-            level: Regional level ('city', 'county', 'township')
+            level: Regional level (REGION_LEVELS[0], REGION_LEVELS[1], REGION_LEVELS[2])
 
         Returns:
             Dictionary mapping (city, county, township) tuple -> position -> Counter
@@ -170,11 +170,11 @@ class NgramExtractor:
                 continue
 
             # Create hierarchical key based on level
-            if level == 'city':
+            if level == REGION_LEVELS[0]:
                 if not city:
                     continue
                 hierarchical_key = (city, None, None)
-            elif level == 'county':
+            elif level == REGION_LEVELS[1]:
                 if not city or not county:
                     continue
                 hierarchical_key = (city, county, None)

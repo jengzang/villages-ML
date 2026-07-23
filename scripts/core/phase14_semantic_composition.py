@@ -35,7 +35,7 @@ from src.semantic_composition_schema import create_semantic_composition_tables
 from src.semantic.lexicon_loader import SemanticLexicon
 from src.semantic.semantic_index import SemanticIndexCalculator
 from src.config.semantic_roles import MODIFIER_CATEGORIES, HEAD_CATEGORIES
-from src.schema import VillageTableSchema, get_schema
+from src.schema import REGION_LEVELS, VillageTableSchema, get_schema
 
 
 def step1_create_tables(db_path: str, exclude_tables: set[str] | None = None):
@@ -524,7 +524,7 @@ def step6_extract_village_structures(
 
             insert_cursor.execute("""
                 INSERT OR REPLACE INTO village_semantic_structure
-                (village_id, 村委会, 自然村, semantic_sequence, sequence_length,
+                (village_id, committee, village_name, semantic_sequence, sequence_length,
                  has_modifier, has_head, has_settlement)
                 VALUES (?, ?, ?, ?, ?, ?, ?, ?)
             """, (
@@ -599,27 +599,27 @@ def step7_generate_semantic_indices_detailed(
     # Calculate indices for each region level
     calculator = SemanticIndexCalculator(lexicon)
     all_indices = []
-    requested_levels = set(region_levels or ['city', 'county', 'township'])
+    requested_levels = set(region_levels or REGION_LEVELS[:3])
 
     level_config = [
-        ('city', S.city_col, 'city'),
-        ('county', S.county_col, 'county'),
-        ('township', S.township_col, 'township'),
+        (REGION_LEVELS[0], S.city_col, REGION_LEVELS[0]),
+        (REGION_LEVELS[1], S.county_col, REGION_LEVELS[1]),
+        (REGION_LEVELS[2], S.township_col, REGION_LEVELS[2]),
     ]
 
     for level, col_name, group_col in level_config:
         if level not in requested_levels:
             continue
         print(f"\nProcessing {level} level...")
-        if level == 'city':
+        if level == REGION_LEVELS[0]:
             level_df = villages_df[[S.city_col, '自然村']].copy()
-            level_df = level_df.rename(columns={S.city_col: 'city'})
-        elif level == 'county':
+            level_df = level_df.rename(columns={S.city_col: REGION_LEVELS[0]})
+        elif level == REGION_LEVELS[1]:
             level_df = villages_df[[S.city_col, S.county_col, '自然村']].copy()
-            level_df = level_df.rename(columns={S.city_col: 'city', S.county_col: 'county'})
+            level_df = level_df.rename(columns={S.city_col: REGION_LEVELS[0], S.county_col: REGION_LEVELS[1]})
         else:
             level_df = villages_df[[S.city_col, S.county_col, S.township_col, '自然村']].copy()
-            level_df = level_df.rename(columns={S.city_col: 'city', S.county_col: 'county', S.township_col: 'township'})
+            level_df = level_df.rename(columns={S.city_col: REGION_LEVELS[0], S.county_col: REGION_LEVELS[1], S.township_col: REGION_LEVELS[2]})
 
         level_df = level_df[level_df[group_col].notna()]
 
@@ -640,7 +640,7 @@ def step7_generate_semantic_indices_detailed(
     combined = pd.concat(all_indices, ignore_index=True)
 
     # Add village_count
-    col_name_map = {'city': S.city_col, 'county': S.county_col, 'township': S.township_col}
+    col_name_map = {REGION_LEVELS[0]: S.city_col, REGION_LEVELS[1]: S.county_col, REGION_LEVELS[2]: S.township_col}
     village_counts = {}
     for (lvl, rname), grp in combined.groupby(['region_level', 'region_name']):
         if lvl not in col_name_map:

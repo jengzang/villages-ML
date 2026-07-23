@@ -9,6 +9,7 @@ import pandas as pd
 from sklearn.neighbors import KernelDensity
 from typing import List, Dict, Optional
 import logging
+from src.schema import REGION_LEVELS
 
 logger = logging.getLogger(__name__)
 
@@ -178,8 +179,8 @@ class HotspotDetector:
             density_score = cluster_df['density_score'].mean()
 
             # Get dominant region
-            city = cluster_df['city'].mode()[0] if len(cluster_df) > 0 else None
-            county = cluster_df['county'].mode()[0] if len(cluster_df) > 0 else None
+            city = cluster_df[REGION_LEVELS[0]].mode()[0] if len(cluster_df) > 0 else None
+            county = cluster_df[REGION_LEVELS[1]].mode()[0] if len(cluster_df) > 0 else None
 
             hotspots.append({
                 'hotspot_id': len(hotspots),
@@ -189,8 +190,8 @@ class HotspotDetector:
                 'radius_km': radius_km,
                 'village_count': village_count,
                 'density_score': density_score,
-                'city': city,
-                'county': county,
+                REGION_LEVELS[0]: city,
+                REGION_LEVELS[1]: county,
                 'semantic_category': None,
                 'pattern': None
             })
@@ -272,8 +273,8 @@ class HotspotDetector:
 
             # Get dominant region
             hotspot_df = category_df[hotspot_mask]
-            city = hotspot_df['city'].mode()[0] if len(hotspot_df) > 0 else None
-            county = hotspot_df['county'].mode()[0] if len(hotspot_df) > 0 else None
+            city = hotspot_df[REGION_LEVELS[0]].mode()[0] if len(hotspot_df) > 0 else None
+            county = hotspot_df[REGION_LEVELS[1]].mode()[0] if len(hotspot_df) > 0 else None
 
             hotspots.append({
                 'hotspot_id': len(hotspots),
@@ -283,8 +284,8 @@ class HotspotDetector:
                 'radius_km': radius_km,
                 'village_count': hotspot_mask.sum(),
                 'density_score': hotspot_density.mean(),
-                'city': city,
-                'county': county,
+                REGION_LEVELS[0]: city,
+                REGION_LEVELS[1]: county,
                 'semantic_category': category,
                 'pattern': None
             })

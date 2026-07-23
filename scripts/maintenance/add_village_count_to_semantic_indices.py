@@ -13,6 +13,7 @@ Expected performance improvement: 2000x (21s → 10ms)
 """
 
 import sqlite3
+from src.schema import REGION_LEVELS
 from datetime import datetime
 
 
@@ -71,9 +72,9 @@ def step2_calculate_village_counts(db_path: str):
 
     # Find column indices (0=市级, 1=区县级, 2=乡镇级)
     level_column_index = {
-        'city': 0,      # 市级
-        'county': 1,    # 区县级
-        'township': 2   # 乡镇级
+        REGION_LEVELS[0]: 0,      # 市级
+        REGION_LEVELS[1]: 1,    # 区县级
+        REGION_LEVELS[2]: 2   # 乡镇级
     }
 
     updated_count = 0

@@ -6,6 +6,7 @@ Calculates semantic category frequencies by aggregating character frequencies.
 
 import pandas as pd
 import numpy as np
+from src.schema import REGION_LEVELS
 from typing import List, Dict
 from .lexicon_loader import SemanticLexicon
 
@@ -85,7 +86,7 @@ class VTFCalculator:
                          Must have columns: region_level, region_name, character,
                                           village_count, total_villages
                          Optional: city, county, township (for hierarchical grouping)
-            level: Region level to filter ('city', 'county', 'township')
+            level: Region level to filter (REGION_LEVELS[0], REGION_LEVELS[1], REGION_LEVELS[2])
 
         Returns:
             DataFrame with columns:
@@ -105,16 +106,16 @@ class VTFCalculator:
             return pd.DataFrame()
 
         # Check if hierarchical columns exist
-        has_hierarchical = all(col in level_df.columns for col in ['city', 'county', 'township'])
+        has_hierarchical = all(col in level_df.columns for col in [REGION_LEVELS[0], REGION_LEVELS[1], REGION_LEVELS[2]])
 
         if has_hierarchical:
             # Use hierarchical grouping to separate duplicate place names
-            if level == 'city':
-                group_cols = ['city']
-            elif level == 'county':
-                group_cols = ['city', 'county']
+            if level == REGION_LEVELS[0]:
+                group_cols = [REGION_LEVELS[0]]
+            elif level == REGION_LEVELS[1]:
+                group_cols = [REGION_LEVELS[0], REGION_LEVELS[1]]
             else:  # township
-                group_cols = ['city', 'county', 'township']
+                group_cols = [REGION_LEVELS[0], REGION_LEVELS[1], REGION_LEVELS[2]]
 
             # Get unique regions by hierarchical key
             region_groups = level_df.groupby(group_cols)
@@ -130,11 +131,11 @@ class VTFCalculator:
             if has_hierarchical:
                 if isinstance(group_key, tuple):
                     # Explicit unpacking based on level
-                    if level == 'city':
+                    if level == REGION_LEVELS[0]:
                         city = group_key[0]  # Extract first element from tuple
                         county = None
                         township = None
-                    elif level == 'county':
+                    elif level == REGION_LEVELS[1]:
                         city, county = group_key
                         township = None
                     else:  # township
@@ -177,9 +178,9 @@ class VTFCalculator:
 
                 # Add hierarchical columns if available
                 if has_hierarchical:
-                    result['city'] = city
-                    result['county'] = county
-                    result['township'] = township
+                    result[REGION_LEVELS[0]] = city
+                    result[REGION_LEVELS[1]] = county
+                    result[REGION_LEVELS[2]] = township
 
                 results.append(result)
 
@@ -237,7 +238,7 @@ class VTFCalculator:
         global_total_villages = global_vtf['total_villages'].iloc[0] if len(global_vtf) > 0 else 1
 
         # Check if hierarchical columns exist
-        has_hierarchical = all(col in regional_vtf.columns for col in ['city', 'county', 'township'])
+        has_hierarchical = all(col in regional_vtf.columns for col in [REGION_LEVELS[0], REGION_LEVELS[1], REGION_LEVELS[2]])
 
         results = []
 
@@ -285,9 +286,9 @@ class VTFCalculator:
 
             # Add hierarchical columns if available
             if has_hierarchical:
-                result['city'] = row['city']
-                result['county'] = row['county']
-                result['township'] = row['township']
+                result[REGION_LEVELS[0]] = row[REGION_LEVELS[0]]
+                result[REGION_LEVELS[1]] = row[REGION_LEVELS[1]]
+                result[REGION_LEVELS[2]] = row[REGION_LEVELS[2]]
 
             results.append(result)
 
@@ -298,14 +299,14 @@ class VTFCalculator:
             # Determine sort columns based on region_level
             if 'region_level' in result_df.columns and len(result_df) > 0:
                 region_level = result_df['region_level'].iloc[0]
-                if region_level == 'city':
-                    sort_cols = ['city', 'log_odds']
-                elif region_level == 'county':
-                    sort_cols = ['city', 'county', 'log_odds']
+                if region_level == REGION_LEVELS[0]:
+                    sort_cols = [REGION_LEVELS[0], 'log_odds']
+                elif region_level == REGION_LEVELS[1]:
+                    sort_cols = [REGION_LEVELS[0], REGION_LEVELS[1], 'log_odds']
                 else:  # township
-                    sort_cols = ['city', 'county', 'township', 'log_odds']
+                    sort_cols = [REGION_LEVELS[0], REGION_LEVELS[1], REGION_LEVELS[2], 'log_odds']
             else:
-                sort_cols = ['city', 'county', 'township', 'log_odds']
+                sort_cols = [REGION_LEVELS[0], REGION_LEVELS[1], REGION_LEVELS[2], 'log_odds']
 
             result_df = result_df.sort_values(sort_cols,
                                               ascending=[True] * (len(sort_cols) - 1) + [False]).reset_index(drop=True)

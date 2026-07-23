@@ -8,6 +8,7 @@ import numpy as np
 import pandas as pd
 from typing import Dict
 import logging
+from src.schema import REGION_LEVELS
 
 logger = logging.getLogger(__name__)
 
@@ -59,14 +60,14 @@ class DensityAnalyzer:
     def calculate_regional_aggregates(
         self,
         features_df: pd.DataFrame,
-        region_level: str = 'city'
+        region_level: str = REGION_LEVELS[0]
     ) -> pd.DataFrame:
         """
         Calculate spatial aggregates by region.
 
         Args:
             features_df: DataFrame with spatial features
-            region_level: Region level ('city', 'county', 'town')
+            region_level: Region level (REGION_LEVELS[0], REGION_LEVELS[1], REGION_LEVELS[2])
 
         Returns:
             DataFrame with regional aggregates
@@ -83,28 +84,28 @@ class DensityAnalyzer:
         }
 
         # Determine grouping columns based on region level
-        if region_level == 'town':
-            group_cols = ['city', 'county', 'town']
-        elif region_level == 'county':
-            group_cols = ['city', 'county']
+        if region_level == REGION_LEVELS[2]:
+            group_cols = [REGION_LEVELS[0], REGION_LEVELS[1], REGION_LEVELS[2]]
+        elif region_level == REGION_LEVELS[1]:
+            group_cols = [REGION_LEVELS[0], REGION_LEVELS[1]]
         else:  # city
-            group_cols = ['city']
+            group_cols = [REGION_LEVELS[0]]
 
         agg_df = features_df.groupby(group_cols).agg(agg_dict).reset_index()
 
         # Extract hierarchy columns
-        if region_level == 'town':
-            agg_df['region_name'] = agg_df['town']
-            hierarchy_cols = ['city', 'county', 'town']
-        elif region_level == 'county':
-            agg_df['region_name'] = agg_df['county']
-            hierarchy_cols = ['city', 'county']
-            agg_df['town'] = None
+        if region_level == REGION_LEVELS[2]:
+            agg_df['region_name'] = agg_df[REGION_LEVELS[2]]
+            hierarchy_cols = [REGION_LEVELS[0], REGION_LEVELS[1], REGION_LEVELS[2]]
+        elif region_level == REGION_LEVELS[1]:
+            agg_df['region_name'] = agg_df[REGION_LEVELS[1]]
+            hierarchy_cols = [REGION_LEVELS[0], REGION_LEVELS[1]]
+            agg_df[REGION_LEVELS[2]] = None
         else:  # city
-            agg_df['region_name'] = agg_df['city']
-            hierarchy_cols = ['city']
-            agg_df['county'] = None
-            agg_df['town'] = None
+            agg_df['region_name'] = agg_df[REGION_LEVELS[0]]
+            hierarchy_cols = [REGION_LEVELS[0]]
+            agg_df[REGION_LEVELS[1]] = None
+            agg_df[REGION_LEVELS[2]] = None
 
         # Rename aggregated columns
         agg_df = agg_df.rename(columns={
@@ -125,7 +126,7 @@ class DensityAnalyzer:
         agg_df['spatial_dispersion'] = dispersion.values
 
         # Reorder columns: region_level, city, county, town, region_name, then metrics
-        cols = ['region_level', 'city', 'county', 'town', 'region_name',
+        cols = ['region_level', REGION_LEVELS[0], REGION_LEVELS[1], REGION_LEVELS[2], 'region_name',
                 'total_villages', 'avg_nn_distance', 'avg_local_density',
                 'avg_isolation_score', 'n_isolated_villages', 'n_spatial_clusters',
                 'spatial_dispersion']
@@ -139,7 +140,7 @@ class DensityAnalyzer:
         self,
         features_df: pd.DataFrame,
         hotspots_df: pd.DataFrame,
-        region_level: str = 'city'
+        region_level: str = REGION_LEVELS[0]
     ) -> pd.DataFrame:
         """
         Calculate hotspot coverage by region.
@@ -147,7 +148,7 @@ class DensityAnalyzer:
         Args:
             features_df: DataFrame with spatial features
             hotspots_df: DataFrame with hotspot information
-            region_level: Region level ('city', 'county', 'town')
+            region_level: Region level (REGION_LEVELS[0], REGION_LEVELS[1], REGION_LEVELS[2])
 
         Returns:
             DataFrame with hotspot coverage statistics

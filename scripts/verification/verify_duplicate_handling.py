@@ -8,6 +8,7 @@ This script verifies that:
 """
 
 import sqlite3
+from src.schema import REGION_LEVELS
 from pathlib import Path
 
 
@@ -106,10 +107,10 @@ def verify_duplicate_handling(db_path: str):
             print(f"    • {township}: appears in {count} locations")
 
             # Check if properly separated in analysis table
-            check_query = """
+            check_query = f"""
                 SELECT COUNT(DISTINCT city || '|' || county || '|' || township) as separated_count
                 FROM char_regional_analysis
-                WHERE region_level = 'township' AND region_name = ?
+                WHERE region_level = {REGION_LEVELS[2]} AND region_name = ?
             """
             try:
                 separated_count = cursor.execute(check_query, (township,)).fetchone()[0]

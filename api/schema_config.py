@@ -515,8 +515,8 @@ VILLAGES_DATABASES = {
             "regional_ngram_frequency": {
                 "name": "regional_ngram_frequency",
                 "columns": {
-                    "level": "level",
-                    "region": "region",
+                    "region_level": "region_level",
+                    "region_name": "region_name",
                     "city": "city",
                     "county": "county",
                     "township": "township",
@@ -567,8 +567,8 @@ VILLAGES_DATABASES = {
             "ngram_tendency": {
                 "name": "ngram_tendency",
                 "columns": {
-                    "level": "level",
-                    "region": "region",
+                    "region_level": "region_level",
+                    "region_name": "region_name",
                     "city": "city",
                     "county": "county",
                     "township": "township",
@@ -597,8 +597,8 @@ VILLAGES_DATABASES = {
             "ngram_significance": {
                 "name": "ngram_significance",
                 "columns": {
-                    "level": "level",
-                    "region": "region",
+                    "region_level": "region_level",
+                    "region_name": "region_name",
                     "city": "city",
                     "county": "county",
                     "township": "township",

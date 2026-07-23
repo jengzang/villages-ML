@@ -80,6 +80,7 @@ from src.data.db_query import (
     get_regions_in_cluster
 )
 from src.deployment import DeploymentConfig, QueryPolicy, SafeQueryExecutor, PolicyViolationError
+from src.schema import REGION_LEVELS
 
 
 def main():
@@ -103,7 +104,7 @@ def main():
                                'semantic-profile', 'semantic-polarized',
                                'cluster-assignments', 'cluster-profile', 'cluster-metrics', 'cluster-regions'],
                        help='Query type')
-    parser.add_argument('--level', type=str, choices=['city', 'county', 'township'],
+    parser.add_argument('--level', type=str, choices=REGION_LEVELS[:3],
                        help='Region level (for regional queries)')
     parser.add_argument('--region', type=str,
                        help='Region name (for regional queries)')
@@ -329,7 +330,7 @@ def main():
 
         elif args.type == 'cluster-assignments':
             if not args.level:
-                args.level = 'county'  # Default to county level
+                args.level = REGION_LEVELS[1]  # Default to county level
             df = get_cluster_assignments(conn, run_id, algorithm=args.algorithm, region_level=args.level)
             print(f"\nCluster Assignments ({args.algorithm}, {args.level}-level):")
             print("=" * 80)
@@ -352,7 +353,7 @@ def main():
                 print("Error: --cluster-id is required for cluster-regions queries")
                 return 1
             if not args.level:
-                args.level = 'county'  # Default to county level
+                args.level = REGION_LEVELS[1]  # Default to county level
             df = get_regions_in_cluster(conn, run_id, args.cluster_id,
                                        algorithm=args.algorithm, region_level=args.level)
             print(f"\nRegions in Cluster {args.cluster_id} ({args.algorithm}, {args.level}-level):")

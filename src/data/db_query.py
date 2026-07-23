@@ -13,6 +13,7 @@ import sqlite3
 import logging
 from typing import Optional
 import pandas as pd
+from src.schema import REGION_LEVELS
 
 logger = logging.getLogger(__name__)
 
@@ -85,7 +86,7 @@ def get_regional_frequency(conn: sqlite3.Connection, run_id: str,
     Args:
         conn: SQLite database connection
         run_id: Run identifier
-        region_level: Region level ('city', 'county', 'township')
+        region_level: Region level (REGION_LEVELS[0], REGION_LEVELS[1], REGION_LEVELS[2])
         region_name: Specific region name (optional, returns all if None)
         top_n: Limit to top N characters by frequency (optional)
 
@@ -124,7 +125,7 @@ def get_char_tendency_by_region(conn: sqlite3.Connection, run_id: str,
         conn: SQLite database connection
         run_id: Run identifier
         char: Character to query
-        region_level: Region level ('city', 'county', 'township')
+        region_level: Region level (REGION_LEVELS[0], REGION_LEVELS[1], REGION_LEVELS[2])
 
     Returns:
         DataFrame with tendency data for the character across regions
@@ -149,7 +150,7 @@ def get_top_polarized_chars(conn: sqlite3.Connection, run_id: str,
     Args:
         conn: SQLite database connection
         run_id: Run identifier
-        region_level: Region level ('city', 'county', 'township')
+        region_level: Region level (REGION_LEVELS[0], REGION_LEVELS[1], REGION_LEVELS[2])
         top_n: Number of top characters to return
         metric: Metric to use ('log_odds', 'log_lift', 'z_score')
 
@@ -180,7 +181,7 @@ def get_region_tendency_profile(conn: sqlite3.Connection, run_id: str,
     Args:
         conn: SQLite database connection
         run_id: Run identifier
-        region_level: Region level ('city', 'county', 'township')
+        region_level: Region level (REGION_LEVELS[0], REGION_LEVELS[1], REGION_LEVELS[2])
         region_name: Region name
         top_n: Number of top characters to return
         metric: Metric to use ('log_odds', 'log_lift', 'z_score')
@@ -272,7 +273,7 @@ def get_pattern_frequency_regional(
         conn: SQLite database connection
         run_id: Run identifier
         pattern_type: Pattern type (e.g., 'suffix_1', 'prefix_2')
-        region_level: Region level ('city', 'county', 'township')
+        region_level: Region level (REGION_LEVELS[0], REGION_LEVELS[1], REGION_LEVELS[2])
         region_name: Specific region name (optional, returns all if None)
         top_n: Limit to top N patterns by frequency (optional)
 
@@ -317,7 +318,7 @@ def get_pattern_tendency_by_region(
         run_id: Run identifier
         pattern_type: Pattern type (e.g., 'suffix_1', 'prefix_2')
         pattern: Pattern to query (e.g., '村', '新村')
-        region_level: Region level ('city', 'county', 'township')
+        region_level: Region level (REGION_LEVELS[0], REGION_LEVELS[1], REGION_LEVELS[2])
 
     Returns:
         DataFrame with tendency data for the pattern across regions
@@ -348,7 +349,7 @@ def get_top_polarized_patterns(
         conn: SQLite database connection
         run_id: Run identifier
         pattern_type: Pattern type (e.g., 'suffix_1', 'prefix_2')
-        region_level: Region level ('city', 'county', 'township')
+        region_level: Region level (REGION_LEVELS[0], REGION_LEVELS[1], REGION_LEVELS[2])
         top_n: Number of top patterns to return
         metric: Metric to use ('log_odds', 'log_lift', 'z_score')
 
@@ -386,7 +387,7 @@ def get_region_pattern_profile(
         conn: SQLite database connection
         run_id: Run identifier
         pattern_type: Pattern type (e.g., 'suffix_1', 'prefix_2')
-        region_level: Region level ('city', 'county', 'township')
+        region_level: Region level (REGION_LEVELS[0], REGION_LEVELS[1], REGION_LEVELS[2])
         region_name: Region name
         top_n: Number of top patterns to return
         metric: Metric to use ('log_odds', 'log_lift', 'z_score')
@@ -448,7 +449,7 @@ def get_semantic_vtf_regional(conn: sqlite3.Connection, run_id: str,
     Args:
         conn: SQLite database connection
         run_id: Run identifier (from semantic_vtf_global run_id)
-        level: Region level ('city', 'county', 'township')
+        level: Region level (REGION_LEVELS[0], REGION_LEVELS[1], REGION_LEVELS[2])
         region: Specific region name (optional)
         top_n: Number of top categories to return
 
@@ -495,7 +496,7 @@ def get_semantic_tendency_by_region(conn: sqlite3.Connection, run_id: str,
         conn: SQLite database connection
         run_id: Run identifier
         category: Semantic category (e.g., 'water', 'mountain')
-        level: Region level ('city', 'county', 'township')
+        level: Region level (REGION_LEVELS[0], REGION_LEVELS[1], REGION_LEVELS[2])
 
     Returns:
         DataFrame with tendency data for the category across regions
@@ -520,7 +521,7 @@ def get_top_polarized_semantic_categories(conn: sqlite3.Connection, run_id: str,
     Args:
         conn: SQLite database connection
         run_id: Run identifier
-        level: Region level ('city', 'county', 'township')
+        level: Region level (REGION_LEVELS[0], REGION_LEVELS[1], REGION_LEVELS[2])
         top_n: Number of top categories to return
         metric: Metric to use ('log_odds', 'log_lift', 'z_score')
 
@@ -551,7 +552,7 @@ def get_region_semantic_profile(conn: sqlite3.Connection, run_id: str,
     Args:
         conn: SQLite database connection
         run_id: Run identifier
-        level: Region level ('city', 'county', 'township')
+        level: Region level (REGION_LEVELS[0], REGION_LEVELS[1], REGION_LEVELS[2])
         region: Region name
         top_n: Number of top categories to return
         metric: Metric to use ('log_odds', 'log_lift', 'z_score')
@@ -580,7 +581,7 @@ def get_region_semantic_profile(conn: sqlite3.Connection, run_id: str,
 
 def get_cluster_assignments(conn: sqlite3.Connection, run_id: str,
                            algorithm: str = 'kmeans',
-                           region_level: str = 'county') -> pd.DataFrame:
+                           region_level: str = REGION_LEVELS[1]) -> pd.DataFrame:
     """
     Query cluster assignments for regions.
 
@@ -588,7 +589,7 @@ def get_cluster_assignments(conn: sqlite3.Connection, run_id: str,
         conn: SQLite database connection
         run_id: Run identifier
         algorithm: Clustering algorithm ('kmeans')
-        region_level: Region level ('city', 'county', 'town')
+        region_level: Region level (REGION_LEVELS[0], REGION_LEVELS[1], REGION_LEVELS[2])
 
     Returns:
         DataFrame with cluster assignments
@@ -655,7 +656,7 @@ def get_clustering_metrics(conn: sqlite3.Connection, run_id: str,
 
 def get_regions_in_cluster(conn: sqlite3.Connection, run_id: str,
                           cluster_id: int, algorithm: str = 'kmeans',
-                          region_level: str = 'county') -> pd.DataFrame:
+                          region_level: str = REGION_LEVELS[1]) -> pd.DataFrame:
     """
     Query all regions in a specific cluster.
 
@@ -664,7 +665,7 @@ def get_regions_in_cluster(conn: sqlite3.Connection, run_id: str,
         run_id: Run identifier
         cluster_id: Cluster ID
         algorithm: Clustering algorithm ('kmeans')
-        region_level: Region level ('city', 'county', 'town')
+        region_level: Region level (REGION_LEVELS[0], REGION_LEVELS[1], REGION_LEVELS[2])
 
     Returns:
         DataFrame with regions in the cluster
@@ -828,14 +829,14 @@ def get_villages_by_cluster(conn: sqlite3.Connection, run_id: str,
 
 
 def get_region_aggregates(conn: sqlite3.Connection, run_id: str,
-                         region_level: str = 'county') -> pd.DataFrame:
+                         region_level: str = REGION_LEVELS[1]) -> pd.DataFrame:
     """
     Query region aggregates.
 
     Args:
         conn: SQLite database connection
         run_id: Run identifier
-        region_level: Region level ('city', 'county', 'town')
+        region_level: Region level (REGION_LEVELS[0], REGION_LEVELS[1], REGION_LEVELS[2])
 
     Returns:
         DataFrame with region aggregates

@@ -23,6 +23,7 @@ from src.features.feature_extractor import VillageFeatureExtractor
 from src.data.db_writer import create_feature_materialization_tables
 from src.pipelines.feature_materialization_pipeline import write_village_features
 from src.schema import get_schema
+from src.schema import REGION_LEVELS
 
 # Configure logging
 logging.basicConfig(

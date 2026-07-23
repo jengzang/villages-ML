@@ -22,6 +22,7 @@ import pandas as pd
 # Add project root to path
 sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 
+from src.schema import REGION_LEVELS
 from src.data.db_loader import load_villages
 from src.analysis.char_frequency import compute_char_frequency
 from src.analysis.regional_analysis import (
@@ -64,7 +65,7 @@ def run_tendency_analysis_with_significance(
         normalization_method: 'percentage' (default, uses lift) or 'zscore' (uses z-scores)
     """
     if region_levels is None:
-        region_levels = ['市级', '区县级', '乡镇级']
+        region_levels = REGION_LEVELS[:3]
 
     logger.info(f"Starting tendency analysis with significance testing: run_id={run_id}, normalization={normalization_method}")
     start_time = time.time()

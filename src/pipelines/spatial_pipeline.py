@@ -26,7 +26,7 @@ from src.data.db_writer import (
     write_village_cluster_assignments,
     write_region_spatial_aggregates
 )
-from src.schema import get_schema
+from src.schema import REGION_LEVELS, get_schema
 
 logger = logging.getLogger(__name__)
 
@@ -147,7 +147,7 @@ def run_spatial_analysis_pipeline(
         logger.info("="*80)
 
         aggregates_list = []
-        for region_level in ['city', 'county', 'town']:
+        for region_level in [REGION_LEVELS[0], REGION_LEVELS[1], REGION_LEVELS[2]]:
             agg_df = density_analyzer.calculate_regional_aggregates(features_df, region_level)
             aggregates_list.append(agg_df)
 

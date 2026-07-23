@@ -27,7 +27,7 @@ def _create_preprocessed_table(conn):
             乡镇级 TEXT,
             村委会 TEXT,
             自然村_去前缀 TEXT,
-            字符数量 INTEGER
+            char_count INTEGER
         )
         """
     )
@@ -44,7 +44,7 @@ def _create_preprocessed_table(conn):
     conn.executemany(
         """
         INSERT INTO 广东省自然村_预处理
-            (市级, 区县级, 乡镇级, 村委会, 自然村_去前缀, 字符数量)
+            (市级, 区县级, 乡镇级, 村委会, 自然村_去前缀, char_count)
         VALUES (?, ?, ?, ?, ?, ?)
         """,
         rows,

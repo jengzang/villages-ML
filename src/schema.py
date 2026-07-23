@@ -13,11 +13,33 @@ Design:
     - Frozen dataclass: IDE autocomplete, type checking, immutability
     - Default singleton: GUANGDONG_SCHEMA for zero-effort backward compatibility
     - Parameter override: functions accept optional schema param for multi-dialect support
-    - Logical keys (e.g. 'city') are the public API; physical names (e.g. '市级') are internal
+    - Logical keys (e.g. REGION_LEVELS[0]) are the public API; physical names (e.g. '市级') are internal
 """
 
 from dataclasses import dataclass
 from typing import Dict, List
+
+# ---------------------------------------------------------------------------
+# Canonical region levels – single source of truth for hierarchical order.
+# All code should import from here rather than hardcoding [REGION_LEVELS[0], REGION_LEVELS[1], …].
+# ---------------------------------------------------------------------------
+_DEFAULT_REGION_LEVELS = ['city', 'county', 'township', 'committee']
+REGION_LEVELS = list(_DEFAULT_REGION_LEVELS)
+
+
+def init_region_levels(levels: list[str]) -> None:
+    """Replace REGION_LEVELS from config at startup.
+
+    Mutates the list in-place so all existing imports see the new values.
+    Call once before any pipeline code that reads ``REGION_LEVELS[N]``.
+    """
+    REGION_LEVELS.clear()
+    REGION_LEVELS.extend(levels)
+
+
+def level_index(level: str) -> int:
+    """Return 1‑based index of *level* in REGION_LEVELS."""
+    return REGION_LEVELS.index(level) + 1
 
 
 @dataclass(frozen=True)
@@ -61,20 +83,21 @@ class VillageTableSchema:
     def level_map(self) -> Dict[str, str]:
         """Logical region keys -> physical column names."""
         return {
-            'city': self.city_col,
-            'county': self.county_col,
-            'township': self.township_col,
+            REGION_LEVELS[0]: self.city_col,
+            REGION_LEVELS[1]: self.county_col,
+            REGION_LEVELS[2]: self.township_col,
+            REGION_LEVELS[3]: self.committee_col_preprocessed,
         }
 
     @property
     def level_order(self) -> List[str]:
         """Administrative levels in hierarchical order."""
-        return ['city', 'county', 'township']
+        return list(REGION_LEVELS)
 
     @property
     def admin_columns(self) -> List[str]:
-        """All three administrative hierarchy column names."""
-        return [self.city_col, self.county_col, self.township_col]
+        """All four administrative hierarchy column names."""
+        return [self.city_col, self.county_col, self.township_col, self.committee_col_preprocessed]
 
     def committee_col(self, preprocessed: bool = True) -> str:
         """Get committee column for the given table variant."""
@@ -104,8 +127,8 @@ GUANGDONG_SCHEMA = VillageTableSchema(
     village_name_col_raw='自然村',
     village_name_col_normalized='自然村_规范名',
     village_name_col_prefix_removed='自然村_去前缀',
-    char_set_col='字符集',
-    char_count_col='字符数量',
+    char_set_col='char_set',
+    char_count_col='char_count',
     village_id_col='village_id',
     longitude_col='longitude',
     latitude_col='latitude',
@@ -125,8 +148,8 @@ NATIONAL_SCHEMA = VillageTableSchema(
     village_name_col_raw='自然村',
     village_name_col_normalized='自然村_规范名',
     village_name_col_prefix_removed='自然村_去前缀',
-    char_set_col='字符集',
-    char_count_col='字符数量',
+    char_set_col='char_set',
+    char_count_col='char_count',
     village_id_col='village_id',
     longitude_col='longitude',
     latitude_col='latitude',

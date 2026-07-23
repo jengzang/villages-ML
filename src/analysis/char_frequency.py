@@ -6,7 +6,7 @@ from typing import Dict, Optional
 import pandas as pd
 import numpy as np
 
-from src.schema import VillageTableSchema, DEFAULT_SCHEMA
+from src.schema import REGION_LEVELS, VillageTableSchema, DEFAULT_SCHEMA
 
 logger = logging.getLogger(__name__)
 
@@ -91,7 +91,7 @@ def compute_char_frequency_by_region(
 
     Args:
         villages_df: DataFrame with columns [{schema.city_col}, {schema.county_col}, {schema.township_col}, char_set]
-        region_level: 'city', 'county', or 'township'
+        region_level: REGION_LEVELS[0], REGION_LEVELS[1], or REGION_LEVELS[2]
         schema: Table schema definition
 
     Returns:
@@ -125,9 +125,9 @@ def compute_char_frequency_by_region(
     results = []
 
     # Group by hierarchical key to separate duplicate place names
-    if region_level == 'city':
+    if region_level == REGION_LEVELS[0]:
         group_cols = [schema.city_col]
-    elif region_level == 'county':
+    elif region_level == REGION_LEVELS[1]:
         group_cols = [schema.city_col, schema.county_col]
     else:  # township
         group_cols = [schema.city_col, schema.county_col, schema.township_col]
@@ -136,18 +136,18 @@ def compute_char_frequency_by_region(
     for group_key, group in valid_df.groupby(group_cols):
         # Handle single vs multiple group columns
         # IMPORTANT: groupby always returns tuple, even for single column
-        if region_level == 'city':
+        if region_level == REGION_LEVELS[0]:
             city = group_key[0] if isinstance(group_key, tuple) else group_key
             county = None
             township = None
-        elif region_level == 'county':
+        elif region_level == REGION_LEVELS[1]:
             city, county = group_key
             township = None
         else:  # township
             city, county, township = group_key
 
         # Skip if any key is NaN
-        if pd.isna(city) or (region_level in ['county', 'township'] and pd.isna(county)) or (region_level == 'township' and pd.isna(township)):
+        if pd.isna(city) or (region_level in [REGION_LEVELS[1], REGION_LEVELS[2]] and pd.isna(county)) or (region_level == REGION_LEVELS[2] and pd.isna(township)):
             continue
 
         # Get region name for display
@@ -165,9 +165,9 @@ def compute_char_frequency_by_region(
         for char, count in char_counts.items():
             results.append({
                 'region_level': region_level,
-                'city': city,
-                'county': county,
-                'township': township,
+                REGION_LEVELS[0]: city,
+                REGION_LEVELS[1]: county,
+                REGION_LEVELS[2]: township,
                 'region_name': region_name,
                 'char': char,
                 'village_count': count,
@@ -179,12 +179,12 @@ def compute_char_frequency_by_region(
 
     # Add rank within each hierarchical region (not just by region_name)
     # Group by hierarchical key for ranking
-    if region_level == 'city':
-        rank_group_cols = ['city']
-    elif region_level == 'county':
-        rank_group_cols = ['city', 'county']
+    if region_level == REGION_LEVELS[0]:
+        rank_group_cols = [REGION_LEVELS[0]]
+    elif region_level == REGION_LEVELS[1]:
+        rank_group_cols = [REGION_LEVELS[0], REGION_LEVELS[1]]
     else:  # township
-        rank_group_cols = ['city', 'county', 'township']
+        rank_group_cols = [REGION_LEVELS[0], REGION_LEVELS[1], REGION_LEVELS[2]]
 
     df['rank_within_region'] = df.groupby(rank_group_cols)['frequency'].rank(
         ascending=False, method='dense'
@@ -260,7 +260,7 @@ def compute_char_frequency(
 
     Args:
         villages_df: DataFrame with village data
-        region_levels: List of region levels to analyze (logical keys: ['city', 'county', 'township'])
+        region_levels: List of region levels to analyze (logical keys: [REGION_LEVELS[0], REGION_LEVELS[1], REGION_LEVELS[2]])
         min_global_support: Minimum global village count (for filtering)
         min_regional_support: Minimum regional village count (for filtering)
         schema: Table schema definition

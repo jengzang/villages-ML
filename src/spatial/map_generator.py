@@ -9,6 +9,7 @@ import numpy as np
 from pathlib import Path
 from typing import Optional
 import logging
+from src.schema import REGION_LEVELS
 
 logger = logging.getLogger(__name__)
 
@@ -192,8 +193,8 @@ class MapGenerator:
             Type: {hotspot['hotspot_type']}<br>
             Villages: {hotspot['village_count']}<br>
             Radius: {hotspot['radius_km']:.2f} km<br>
-            City: {hotspot.get('city', 'N/A')}<br>
-            County: {hotspot.get('county', 'N/A')}
+            City: {hotspot.get(REGION_LEVELS[0], 'N/A')}<br>
+            County: {hotspot.get(REGION_LEVELS[1], 'N/A')}
             """
 
             if pd.notna(hotspot.get('semantic_category')):

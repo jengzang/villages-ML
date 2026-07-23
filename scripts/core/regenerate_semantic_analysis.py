@@ -78,12 +78,12 @@ def main():
     logger.info(f"Global total villages: {global_total_villages:,}")
 
     # Load global character frequency
-    global_char_df = pd.read_sql_query("""
+    global_char_df = pd.read_sql_query(f"""
         SELECT
             char as character,
             SUM(village_count) as village_count
         FROM char_regional_analysis
-        WHERE region_level = 'city'
+        WHERE region_level = {REGION_LEVELS[0]}
         GROUP BY char
     """, conn)
     # Add global total villages to all rows
@@ -132,7 +132,7 @@ def main():
     logger.info(f"Calculated tendency for {len(tendency_df)} region-category pairs")
 
     # Add missing columns for database write
-    tendency_df['rank_within_region'] = tendency_df.groupby(['region_level', 'city', 'county', 'township'])['vtf_count'].rank(
+    tendency_df['rank_within_region'] = tendency_df.groupby(['region_level', REGION_LEVELS[0], REGION_LEVELS[1], REGION_LEVELS[2]])['vtf_count'].rank(
         ascending=False, method='dense'
     ).fillna(0).astype(int)
 
@@ -157,7 +157,7 @@ def main():
     logger.info("\n[Step 4/4] Writing results to database...")
 
     # Ensure hierarchical columns are scalar values, not tuples
-    for col in ['city', 'county', 'township']:
+    for col in REGION_LEVELS[:3]:
         if col in tendency_df.columns:
             # Convert any tuple values to strings or None
             tendency_df[col] = tendency_df[col].apply(

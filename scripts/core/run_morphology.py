@@ -23,6 +23,7 @@ sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 
 from src.utils.config import PipelineConfig
 from src.pipelines.morphology_pipeline import MorphologyPipeline
+from src.schema import REGION_LEVELS
 
 logging.basicConfig(
     level=logging.INFO,
@@ -65,7 +66,7 @@ def main():
     )
     parser.add_argument('--suffix-lengths', default='1,2,3', help='Comma-separated suffix lengths')
     parser.add_argument('--prefix-lengths', default='2,3', help='Comma-separated prefix lengths; empty disables prefixes')
-    parser.add_argument('--region-levels', default='city,county,township', help='Comma-separated region levels')
+    parser.add_argument('--region-levels', default=','.join(REGION_LEVELS[:3]), help='Comma-separated region levels')
     parser.add_argument('--schema', default='guangdong', choices=['guangdong', 'national'], help='Village table schema')
     parser.add_argument('--chunk-size', type=int, default=10000, help='Village load chunk size')
     parser.add_argument('--min-global-support', type=int, default=20, help='Minimum global support')

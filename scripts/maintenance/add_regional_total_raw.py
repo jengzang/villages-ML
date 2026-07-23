@@ -19,7 +19,7 @@ def calculate_regional_total_raw(db_path: str = 'data/villages.db'):
 
     返回一个字典：
     {
-        (level, city, county, township, n, position): total_raw
+        (region_level, city, county, township, n, position): total_raw
     }
     """
     print("\n" + "="*70)
@@ -34,14 +34,14 @@ def calculate_regional_total_raw(db_path: str = 'data/villages.db'):
 
     # 查询所有区域的 n-gram 数据
     cursor.execute("""
-        SELECT level, city, county, township, n, position, COUNT(*) as ngram_count
+        SELECT region_region_level, city, county, township, n, position, COUNT(*) as ngram_count
         FROM regional_ngram_frequency
-        GROUP BY level, city, county, township, n, position
+        GROUP BY region_region_level, city, county, township, n, position
     """)
 
     for row in cursor.fetchall():
-        level, city, county, township, n, position, count = row
-        key = (level, city, county, township, n, position)
+        region_region_level, city, county, township, n, position, count = row
+        key = (region_region_level, city, county, township, n, position)
         regional_totals_raw[key] = count
 
     print(f"  计算了 {len(regional_totals_raw):,} 个区域-位置组合的原始总数")
@@ -70,7 +70,7 @@ def save_regional_totals_to_temp_table(db_path: str, regional_totals_raw: dict):
             n INTEGER NOT NULL,
             position TEXT NOT NULL,
             total_raw INTEGER NOT NULL,
-            PRIMARY KEY (level, city, county, township, n, position)
+            PRIMARY KEY (region_level, city, county, township, n, position)
         )
     """)
 
@@ -79,12 +79,12 @@ def save_regional_totals_to_temp_table(db_path: str, regional_totals_raw: dict):
 
     # 插入新数据
     for key, total_raw in regional_totals_raw.items():
-        level, city, county, township, n, position = key
+        region_level, city, county, township, n, position = key
         cursor.execute("""
             INSERT INTO temp_regional_totals_raw
-            (level, city, county, township, n, position, total_raw)
+            (region_level, city, county, township, n, position, total_raw)
             VALUES (?, ?, ?, ?, ?, ?, ?)
-        """, (level, city, county, township, n, position, total_raw))
+        """, (region_level, city, county, township, n, position, total_raw))
 
     conn.commit()
     conn.close()
@@ -103,9 +103,9 @@ def get_regional_total_raw(db_path: str, level: str, city: str, county: str,
     cursor.execute("""
         SELECT total_raw
         FROM temp_regional_totals_raw
-        WHERE level = ? AND city IS ? AND county IS ? AND township IS ?
+        WHERE region_level = ? AND city IS ? AND county IS ? AND township IS ?
           AND n = ? AND position = ?
-    """, (level, city, county, township, n, position))
+    """, (region_level, city, county, township, n, position))
 
     result = cursor.fetchone()
     conn.close()

@@ -59,8 +59,8 @@ SEMANTIC_COMPOSITION_SCHEMA = {
     'village_semantic_structure': """
         CREATE TABLE IF NOT EXISTS village_semantic_structure (
             village_id TEXT PRIMARY KEY,
-            村委会 TEXT,
-            自然村 TEXT,
+            committee TEXT,
+            village_name TEXT,
             semantic_sequence TEXT NOT NULL,
             sequence_length INTEGER NOT NULL,
             has_modifier INTEGER NOT NULL,

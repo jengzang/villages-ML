@@ -13,7 +13,7 @@ from typing import Dict, List, Optional
 import pandas as pd
 import numpy as np
 
-from src.schema import VillageTableSchema, DEFAULT_SCHEMA, get_schema
+from src.schema import REGION_LEVELS, VillageTableSchema, DEFAULT_SCHEMA, get_schema
 from src.features.feature_extractor import VillageFeatureExtractor
 from src.data.db_writer import (
     create_feature_materialization_tables,
@@ -46,11 +46,11 @@ def load_villages(conn: sqlite3.Connection,
     df = pd.read_sql_query(query, conn)
 
     # Rename columns to English
-    df.columns = ['city', 'county', 'town', 'village_committee', 'village_name', 'pinyin',
+    df.columns = [REGION_LEVELS[0], REGION_LEVELS[1], REGION_LEVELS[2], 'village_committee', 'village_name', 'pinyin',
                   'language_distribution', 'longitude', 'latitude', 'notes', 'update_time', 'data_source']
 
     # Keep only needed columns
-    df = df[['city', 'county', 'town', 'village_committee', 'village_name', 'pinyin']]
+    df = df[[REGION_LEVELS[0], REGION_LEVELS[1], REGION_LEVELS[2], 'village_committee', 'village_name', 'pinyin']]
 
     logger.info(f"Loaded {len(df)} villages")
 
@@ -204,7 +204,7 @@ def write_village_features(
                   S.committee_col_preprocessed, S.village_name_col_prefix_removed]
     df = df.merge(
         id_mapping,
-        left_on=['city', 'county', 'town', 'village_committee', 'village_name'],
+        left_on=[REGION_LEVELS[0], REGION_LEVELS[1], REGION_LEVELS[2], 'village_committee', 'village_name'],
         right_on=right_cols,
         how='left'
     )
@@ -227,7 +227,7 @@ def write_village_features(
 
     # Prepare data for insertion (now includes village_id, no run_id/created_at)
     columns = [
-        'village_id', 'city', 'county', 'town', 'village_committee', 'village_name', 'pinyin',
+        'village_id', REGION_LEVELS[0], REGION_LEVELS[1], REGION_LEVELS[2], 'village_committee', 'village_name', 'pinyin',
         'name_length', 'suffix_1', 'suffix_2', 'suffix_3', 'prefix_1', 'prefix_2', 'prefix_3',
         *lexicon.get_column_names(),
         'kmeans_cluster_id', 'dbscan_cluster_id', 'gmm_cluster_id',

@@ -8,6 +8,7 @@ Extract analysis results for Chinese showcase document
 import sqlite3
 import pandas as pd
 import json
+from src.schema import REGION_LEVELS
 from pathlib import Path
 
 def safe_query(conn, query, params=None, description=""):
@@ -31,7 +32,7 @@ def main():
     cursor = conn.cursor()
     cursor.execute('SELECT COUNT(*) FROM 广东省自然村')
     total_villages = cursor.fetchone()[0]
-    cursor.execute('SELECT COUNT(*) FROM 广东省自然村_预处理 WHERE 字符数量 > 0')
+    cursor.execute('SELECT COUNT(*) FROM 广东省自然村_预处理 WHERE char_count > 0')
     valid_villages = cursor.fetchone()[0]
 
     results['overview'] = {
@@ -55,10 +56,10 @@ def main():
     results['regional_tendency'] = {}
 
     for city in cities:
-        data = safe_query(conn, '''
+        data = safe_query(conn, f'''
             SELECT char, lift, log_lift, frequency, village_count, z_score
             FROM regional_tendency
-            WHERE region_name = ? AND region_level = 'city'
+            WHERE region_name = ? AND region_level = {REGION_LEVELS[0]}
             ORDER BY lift DESC
             LIMIT 10
         ''', params=(city,), description=f"{city}倾向性")

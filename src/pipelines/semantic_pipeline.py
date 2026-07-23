@@ -18,7 +18,7 @@ from typing import List, Optional
 import numpy as np
 import pandas as pd
 
-from src.schema import get_schema
+from src.schema import REGION_LEVELS, get_schema
 from src.semantic.lexicon_loader import SemanticLexicon
 from src.semantic.vtf_calculator import VTFCalculator
 from src.semantic.semantic_index import SemanticIndexCalculator
@@ -55,7 +55,7 @@ def run_semantic_analysis_pipeline(
         schema_name: Village table schema name
     """
     if region_levels is None:
-        region_levels = ['city', 'county', 'township']
+        region_levels = REGION_LEVELS[:3]
 
     logger.info(f"Starting semantic analysis pipeline")
     logger.info(f"  Character run ID: {char_run_id}")
@@ -142,31 +142,31 @@ def run_semantic_analysis_pipeline(
 
         all_indices = []
         level_config = [
-            ('city', S.city_col, 'city'),
-            ('county', S.county_col, 'county'),
-            ('township', S.township_col, 'township'),
+            (REGION_LEVELS[0], S.city_col, REGION_LEVELS[0]),
+            (REGION_LEVELS[1], S.county_col, REGION_LEVELS[1]),
+            (REGION_LEVELS[2], S.township_col, REGION_LEVELS[2]),
         ]
         for level, col_name, group_col in level_config:
             logger.info(f"Processing {level} level...")
-            if level == 'city':
+            if level == REGION_LEVELS[0]:
                 level_df = villages_df[[S.city_col, '自然村']].copy()
-                level_df = level_df.rename(columns={S.city_col: 'city'})
+                level_df = level_df.rename(columns={S.city_col: REGION_LEVELS[0]})
                 count_df = villages_df.groupby(S.city_col).size().reset_index(name='village_count')
                 count_df = count_df.rename(columns={S.city_col: 'region_name'})
                 merge_keys = ['region_name']
-            elif level == 'county':
+            elif level == REGION_LEVELS[1]:
                 level_df = villages_df[[S.city_col, S.county_col, '自然村']].copy()
-                level_df = level_df.rename(columns={S.city_col: 'city', S.county_col: 'county'})
+                level_df = level_df.rename(columns={S.city_col: REGION_LEVELS[0], S.county_col: REGION_LEVELS[1]})
                 count_df = villages_df.groupby(S.county_col).size().reset_index(name='village_count')
                 count_df = count_df.rename(columns={S.county_col: 'region_name'})
                 merge_keys = ['region_name']
             else:
                 level_df = villages_df[[S.city_col, S.county_col, S.township_col, '自然村']].copy()
-                level_df = level_df.rename(columns={S.city_col: 'city', S.county_col: 'county', S.township_col: 'township'})
+                level_df = level_df.rename(columns={S.city_col: REGION_LEVELS[0], S.county_col: REGION_LEVELS[1], S.township_col: REGION_LEVELS[2]})
                 # Township names can be duplicates across counties — use full hierarchy
                 count_df = villages_df.groupby([S.city_col, S.county_col, S.township_col]).size().reset_index(name='village_count')
-                count_df = count_df.rename(columns={S.city_col: 'city', S.county_col: 'county', S.township_col: 'region_name'})
-                merge_keys = ['city', 'county', 'region_name']
+                count_df = count_df.rename(columns={S.city_col: REGION_LEVELS[0], S.county_col: REGION_LEVELS[1], S.township_col: 'region_name'})
+                merge_keys = [REGION_LEVELS[0], REGION_LEVELS[1], 'region_name']
 
             level_df = level_df[level_df[group_col].notna()]
 

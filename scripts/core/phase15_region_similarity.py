@@ -19,6 +19,7 @@ project_root = Path(__file__).parent.parent.parent
 sys.path.insert(0, str(project_root))
 
 from src.analysis.region_similarity import RegionSimilarityAnalyzer
+from src.schema import REGION_LEVELS
 
 
 def create_tables(conn: sqlite3.Connection):

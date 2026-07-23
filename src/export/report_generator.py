@@ -3,6 +3,7 @@ Report generation module for analysis results.
 """
 
 import sqlite3
+from src.schema import REGION_LEVELS
 from typing import Dict, List, Optional, Any
 from datetime import datetime
 from pathlib import Path
@@ -89,7 +90,7 @@ class ReportGenerator:
         lines.append(f"## Top 10 Polarized Characters (Regional Tendency)")
         lines.append(f"")
         try:
-            tendency = get_top_polarized_chars(self.conn, run_id, region_level='city', top_n=10)
+            tendency = get_top_polarized_chars(self.conn, run_id, region_level=REGION_LEVELS[0], top_n=10)
             if tendency is not None and not (hasattr(tendency, 'empty') and tendency.empty):
                 if hasattr(tendency, 'to_dict'):
                     tendency = tendency.to_dict('records')

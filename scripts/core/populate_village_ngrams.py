@@ -107,7 +107,7 @@ def populate_village_ngrams(db_path: str = 'data/villages.db', batch_size: int =
             if len(batch) >= batch_size:
                 insert_cursor.executemany("""
                     INSERT OR REPLACE INTO village_ngrams
-                    (village_id, 村委会, 自然村, n, bigrams, trigrams, prefix_bigram, suffix_bigram, prefix_trigram, suffix_trigram)
+                    (village_id, committee, village_name, n, bigrams, trigrams, prefix_bigram, suffix_bigram, prefix_trigram, suffix_trigram)
                     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """, batch)
                 conn.commit()
@@ -117,7 +117,7 @@ def populate_village_ngrams(db_path: str = 'data/villages.db', batch_size: int =
     if batch:
         insert_cursor.executemany("""
             INSERT OR REPLACE INTO village_ngrams
-            (village_id, 村委会, 自然村, n, bigrams, trigrams, prefix_bigram, suffix_bigram, prefix_trigram, suffix_trigram)
+            (village_id, committee, village_name, n, bigrams, trigrams, prefix_bigram, suffix_bigram, prefix_trigram, suffix_trigram)
             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """, batch)
         conn.commit()

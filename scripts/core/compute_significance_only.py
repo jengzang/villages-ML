@@ -24,6 +24,7 @@ from scipy import stats
 sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 
 from src.data.db_writer import create_tendency_significance_table, save_tendency_significance
+from src.schema import REGION_LEVELS
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
@@ -201,9 +202,9 @@ def compute_significance_from_regional_analysis(
                 row['effect_size'],
                 row['effect_size_interpretation'],
                 row['region_level'],
-                row['city'] if pd.notna(row['city']) else None,
-                row['county'] if pd.notna(row['county']) else None,
-                row['township'] if pd.notna(row['township']) else None,
+                row[REGION_LEVELS[0]] if pd.notna(row[REGION_LEVELS[0]]) else None,
+                row[REGION_LEVELS[1]] if pd.notna(row[REGION_LEVELS[1]]) else None,
+                row[REGION_LEVELS[2]] if pd.notna(row[REGION_LEVELS[2]]) else None,
                 row['char']
             ))
 

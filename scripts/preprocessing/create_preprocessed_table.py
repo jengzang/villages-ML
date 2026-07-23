@@ -75,6 +75,9 @@ def parse_args():
         default=False,
         help="Include deduplicated admin village names as additional rows",
     )
+    return parser.parse_args()
+
+
 def _clean_admin_name(name: str) -> str:
     """Strip administrative suffixes from an admin village name."""
     ADMIN_SUFFIXES = [
@@ -236,7 +239,7 @@ def materialize_metadata_stats(
             village_count, sort_key, generated_at, data_version
         )
         SELECT
-            'county',
+            REGION_LEVELS[1],
             {S.county_col},
             {S.city_col},
             {S.county_col},
@@ -323,7 +326,7 @@ def materialize_metadata_stats(
         )
         SELECT
             'county|' || {S.city_col} || '|' || {S.county_col},
-            'county',
+            REGION_LEVELS[1],
             {S.county_col},
             {S.city_col},
             {S.county_col},

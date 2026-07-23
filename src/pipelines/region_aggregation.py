@@ -11,6 +11,7 @@ import json
 from typing import Dict, List
 import pandas as pd
 import numpy as np
+from src.schema import REGION_LEVELS
 
 logger = logging.getLogger(__name__)
 
@@ -27,7 +28,7 @@ def compute_region_aggregates(
     Args:
         conn: SQLite database connection
         run_id: Run identifier
-        region_level: 'city', 'county', or 'town'
+        region_level: REGION_LEVELS[0], REGION_LEVELS[1], or REGION_LEVELS[2]
         top_n: Number of top suffixes/prefixes to include
 
     Returns:
@@ -36,12 +37,12 @@ def compute_region_aggregates(
     logger.info(f"Computing {region_level}-level aggregates for run_id={run_id}")
 
     # Define grouping columns based on region level
-    if region_level == 'city':
-        group_cols = ['city']
-    elif region_level == 'county':
-        group_cols = ['city', 'county']
-    elif region_level == 'town':
-        group_cols = ['city', 'county', 'town']
+    if region_level == REGION_LEVELS[0]:
+        group_cols = [REGION_LEVELS[0]]
+    elif region_level == REGION_LEVELS[1]:
+        group_cols = [REGION_LEVELS[0], REGION_LEVELS[1]]
+    elif region_level == REGION_LEVELS[2]:
+        group_cols = [REGION_LEVELS[0], REGION_LEVELS[1], REGION_LEVELS[2]]
     else:
         raise ValueError(f"Invalid region_level: {region_level}")
 
@@ -125,7 +126,7 @@ def write_region_aggregates(
     Args:
         conn: SQLite database connection
         run_id: Run identifier
-        region_level: 'city', 'county', or 'town'
+        region_level: REGION_LEVELS[0], REGION_LEVELS[1], or REGION_LEVELS[2]
         df: DataFrame with region aggregates
     """
     logger.info(f"Writing {len(df)} {region_level}-level aggregates to database")
@@ -170,7 +171,7 @@ def compute_and_write_all_aggregates(
         run_id: Run identifier
         top_n: Number of top suffixes/prefixes to include
     """
-    for region_level in ['city', 'county', 'town']:
+    for region_level in [REGION_LEVELS[0], REGION_LEVELS[1], REGION_LEVELS[2]]:
         logger.info(f"Processing {region_level}-level aggregates")
         agg_df = compute_region_aggregates(conn, run_id, region_level, top_n)
         write_region_aggregates(conn, run_id, region_level, agg_df)

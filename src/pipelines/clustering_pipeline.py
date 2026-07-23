@@ -19,6 +19,7 @@ import json
 import time
 import logging
 import pickle
+from src.schema import REGION_LEVELS
 
 from ..clustering.feature_builder import RegionFeatureBuilder
 from ..clustering.clustering_engine import ClusteringEngine
@@ -38,7 +39,7 @@ def run_clustering_pipeline(
     semantic_run_id: str,
     morphology_run_id: str,
     output_run_id: str,
-    region_level: str = 'county',
+    region_level: str = REGION_LEVELS[1],
     k_range: List[int] = [4, 6, 8, 10, 12, 15, 18, 20],
     use_semantic: bool = True,
     use_morphology: bool = True,
@@ -61,7 +62,7 @@ def run_clustering_pipeline(
         semantic_run_id: Semantic analysis run ID
         morphology_run_id: Morphology analysis run ID
         output_run_id: Output run ID for clustering results
-        region_level: Region level ('city', 'county', 'town')
+        region_level: Region level (REGION_LEVELS[0], REGION_LEVELS[1], REGION_LEVELS[2])
         k_range: List of k values to try
         use_semantic: Include semantic features
         use_morphology: Include morphology features
@@ -82,8 +83,8 @@ def run_clustering_pipeline(
     logger.info(f"Starting clustering pipeline: run_id={output_run_id}")
     start_time = time.time()
 
-    # Map 'town' to 'township' for database compatibility
-    db_region_level = 'township' if region_level == 'town' else region_level
+    # Map REGION_LEVELS[2] to REGION_LEVELS[2] for database compatibility
+    db_region_level = REGION_LEVELS[2] if region_level == REGION_LEVELS[2] else region_level
 
     # Connect to database
     conn = sqlite3.connect(db_path)

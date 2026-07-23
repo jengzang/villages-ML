@@ -10,6 +10,7 @@ This script tests that the modified phase12_ngram_analysis.py correctly:
 
 import sqlite3
 import sys
+from src.schema import REGION_LEVELS
 from pathlib import Path
 
 # Add project root to path
@@ -136,7 +137,7 @@ def test_retention_rates(db_path: str):
     conn = sqlite3.connect(db_path)
     cursor = conn.cursor()
 
-    levels = ['city', 'county', 'township']
+    levels = REGION_LEVELS[:3]
 
     for level in levels:
         cursor.execute("""

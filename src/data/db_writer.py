@@ -16,7 +16,7 @@ from typing import Dict, Any, Optional
 import pandas as pd
 import numpy as np
 
-from src.schema import VillageTableSchema, DEFAULT_SCHEMA
+from src.schema import REGION_LEVELS, VillageTableSchema, DEFAULT_SCHEMA
 
 logger = logging.getLogger(__name__)
 
@@ -406,7 +406,7 @@ def save_tendency_significance(conn: sqlite3.Connection, run_id: str, df: pd.Dat
     df_copy['created_at'] = time.time()
 
     # Handle NaN values for optional columns
-    for col in ['city', 'county', 'township', 'ci_lower', 'ci_upper', 'effect_size_interpretation']:
+    for col in [REGION_LEVELS[0], REGION_LEVELS[1], REGION_LEVELS[2], 'ci_lower', 'ci_upper', 'effect_size_interpretation']:
         if col in df_copy.columns:
             df_copy[col] = df_copy[col].where(pd.notna(df_copy[col]), None)
 
@@ -415,14 +415,14 @@ def save_tendency_significance(conn: sqlite3.Connection, run_id: str, df: pd.Dat
 
     # Select and reorder columns
     columns = [
-        'run_id', 'region_level', 'city', 'county', 'township', 'region_name', 'char',
+        'run_id', 'region_level', REGION_LEVELS[0], REGION_LEVELS[1], REGION_LEVELS[2], 'region_name', 'char',
         'chi_square_statistic', 'p_value', 'is_significant', 'significance_level',
         'effect_size', 'effect_size_interpretation',
         'ci_lower', 'ci_upper', 'created_at'
     ]
 
     # Handle missing optional columns
-    for col in ['city', 'county', 'township', 'ci_lower', 'ci_upper', 'effect_size_interpretation']:
+    for col in [REGION_LEVELS[0], REGION_LEVELS[1], REGION_LEVELS[2], 'ci_lower', 'ci_upper', 'effect_size_interpretation']:
         if col not in df_copy.columns:
             df_copy[col] = None
 
@@ -453,13 +453,13 @@ def persist_results_to_db(db_path: str, run_id: str, results_dir: Path,
         db_path: Path to SQLite database
         run_id: Run identifier
         results_dir: Directory containing CSV result files
-        region_levels: List of region levels to process (default: ['city', 'county', 'township'])
+        region_levels: List of region levels to process (default: REGION_LEVELS[:3])
         batch_size: Number of rows to insert per batch
     """
     import time
 
     if region_levels is None:
-        region_levels = ['city', 'county', 'township']
+        region_levels = REGION_LEVELS[:3]
 
     logger.info(f"Starting database persistence for run_id={run_id}")
     start_time = time.time()
@@ -536,7 +536,7 @@ def persist_results_to_db(db_path: str, run_id: str, results_dir: Path,
         # Step 5: Merge regional frequency and tendency data
         logger.info("Merging regional frequency and tendency data...")
         # Merge on hierarchical key + char
-        merge_cols = ['region_level', 'city', 'county', 'township', 'char']
+        merge_cols = ['region_level', REGION_LEVELS[0], REGION_LEVELS[1], REGION_LEVELS[2], 'char']
         merged_df = regional_freq_df.merge(
             tendency_df,
             on=merge_cols,
@@ -791,7 +791,7 @@ def persist_morphology_results_to_db(
     import time
 
     if region_levels is None:
-        region_levels = ['city', 'county', 'township']
+        region_levels = REGION_LEVELS[:3]
 
     logger.info(f"Starting morphology database persistence")
     start_time = time.time()
@@ -854,7 +854,7 @@ def persist_morphology_results_to_db(
                 tendency_df = pd.concat(tendency_dfs, ignore_index=True)
 
                 # Merge on common keys
-                merge_keys = ['region_level', 'city', 'county', 'township', 'region_name', 'pattern']
+                merge_keys = ['region_level', REGION_LEVELS[0], REGION_LEVELS[1], REGION_LEVELS[2], 'region_name', 'pattern']
                 merged_df = pd.merge(
                     regional_freq_df,
                     tendency_df,
@@ -871,9 +871,9 @@ def persist_morphology_results_to_db(
                 final_df = pd.DataFrame({
                     'pattern_type': merged_df['pattern_type'],
                     'region_level': merged_df['region_level'],
-                    'city': merged_df['city'],
-                    'county': merged_df['county'],
-                    'township': merged_df['township'],
+                    REGION_LEVELS[0]: merged_df[REGION_LEVELS[0]],
+                    REGION_LEVELS[1]: merged_df[REGION_LEVELS[1]],
+                    REGION_LEVELS[2]: merged_df[REGION_LEVELS[2]],
                     'region_name': merged_df['region_name'],
                     'pattern': merged_df['pattern'],
                     'village_count': merged_df['village_count_tend'],
@@ -1053,11 +1053,11 @@ def write_semantic_indices(
     df_copy['z_score'] = df_copy['z_score'].where(pd.notna(df_copy['z_score']), None)
 
     # Check if hierarchy columns exist (any of them)
-    has_hierarchy = any(col in df_copy.columns for col in ['city', 'county', 'township'])
+    has_hierarchy = any(col in df_copy.columns for col in [REGION_LEVELS[0], REGION_LEVELS[1], REGION_LEVELS[2]])
 
     # Ensure all hierarchy columns exist (fill with None if missing)
     if has_hierarchy:
-        for col in ['city', 'county', 'township']:
+        for col in [REGION_LEVELS[0], REGION_LEVELS[1], REGION_LEVELS[2]]:
             if col not in df_copy.columns:
                 df_copy[col] = None
 
@@ -1076,28 +1076,28 @@ def write_semantic_indices(
 
     if has_hierarchy:
         # Use full hierarchy for counting (NEW: 2026-03-01)
-        for _, row in df_copy[['region_level', 'city', 'county', 'township']].drop_duplicates().iterrows():
+        for _, row in df_copy[['region_level', REGION_LEVELS[0], REGION_LEVELS[1], REGION_LEVELS[2]]].drop_duplicates().iterrows():
             region_level = row['region_level']
-            city = row['city'] if pd.notna(row['city']) else None
-            county = row['county'] if pd.notna(row['county']) else None
-            township = row['township'] if pd.notna(row['township']) else None
+            city = row[REGION_LEVELS[0]] if pd.notna(row[REGION_LEVELS[0]]) else None
+            county = row[REGION_LEVELS[1]] if pd.notna(row[REGION_LEVELS[1]]) else None
+            township = row[REGION_LEVELS[2]] if pd.notna(row[REGION_LEVELS[2]]) else None
 
             # Build WHERE clause based on region level
-            if region_level == 'city' and city:
+            if region_level == REGION_LEVELS[0] and city:
                 query = f"""
                     SELECT COUNT(DISTINCT {schema.village_id_col})
                     FROM {schema.preprocessed_table}
                     WHERE {schema.city_col} = ?
                 """
                 cursor.execute(query, (city,))
-            elif region_level == 'county' and city and county:
+            elif region_level == REGION_LEVELS[1] and city and county:
                 query = f"""
                     SELECT COUNT(DISTINCT {schema.village_id_col})
                     FROM {schema.preprocessed_table}
                     WHERE {schema.city_col} = ? AND {schema.county_col} = ?
                 """
                 cursor.execute(query, (city, county))
-            elif region_level == 'township' and city and county and township:
+            elif region_level == REGION_LEVELS[2] and city and county and township:
                 query = f"""
                     SELECT COUNT(DISTINCT {schema.village_id_col})
                     FROM {schema.preprocessed_table}
@@ -1116,9 +1116,9 @@ def write_semantic_indices(
         df_copy['village_count'] = df_copy.apply(
             lambda row: village_counts.get(
                 (row['region_level'],
-                 row['city'] if pd.notna(row['city']) else None,
-                 row['county'] if pd.notna(row['county']) else None,
-                 row['township'] if pd.notna(row['township']) else None), 0
+                 row[REGION_LEVELS[0]] if pd.notna(row[REGION_LEVELS[0]]) else None,
+                 row[REGION_LEVELS[1]] if pd.notna(row[REGION_LEVELS[1]]) else None,
+                 row[REGION_LEVELS[2]] if pd.notna(row[REGION_LEVELS[2]]) else None), 0
             ),
             axis=1
         )
@@ -1157,7 +1157,7 @@ def write_semantic_indices(
 
     # Prepare data for insertion
     if has_hierarchy:
-        columns = ['run_id', 'region_level', 'city', 'county', 'township', 'region_name',
+        columns = ['run_id', 'region_level', REGION_LEVELS[0], REGION_LEVELS[1], REGION_LEVELS[2], 'region_name',
                    'category', 'raw_intensity', 'normalized_index', 'z_score',
                    'rank_within_province', 'village_count']
         data = df_copy[columns].values.tolist()
@@ -1288,7 +1288,7 @@ def write_cluster_assignments(
     for i, (_, row) in enumerate(region_df.iterrows()):
         data.append((
             run_id,
-            'county',  # Default to county level
+            REGION_LEVELS[1],  # Default to county level
             row['region_name'],
             row['region_name'],
             int(labels[i]),
@@ -1431,8 +1431,8 @@ def create_feature_materialization_tables(
             run_id TEXT,
             city TEXT,
             county TEXT,
-            town TEXT,
-            village_committee TEXT,
+            township TEXT,
+            committee TEXT,
             village_name TEXT NOT NULL,
             pinyin TEXT,
             name_length INTEGER NOT NULL,
@@ -1479,7 +1479,7 @@ def create_feature_materialization_indexes(
     # Indexes for village_features
     cursor.execute("CREATE INDEX IF NOT EXISTS idx_village_features_city ON village_features(city)")
     cursor.execute("CREATE INDEX IF NOT EXISTS idx_village_features_county ON village_features(county)")
-    cursor.execute("CREATE INDEX IF NOT EXISTS idx_village_features_town ON village_features(town)")
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_village_features_township ON village_features(township)")
     cursor.execute("CREATE INDEX IF NOT EXISTS idx_village_features_suffix_2 ON village_features(suffix_2)")
     cursor.execute("CREATE INDEX IF NOT EXISTS idx_village_features_suffix_3 ON village_features(suffix_3)")
 
@@ -1521,7 +1521,7 @@ def create_spatial_analysis_tables(conn: sqlite3.Connection) -> None:
             village_name TEXT NOT NULL,
             city TEXT,
             county TEXT,
-            town TEXT,
+            township TEXT,
             longitude REAL NOT NULL,
             latitude REAL NOT NULL,
             nn_distance_1 REAL,
@@ -1675,7 +1675,7 @@ def create_spatial_tendency_table(conn: sqlite3.Connection) -> None:
             global_tendency_mean REAL,
             tendency_deviation REAL,
             cluster_size INTEGER NOT NULL,
-            n_villages_with_char INTEGER NOT NULL,
+            village_count_with_char INTEGER NOT NULL,
 
             -- Spatial features
             centroid_lon REAL,
@@ -1754,7 +1754,7 @@ def write_spatial_features(conn: sqlite3.Connection, run_id: str, features_df: p
 
     # Select columns in correct order
     columns = [
-        'village_id', 'village_name', 'city', 'county', 'town',
+        'village_id', 'village_name', REGION_LEVELS[0], REGION_LEVELS[1], REGION_LEVELS[2],
         'longitude', 'latitude',
         'nn_distance_1', 'nn_distance_5', 'nn_distance_10',
         'local_density_1km', 'local_density_5km', 'local_density_10km',
@@ -1905,7 +1905,7 @@ def write_spatial_hotspots(conn: sqlite3.Connection, run_id: str, hotspots_df: p
         'center_lon', 'center_lat', 'radius_km',
         'village_count', 'density_score',
         'semantic_category', 'pattern',
-        'city', 'county',
+        REGION_LEVELS[0], REGION_LEVELS[1],
         'created_at'
     ]
 
@@ -1996,7 +1996,7 @@ def write_spatial_tendency_integration(conn: sqlite3.Connection, run_id: str, in
         'character', 'character_category', 'cluster_id',
         'cluster_tendency_mean', 'cluster_tendency_std',
         'global_tendency_mean', 'tendency_deviation',
-        'cluster_size', 'n_villages_with_char',
+        'cluster_size', 'village_count_with_char',
         'centroid_lon', 'centroid_lat', 'avg_distance_km',
         'spatial_coherence', 'spatial_specificity',
         'dominant_city', 'dominant_county',
@@ -2045,13 +2045,13 @@ def write_char_regional_analysis(conn: sqlite3.Connection, df: pd.DataFrame, bat
     df_copy = df.copy()
 
     # Handle NaN values for optional columns
-    for col in ['z_score', 'rank_overrepresented', 'rank_underrepresented', 'city', 'county', 'township']:
+    for col in ['z_score', 'rank_overrepresented', 'rank_underrepresented', REGION_LEVELS[0], REGION_LEVELS[1], REGION_LEVELS[2]]:
         if col in df_copy.columns:
             df_copy[col] = df_copy[col].where(pd.notna(df_copy[col]), None)
 
     # Select and reorder columns to match table schema
     columns = [
-        'region_level', 'city', 'county', 'township', 'region_name', 'char',
+        'region_level', REGION_LEVELS[0], REGION_LEVELS[1], REGION_LEVELS[2], 'region_name', 'char',
         'village_count', 'total_villages', 'frequency', 'rank_within_region',
         'global_village_count', 'global_frequency',
         'lift', 'log_lift', 'log_odds', 'z_score', 'support_flag',
@@ -2106,13 +2106,13 @@ def write_pattern_regional_analysis(conn: sqlite3.Connection, df: pd.DataFrame, 
         logger.info(f"Filtered pattern_regional_analysis: {total_before} → {len(df_copy)} rows (support_flag=1 only)")
 
     # Handle NaN values for optional columns
-    for col in ['z_score', 'rank_overrepresented', 'rank_underrepresented', 'city', 'county', 'township']:
+    for col in ['z_score', 'rank_overrepresented', 'rank_underrepresented', REGION_LEVELS[0], REGION_LEVELS[1], REGION_LEVELS[2]]:
         if col in df_copy.columns:
             df_copy[col] = df_copy[col].where(pd.notna(df_copy[col]), None)
 
     # Select and reorder columns
     columns = [
-        'pattern_type', 'region_level', 'city', 'county', 'township', 'region_name', 'pattern',
+        'pattern_type', 'region_level', REGION_LEVELS[0], REGION_LEVELS[1], REGION_LEVELS[2], 'region_name', 'pattern',
         'village_count', 'total_villages', 'frequency', 'rank_within_region',
         'global_village_count', 'global_frequency',
         'lift', 'log_lift', 'log_odds', 'z_score', 'support_flag',
@@ -2166,13 +2166,13 @@ def write_semantic_regional_analysis(conn: sqlite3.Connection, df: pd.DataFrame,
     df_copy = df.copy()
 
     # Handle NaN values for optional columns
-    for col in ['z_score', 'rank_overrepresented', 'rank_underrepresented', 'city', 'county', 'township']:
+    for col in ['z_score', 'rank_overrepresented', 'rank_underrepresented', REGION_LEVELS[0], REGION_LEVELS[1], REGION_LEVELS[2]]:
         if col in df_copy.columns:
             df_copy[col] = df_copy[col].where(pd.notna(df_copy[col]), None)
 
     # Select and reorder columns
     columns = [
-        'region_level', 'city', 'county', 'township', 'region_name', 'category',
+        'region_level', REGION_LEVELS[0], REGION_LEVELS[1], REGION_LEVELS[2], 'region_name', 'category',
         'vtf_count', 'total_villages', 'frequency', 'rank_within_region',
         'global_vtf_count', 'global_frequency',
         'lift', 'log_lift', 'log_odds', 'z_score', 'support_flag',

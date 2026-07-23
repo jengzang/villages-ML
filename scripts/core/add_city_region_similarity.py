@@ -16,9 +16,10 @@ project_root = Path(__file__).parent.parent.parent
 sys.path.insert(0, str(project_root))
 
 from src.analysis.region_similarity import RegionSimilarityAnalyzer
+from src.schema import REGION_LEVELS
 
 DB_PATH = project_root / "data" / "villages.db"
-REGION_LEVEL = 'city'
+REGION_LEVEL = REGION_LEVELS[0]
 
 
 def main():
@@ -116,10 +117,10 @@ def main():
         print(f"{row[0]:<10} {row[1]:<8} {row[2]:<12} {row[3]:<10} {row[4]:<10}")
 
     print("\n[Top 5 最相似的市级对]")
-    cursor.execute("""
+    cursor.execute(f"""
         SELECT region1, region2, cosine_similarity, jaccard_similarity
         FROM region_similarity
-        WHERE region_level = 'city'
+        WHERE region_level = {REGION_LEVELS[0]}
         ORDER BY cosine_similarity DESC
         LIMIT 5
     """)

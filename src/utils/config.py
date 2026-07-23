@@ -6,6 +6,8 @@ import json
 from pathlib import Path
 from datetime import datetime
 
+from src.schema import REGION_LEVELS
+
 
 @dataclass
 class CleaningConfig:
@@ -25,14 +27,14 @@ class CleaningConfig:
 @dataclass
 class FrequencyConfig:
     """Configuration for frequency computation."""
-    region_levels: List[str] = field(default_factory=lambda: ["city", "county", "township"])
+    region_levels: List[str] = field(default_factory=lambda: list(REGION_LEVELS[:3]))
     min_count_threshold: int = 10  # Minimum count for reporting
     chunk_size: int = 10000  # Chunk size for streaming processing
     persist_batch_size: int = 10000  # Rows to insert per database batch
 
     def validate(self):
         """Validate configuration parameters."""
-        valid_levels = ["city", "county", "township"]
+        valid_levels = list(REGION_LEVELS)
         for level in self.region_levels:
             if level not in valid_levels:
                 raise ValueError(f"Invalid region level: {level}")

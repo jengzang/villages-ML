@@ -8,6 +8,7 @@ Run before and after cleanup to compare performance.
 
 import sqlite3
 import time
+from src.schema import REGION_LEVELS
 from typing import List, Tuple
 
 
@@ -52,10 +53,10 @@ def benchmark_queries(db_path: str) -> List[Tuple[str, float]]:
             FROM ngram_significance
             GROUP BY level
         """),
-        ("Top n-grams query", """
+        ("Top n-grams query", f"""
             SELECT ngram, COUNT(*) as freq
             FROM regional_ngram_frequency
-            WHERE level = 'township'
+            WHERE level = {REGION_LEVELS[2]}
             GROUP BY ngram
             ORDER BY freq DESC
             LIMIT 100

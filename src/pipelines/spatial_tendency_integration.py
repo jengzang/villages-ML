@@ -17,7 +17,7 @@ from typing import Dict, List, Optional
 import numpy as np
 import pandas as pd
 
-from src.schema import DEFAULT_SCHEMA
+from src.schema import REGION_LEVELS, DEFAULT_SCHEMA
 from src.data.db_writer import (
     create_spatial_tendency_table,
     create_spatial_tendency_indexes,
@@ -41,7 +41,7 @@ def _load_char_category_map(conn: sqlite3.Connection) -> Dict[str, str]:
 def load_tendency_results(
     conn: sqlite3.Connection,
     tendency_run_id: str,
-    region_level: str = 'county'
+    region_level: str = REGION_LEVELS[1]
 ) -> pd.DataFrame:
     """
     Load tendency analysis results from char_regional_analysis table.
@@ -49,7 +49,7 @@ def load_tendency_results(
     Args:
         conn: Database connection
         tendency_run_id: Run ID for tendency analysis (unused - table has no run_id)
-        region_level: Region level ('city', 'county', 'township')
+        region_level: Region level (REGION_LEVELS[0], REGION_LEVELS[1], REGION_LEVELS[2])
 
     Returns:
         DataFrame with tendency results including significance (if available)
@@ -345,7 +345,7 @@ def run_integration(
     spatial_run_id: str,
     output_run_id: str,
     characters: List[str],
-    region_level: str = 'county'
+    region_level: str = REGION_LEVELS[1]
 ) -> pd.DataFrame:
     """
     Run spatial-tendency integration for a list of characters.
