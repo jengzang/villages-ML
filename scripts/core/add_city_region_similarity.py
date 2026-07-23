@@ -2,7 +2,7 @@
 补充 region_similarity 表的市级（city）数据
 
 使用与 phase15 完全相同的算法和 RegionSimilarityAnalyzer，
-只是将 region_level 从 'county' 改为 'city'。
+只是将 region_level 从 county 级改为 city 级。
 
 预期输出：21 × 20 / 2 = 210 条记录
 """

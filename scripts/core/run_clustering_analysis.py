@@ -75,7 +75,7 @@ def main():
     )
     parser.add_argument(
         '--region-level',
-        default='county',  # index 2 in REGION_LEVELS,
+        default=REGION_LEVELS[1],
         choices=[REGION_LEVELS[0], REGION_LEVELS[1], REGION_LEVELS[2]],
         help='Region level for clustering (default: county)'
     )

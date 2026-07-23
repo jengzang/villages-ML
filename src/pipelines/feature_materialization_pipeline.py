@@ -46,11 +46,11 @@ def load_villages(conn: sqlite3.Connection,
     df = pd.read_sql_query(query, conn)
 
     # Rename columns to English
-    df.columns = [REGION_LEVELS[0], REGION_LEVELS[1], REGION_LEVELS[2], 'village_committee', 'village_name', 'pinyin',
+    df.columns = [REGION_LEVELS[0], REGION_LEVELS[1], REGION_LEVELS[2], REGION_LEVELS[3], 'village_name', 'pinyin',
                   'language_distribution', 'longitude', 'latitude', 'notes', 'update_time', 'data_source']
 
     # Keep only needed columns
-    df = df[[REGION_LEVELS[0], REGION_LEVELS[1], REGION_LEVELS[2], 'village_committee', 'village_name', 'pinyin']]
+    df = df[[REGION_LEVELS[0], REGION_LEVELS[1], REGION_LEVELS[2], REGION_LEVELS[3], 'village_name', 'pinyin']]
 
     logger.info(f"Loaded {len(df)} villages")
 
@@ -204,7 +204,7 @@ def write_village_features(
                   S.committee_col_preprocessed, S.village_name_col_prefix_removed]
     df = df.merge(
         id_mapping,
-        left_on=[REGION_LEVELS[0], REGION_LEVELS[1], REGION_LEVELS[2], 'village_committee', 'village_name'],
+        left_on=[REGION_LEVELS[0], REGION_LEVELS[1], REGION_LEVELS[2], REGION_LEVELS[3], 'village_name'],
         right_on=right_cols,
         how='left'
     )
@@ -227,7 +227,7 @@ def write_village_features(
 
     # Prepare data for insertion (now includes village_id, no run_id/created_at)
     columns = [
-        'village_id', REGION_LEVELS[0], REGION_LEVELS[1], REGION_LEVELS[2], 'village_committee', 'village_name', 'pinyin',
+        'village_id', REGION_LEVELS[0], REGION_LEVELS[1], REGION_LEVELS[2], REGION_LEVELS[3], 'village_name', 'pinyin',
         'name_length', 'suffix_1', 'suffix_2', 'suffix_3', 'prefix_1', 'prefix_2', 'prefix_3',
         *lexicon.get_column_names(),
         'kmeans_cluster_id', 'dbscan_cluster_id', 'gmm_cluster_id',
@@ -374,8 +374,8 @@ def run_feature_generation_pipeline(
         SELECT
             "{S.city_col}" as city,
             "{S.county_col}" as county,
-            "{S.township_col}" as town,
-            "{S.committee_col_preprocessed}" as village_committee,
+            "{S.township_col}" as {REGION_LEVELS[2]},
+            "{S.committee_col_preprocessed}" as {REGION_LEVELS[3]},
             "{S.village_name_col_prefix_removed}" as village_name,
             "{S.village_id_col}" as village_id
         FROM "{S.preprocessed_table}"
@@ -402,7 +402,7 @@ def run_feature_generation_pipeline(
         cursor = conn.cursor()
         columns_to_write = [
             'village_id', 'run_id', REGION_LEVELS[0], REGION_LEVELS[1], REGION_LEVELS[2],
-            'village_committee', 'village_name', 'pinyin',
+            REGION_LEVELS[3], 'village_name', 'pinyin',
             'name_length', 'suffix_1', 'suffix_2', 'suffix_3', 'prefix_1', 'prefix_2', 'prefix_3',
             *extractor.lexicon.get_column_names(),
             'has_valid_chars', 'kmeans_cluster_id', 'dbscan_cluster_id', 'gmm_cluster_id',
