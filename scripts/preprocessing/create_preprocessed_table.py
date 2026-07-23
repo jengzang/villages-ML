@@ -23,7 +23,7 @@ import sys
 project_root = Path(__file__).parent.parent.parent
 sys.path.insert(0, str(project_root))
 
-from src.schema import VillageTableSchema, get_schema
+from src.schema import REGION_LEVELS, VillageTableSchema, get_schema
 from src.preprocessing.text_cleaner import normalize_village_name
 from src.preprocessing.prefix_cleaner import batch_clean_prefixes
 from src.preprocessing.numbered_village_normalizer import (
@@ -218,7 +218,7 @@ def materialize_metadata_stats(
             village_count, sort_key, generated_at, data_version
         )
         SELECT
-            'city',
+            '{REGION_LEVELS[0]}',
             {S.city_col},
             {S.city_col},
             NULL,
@@ -239,7 +239,7 @@ def materialize_metadata_stats(
             village_count, sort_key, generated_at, data_version
         )
         SELECT
-            REGION_LEVELS[1],
+            '{REGION_LEVELS[1]}',
             {S.county_col},
             {S.city_col},
             {S.county_col},
@@ -260,7 +260,7 @@ def materialize_metadata_stats(
             village_count, sort_key, generated_at, data_version
         )
         SELECT
-            'township',
+            '{REGION_LEVELS[2]}',
             {S.township_col},
             {S.city_col},
             {S.county_col},
@@ -304,8 +304,8 @@ def materialize_metadata_stats(
             village_count, avg_name_length, generated_at, data_version
         )
         SELECT
-            'city|' || {S.city_col},
-            'city',
+            '{REGION_LEVELS[0]}|' || {S.city_col},
+            '{REGION_LEVELS[0]}',
             {S.city_col},
             {S.city_col},
             NULL,
@@ -325,8 +325,8 @@ def materialize_metadata_stats(
             village_count, avg_name_length, generated_at, data_version
         )
         SELECT
-            'county|' || {S.city_col} || '|' || {S.county_col},
-            REGION_LEVELS[1],
+            '{REGION_LEVELS[1]}|' || {S.city_col} || '|' || {S.county_col},
+            '{REGION_LEVELS[1]}',
             {S.county_col},
             {S.city_col},
             {S.county_col},
@@ -346,8 +346,8 @@ def materialize_metadata_stats(
             village_count, avg_name_length, generated_at, data_version
         )
         SELECT
-            'township|' || {S.city_col} || '|' || {S.county_col} || '|' || {S.township_col},
-            'township',
+            '{REGION_LEVELS[2]}|' || {S.city_col} || '|' || {S.county_col} || '|' || {S.township_col},
+            '{REGION_LEVELS[2]}',
             {S.township_col},
             {S.city_col},
             {S.county_col},
