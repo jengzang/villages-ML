@@ -165,15 +165,20 @@ def _extract_global_ngrams(db_path, schema_name, n_values, min_freq, batch_size)
 def _insert_global_ngrams(conn, n, all_ngrams, min_freq, batch_size):
     cursor = conn.cursor()
     rows = []
+    totals = {}
     for pos in _POSITIONS:
-        for ngram, count in all_ngrams.get(pos, {}).items():
+        pos_data = all_ngrams.get(pos, {})
+        total = sum(pos_data.values())
+        totals[pos] = total
+        for ngram, count in pos_data.items():
             if count >= min_freq:
-                rows.append((n, pos, ngram, count))
+                pct = round(count / total * 100, 4) if total > 0 else 0.0
+                rows.append((n, pos, ngram, count, total, pct))
     if rows:
         for i in range(0, len(rows), batch_size):
             batch = rows[i:i + batch_size]
             cursor.executemany(
-                "INSERT OR REPLACE INTO ngram_frequency (n, position, ngram, frequency) VALUES (?, ?, ?, ?)",
+                "INSERT OR REPLACE INTO ngram_frequency (n, position, ngram, frequency, total_count, percentage) VALUES (?, ?, ?, ?, ?, ?)",
                 batch,
             )
     conn.commit()
@@ -194,7 +199,6 @@ def _extract_regional_ngrams(db_path, schema_name, n_values, region_levels, posi
 def _insert_regional_ngrams(conn, n, level, regional, positions, min_freq, batch_size):
     cursor = conn.cursor()
     rows = []
-    level_cols = [REGION_LEVELS[0], REGION_LEVELS[1], REGION_LEVELS[2]]
     for key, pos_data in regional.items():
         city_val = key[0] if len(key) > 0 else None
         county_val = key[1] if len(key) > 1 else None
@@ -203,15 +207,18 @@ def _insert_regional_ngrams(conn, n, level, regional, positions, min_freq, batch
         for pos in _POSITIONS:
             if pos not in positions:
                 continue
-            for ngram, count in pos_data.get(pos, {}).items():
+            pos_ngrams = pos_data.get(pos, {})
+            total = sum(pos_ngrams.values())
+            for ngram, count in pos_ngrams.items():
                 if count >= min_freq:
-                    rows.append((n, level, city_val, county_val, township_val, region_name, pos, ngram, count))
+                    pct = round(count / total * 100, 4) if total > 0 else 0.0
+                    rows.append((n, level, city_val, county_val, township_val, region_name, pos, ngram, count, total, pct))
     if rows:
         for i in range(0, len(rows), batch_size):
             batch = rows[i:i + batch_size]
             cursor.executemany(
-                "INSERT OR REPLACE INTO regional_ngram_frequency (n, region_level, city, county, township, region_name, position, ngram, frequency) "
-                "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                "INSERT OR REPLACE INTO regional_ngram_frequency (n, region_level, city, county, township, region_name, position, ngram, frequency, total_count, percentage) "
+                "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
                 batch,
             )
     conn.commit()
@@ -318,8 +325,7 @@ def _calculate_significance(conn, db_path, region_levels, batch_size):
                     city_v, county_v, township_v, reg_name = hier
                     rows_to_insert.append((
                         n_v, level, city_v, county_v, township_v, reg_name, pos,
-                        ngram, reg_cnt, reg_tot, glob_cnt, glob_tot,
-                        sig['chi2'], sig['p_value'], sig['cramers_v'],
+                        ngram, sig['chi2'], sig['p_value'], sig['cramers_v'], 1,
                     ))
             if rows_to_insert:
                 for i in range(0, len(rows_to_insert), batch_size):
@@ -327,9 +333,8 @@ def _calculate_significance(conn, db_path, region_levels, batch_size):
                     cursor.executemany("""
                         INSERT OR REPLACE INTO ngram_significance
                         (n, region_level, city, county, township, region_name, position,
-                         ngram, regional_count, regional_total, global_count, global_total,
-                         chi2, p_value, cramers_v)
-                        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                         ngram, chi2, p_value, cramers_v, is_significant)
+                        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                     """, batch)
                 conn.commit()
             logger.info(f"    {level}: {len(rows_to_insert):,} significant (p<0.05)")
@@ -337,12 +342,22 @@ def _calculate_significance(conn, db_path, region_levels, batch_size):
 
 def _cleanup_insignificant(conn, n_values, thresholds):
     cursor = conn.cursor()
-    # Remove from ngram_significance where regional_count < threshold
+    # Remove from ngram_significance where regional_count < threshold (join through ngram_tendency)
     for n, thresh in thresholds.items():
         if thresh:
-            cursor.execute(
-                "DELETE FROM ngram_significance WHERE n = ? AND regional_count < ?", (n, thresh)
-            )
+            cursor.execute("""
+                DELETE FROM ngram_significance
+                WHERE rowid IN (
+                    SELECT s.rowid FROM ngram_significance s
+                    JOIN ngram_tendency t
+                      ON t.ngram = s.ngram AND t.n = s.n
+                     AND t.position = s.position AND t.region_level = s.region_level
+                     AND COALESCE(t.city, '') = COALESCE(s.city, '')
+                     AND COALESCE(t.county, '') = COALESCE(s.county, '')
+                     AND COALESCE(t.township, '') = COALESCE(s.township, '')
+                    WHERE t.n = ? AND t.regional_count < ?
+                )
+            """, (n, thresh))
     # Remove orphaned from ngram_tendency (not in significance)
     cursor.execute("""
         DELETE FROM ngram_tendency
@@ -383,8 +398,8 @@ def _detect_patterns(conn, n_values, min_freq):
         if patterns:
             for p in patterns:
                 cursor.execute(
-                    "INSERT OR REPLACE INTO structural_patterns (n, pattern, type, example, frequency) VALUES (?, ?, ?, ?, ?)",
-                    (n, p['pattern'], p['type'], p['example'], p['frequency']),
+                    "INSERT OR REPLACE INTO structural_patterns (n, pattern, pattern_type, position, example, frequency) VALUES (?, ?, ?, ?, ?, ?)",
+                    (n, p['pattern'], p['type'], p['type'], p['example'], p['frequency']),
                 )
             conn.commit()
         logger.info(f"    {n}-gram: {len(patterns)} patterns detected")
