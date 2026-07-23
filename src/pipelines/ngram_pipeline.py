@@ -30,13 +30,6 @@ logger = logging.getLogger(__name__)
 # helpers
 # ---------------------------------------------------------------------------
 
-_FREQ_TABLE_LEVEL_MAP = {
-    REGION_LEVELS[0]: '市级',
-    REGION_LEVELS[1]: '区县级',
-    REGION_LEVELS[2]: '乡镇级',
-}
-
-_LEVEL_COL = {REGION_LEVELS[0]: 'city', REGION_LEVELS[1]: 'county', REGION_LEVELS[2]: 'township'}
 _POSITIONS = ['prefix', 'suffix', 'middle']
 
 # ---------------------------------------------------------------------------

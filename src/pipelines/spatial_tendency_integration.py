@@ -115,13 +115,13 @@ def load_spatial_features(conn: sqlite3.Connection) -> pd.DataFrame:
     """
     logger.info("Loading spatial features from village_spatial_features")
 
-    query = """
+    query = f"""
         SELECT
             village_id,
             village_name,
             city,
             county,
-            town,
+            {REGION_LEVELS[2]},
             longitude,
             latitude,
             spatial_cluster_id,
@@ -158,7 +158,7 @@ def load_villages_with_chars(conn: sqlite3.Connection) -> pd.DataFrame:
             {S.village_name_col_prefix_removed} as village_name,
             {S.city_col} as city,
             {S.county_col} as county,
-            {S.township_col} as town
+            {S.township_col} as {REGION_LEVELS[2]}
         FROM {S.preprocessed_table}
         WHERE {S.char_count_col} > 0
     """

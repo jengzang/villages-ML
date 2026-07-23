@@ -306,9 +306,9 @@ def run_spatial_features_pipeline(
         features = pd.DataFrame()
         features['village_id'] = df['village_id'].values
         features['village_name'] = df['village_name'].values
-        features[REGION_LEVELS[0]] = df['city'].values
-        features[REGION_LEVELS[1]] = df['county'].values
-        features[REGION_LEVELS[2]] = df['town'].values
+        features[REGION_LEVELS[0]] = df[REGION_LEVELS[0]].values
+        features[REGION_LEVELS[1]] = df[REGION_LEVELS[1]].values
+        features[REGION_LEVELS[2]] = df[REGION_LEVELS[2]].values
         features['longitude'] = df['longitude'].values
         features['latitude'] = df['latitude'].values
         features['nn_distance_1'] = distances_km[:, 1]

@@ -56,7 +56,7 @@ class CoordinateLoader:
                 - village_name: str
                 - city: str
                 - county: str
-                - town: str
+                - township: str
                 - longitude: float
                 - latitude: float
         """
@@ -68,7 +68,7 @@ class CoordinateLoader:
             {S.village_id_col},
             {S.city_col} as city,
             {S.county_col} as county,
-            {S.township_col} as town,
+            {S.township_col} as {REGION_LEVELS[2]},
             {S.committee_col_preprocessed} as village_committee,
             {S.village_name_col_prefix_removed} as village_name,
             {S.longitude_col},
