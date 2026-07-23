@@ -316,7 +316,7 @@ def integrate_spatial_tendency(
             'character_category': char_category,
             'cluster_id': int(cluster_id),
             'cluster_size': cluster_total,
-            'n_villages_with_char': n_char,
+            'village_count_with_char': n_char,
             'cluster_tendency_mean': tendency_mean,
             'cluster_tendency_std': None,
             'global_tendency_mean': global_tendency,
