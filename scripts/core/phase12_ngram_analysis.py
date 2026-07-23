@@ -63,7 +63,8 @@ def main():
     args = parser.parse_args()
 
     n_values = tuple(_parse_int_csv(args.n_values))
-    region_levels = _parse_str_csv(args.region_levels)
+    raw_levels = _parse_str_csv(args.region_levels)
+    region_levels = [REGION_LEVELS[int(s)] if s.isdigit() else s for s in raw_levels]
     positions = tuple(_parse_str_csv(args.positions))
     min_regional_freq = _parse_thresholds(args.min_regional_count_by_n) or {2: 3, 3: 2}
     min_tendency_support = _parse_thresholds(args.min_tendency_support_by_n) or {2: 5, 3: 3}

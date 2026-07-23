@@ -17,11 +17,11 @@ logger = logging.getLogger(__name__)
 
 _POSITIONS = ['prefix', 'suffix', 'middle']
 
-LEVEL_NAME_MAP = {
-    REGION_LEVELS[0]: '市级',
-    REGION_LEVELS[1]: '区县级',
-    REGION_LEVELS[2]: '乡镇级',
-}
+# Shorthand aliases — these ARE the ngram table column names which match REGION_LEVELS values.
+_L0 = REGION_LEVELS[0]
+_L1 = REGION_LEVELS[1]
+_L2 = REGION_LEVELS[2]
+_L3 = REGION_LEVELS[3]
 
 
 def _filter_positions(position_data, positions):
@@ -81,44 +81,34 @@ def run_ngram_pipeline(
 
     start_time = time.time()
 
-    # Step 1
     logger.info("Step 1: Creating n-gram tables...")
     create_ngram_tables(db_path, exclude_tables=exclude_tables)
     logger.info("  Tables created")
 
-    # Step 2
     logger.info("Step 2: Extracting global n-grams...")
     _step2_extract_global_ngrams(db_path, n_values_list, positions_list, schema)
 
-    # Step 3
     logger.info("Step 3: Extracting regional n-grams...")
     _step3_extract_regional_ngrams(db_path, n_values_list, region_levels, positions_list, schema)
 
-    # Step 3.5
     logger.info("Step 3.5: Capturing raw regional totals...")
     _step3_5_calculate_regional_totals_raw(db_path)
 
-    # Step 4
     logger.info("Step 4: Calculating tendency...")
     _step4_calculate_tendency(db_path, region_levels)
 
-    # Step 5
     logger.info("Step 5: Calculating significance...")
     _step5_calculate_significance(db_path, region_levels)
 
-    # Step 6
     logger.info("Step 6: Cleaning up non-significant data...")
     _step6_cleanup_insignificant_data(db_path, min_regional_freq, min_tendency_support)
 
-    # Step 7
     logger.info("Step 7: Detecting structural patterns...")
     _step7_detect_patterns(db_path, n_values_list)
 
-    # Step 8
     logger.info("Step 8: Creating indexes and centroids...")
     _step8_create_optimization_indexes(db_path, schema)
 
-    # Step 9
     if not skip_village_ngrams:
         logger.info("Step 9: Populating village n-grams...")
         _step9_populate_village_ngrams(db_path, schema)
@@ -134,7 +124,7 @@ def run_ngram_pipeline(
 
 
 # ---------------------------------------------------------------------------
-# step implementations — copied from the original working phase12_ngram_analysis.py
+# step implementations
 # ---------------------------------------------------------------------------
 
 
@@ -176,22 +166,21 @@ def _step3_extract_regional_ngrams(db_path, n_values, regional_levels, positions
 
     with NgramExtractor(db_path, schema=schema) as extractor:
         for level_en in regional_levels:
-            level = LEVEL_NAME_MAP[level_en]
-            logger.info(f"  Extracting for {level}...")
+            logger.info(f"  Extracting for {level_en}...")
             for n in n_values:
                 ngram_data = extractor.extract_regional_ngrams(n=n, level=level_en)
                 for hierarchical_key, position_data in ngram_data.items():
-                    city, county, township = hierarchical_key
-                    region_name = {REGION_LEVELS[0]: city, REGION_LEVELS[1]: county, REGION_LEVELS[2]: township}[level_en]
+                    level_idx = REGION_LEVELS.index(level_en)
+                    region_name = hierarchical_key[min(level_idx, len(hierarchical_key) - 1)]
                     for position, counter in _filter_positions(position_data, positions + ['all']).items():
                         total = sum(counter.values())
                         for ngram, freq in counter.items():
                             percentage = (freq / total * 100) if total > 0 else 0
                             cursor.execute(
-                                "INSERT OR REPLACE INTO regional_ngram_frequency "
-                                "(region_level, city, county, township, region_name, ngram, n, position, frequency, total_count, percentage) "
-                                "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
-                                (level_en, city, county, township, region_name, ngram, n, position, freq, total, percentage),
+                                f"INSERT OR REPLACE INTO regional_ngram_frequency "
+                                f"(region_level, {_L0}, {_L1}, {_L2}, region_name, ngram, n, position, frequency, total_count, percentage) "
+                                f"VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                                (level_en, *hierarchical_key, region_name, ngram, n, position, freq, total, percentage),
                             )
 
         conn.commit()
@@ -204,24 +193,24 @@ def _step3_5_calculate_regional_totals_raw(db_path):
     conn = sqlite3.connect(db_path, timeout=60.0)
     cursor = conn.cursor()
 
-    cursor.execute("""
+    cursor.execute(f"""
         CREATE TABLE IF NOT EXISTS temp_regional_totals_raw (
             region_level TEXT NOT NULL,
-            city TEXT,
-            county TEXT,
-            township TEXT,
+            {_L0} TEXT,
+            {_L1} TEXT,
+            {_L2} TEXT,
             n INTEGER NOT NULL,
             position TEXT NOT NULL,
             total_raw INTEGER NOT NULL,
-            PRIMARY KEY (region_level, city, county, township, n, position)
+            PRIMARY KEY (region_level, {_L0}, {_L1}, {_L2}, n, position)
         )
     """)
     cursor.execute("DELETE FROM temp_regional_totals_raw")
-    cursor.execute("""
+    cursor.execute(f"""
         INSERT INTO temp_regional_totals_raw
-        SELECT region_level, city, county, township, n, position, COUNT(*) as total_raw
+        SELECT region_level, {_L0}, {_L1}, {_L2}, n, position, COUNT(*) as total_raw
         FROM regional_ngram_frequency
-        GROUP BY region_level, city, county, township, n, position
+        GROUP BY region_level, {_L0}, {_L1}, {_L2}, n, position
     """)
     logger.info(f"  Raw totals: {cursor.rowcount:,} region-position combinations")
 
@@ -238,9 +227,9 @@ def _step4_calculate_tendency(db_path, regional_levels):
 
     for level_en in regional_levels:
         logger.info(f"  Processing level: {level_en}")
-        cursor.execute("""
+        cursor.execute(f"""
             SELECT
-                r.region_level, r.city, r.county, r.township, r.region_name, r.ngram, r.n, r.position,
+                r.region_level, r.{_L0}, r.{_L1}, r.{_L2}, r.region_name, r.ngram, r.n, r.position,
                 r.frequency as regional_count,
                 r.total_count as regional_total,
                 COALESCE(t.total_raw, r.total_count) as regional_total_raw,
@@ -249,9 +238,9 @@ def _step4_calculate_tendency(db_path, regional_levels):
             FROM regional_ngram_frequency r
             LEFT JOIN temp_regional_totals_raw t
                 ON r.region_level = t.region_level
-                AND r.city IS t.city
-                AND r.county IS t.county
-                AND r.township IS t.township
+                AND r.{_L0} IS t.{_L0}
+                AND r.{_L1} IS t.{_L1}
+                AND r.{_L2} IS t.{_L2}
                 AND r.n = t.n
                 AND r.position = t.position
             LEFT JOIN ngram_frequency g
@@ -265,12 +254,13 @@ def _step4_calculate_tendency(db_path, regional_levels):
         batch = []
         batch_size = 1000
 
-        for idx, (level_db, city, county, township, region_name, ngram, n, position,
-                  regional_count, regional_total, regional_total_raw,
-                  global_count, global_total) in enumerate(rows, 1):
-
+        for idx, row in enumerate(rows, 1):
             if idx % 10000 == 0:
                 logger.info(f"    Progress: {idx:,}/{len(rows):,}")
+
+            (level_db, v0, v1, v2, region_name, ngram, n, position,
+             regional_count, regional_total, regional_total_raw,
+             global_count, global_total) = row
 
             if global_count is None or global_total is None:
                 continue
@@ -281,17 +271,17 @@ def _step4_calculate_tendency(db_path, regional_levels):
             )
 
             batch.append((
-                level_en, city, county, township, region_name, ngram, n, position,
+                level_en, v0, v1, v2, region_name, ngram, n, position,
                 tendency['lift'], tendency['log_odds'], tendency['z_score'],
                 regional_count, regional_total, regional_total_raw, global_count, global_total
             ))
 
             if len(batch) >= batch_size:
                 cursor.executemany(
-                    "INSERT OR REPLACE INTO ngram_tendency "
-                    "(region_level, city, county, township, region_name, ngram, n, position, lift, log_odds, z_score, "
-                    " regional_count, regional_total, regional_total_raw, global_count, global_total) "
-                    "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                    f"INSERT OR REPLACE INTO ngram_tendency "
+                    f"(region_level, {_L0}, {_L1}, {_L2}, region_name, ngram, n, position, lift, log_odds, z_score, "
+                    f" regional_count, regional_total, regional_total_raw, global_count, global_total) "
+                    f"VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
                     batch,
                 )
                 conn.commit()
@@ -299,10 +289,10 @@ def _step4_calculate_tendency(db_path, regional_levels):
 
         if batch:
             cursor.executemany(
-                "INSERT OR REPLACE INTO ngram_tendency "
-                "(region_level, city, county, township, region_name, ngram, n, position, lift, log_odds, z_score, "
-                " regional_count, regional_total, regional_total_raw, global_count, global_total) "
-                "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                f"INSERT OR REPLACE INTO ngram_tendency "
+                f"(region_level, {_L0}, {_L1}, {_L2}, region_name, ngram, n, position, lift, log_odds, z_score, "
+                f" regional_count, regional_total, regional_total_raw, global_count, global_total) "
+                f"VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
                 batch,
             )
             conn.commit()
@@ -326,8 +316,8 @@ def _step5_calculate_significance(db_path, regional_levels, alpha=0.05):
     for level_en in regional_levels:
         logger.info(f"  Processing level: {level_en}")
 
-        cursor.execute("""
-            SELECT region_level, city, county, township, region_name, ngram, n, position,
+        cursor.execute(f"""
+            SELECT region_level, {_L0}, {_L1}, {_L2}, region_name, ngram, n, position,
                    regional_count, regional_total, global_count, global_total
             FROM ngram_tendency
             WHERE region_level = ?
@@ -340,7 +330,8 @@ def _step5_calculate_significance(db_path, regional_levels, alpha=0.05):
             if idx % 1000 == 0:
                 logger.info(f"    Progress: {idx}/{len(rows)} ({significant_count} significant)")
 
-            level_db, city, county, township, region_name, ngram, n, position, regional_count, regional_total, global_count, global_total = row
+            (level_db, v0, v1, v2, region_name, ngram, n, position,
+             regional_count, regional_total, global_count, global_total) = row
 
             sig = analyzer.calculate_significance(
                 regional_count, regional_total,
@@ -348,20 +339,20 @@ def _step5_calculate_significance(db_path, regional_levels, alpha=0.05):
             )
 
             if sig['p_value'] < alpha:
-                cursor.execute("""
+                cursor.execute(f"""
                     SELECT total_raw
                     FROM temp_regional_totals_raw
-                    WHERE region_level = ? AND city IS ? AND county IS ? AND township IS ?
+                    WHERE region_level = ? AND {_L0} IS ? AND {_L1} IS ? AND {_L2} IS ?
                       AND n = ? AND position = ?
-                """, (level_db, city, county, township, n, position))
+                """, (level_db, v0, v1, v2, n, position))
                 raw_result = cursor.fetchone()
                 total_before_filter = raw_result[0] if raw_result else regional_total
 
                 cursor.execute(
-                    "INSERT OR REPLACE INTO ngram_significance "
-                    "(region_level, city, county, township, region_name, ngram, n, position, chi2, p_value, cramers_v, is_significant, total_before_filter) "
-                    "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
-                    (level_db, city, county, township, region_name, ngram, n, position,
+                    f"INSERT OR REPLACE INTO ngram_significance "
+                    f"(region_level, {_L0}, {_L1}, {_L2}, region_name, ngram, n, position, chi2, p_value, cramers_v, is_significant, total_before_filter) "
+                    f"VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                    (level_db, v0, v1, v2, region_name, ngram, n, position,
                      sig['chi2'], sig['p_value'], sig['cramers_v'], 1, total_before_filter),
                 )
                 significant_count += 1
@@ -408,9 +399,9 @@ def _step6_cleanup_insignificant_data(db_path, min_regional_count_by_n=None, min
             WHERE NOT EXISTS (
                 SELECT 1 FROM ngram_tendency nt
                 WHERE nt.region_level = ngram_significance.region_level
-                AND nt.city IS ngram_significance.city
-                AND nt.county IS ngram_significance.county
-                AND nt.township IS ngram_significance.township
+                AND nt.{_L0} IS ngram_significance.{_L0}
+                AND nt.{_L1} IS ngram_significance.{_L1}
+                AND nt.{_L2} IS ngram_significance.{_L2}
                 AND nt.ngram = ngram_significance.ngram
                 AND nt.n = ngram_significance.n
                 AND nt.position = ngram_significance.position
@@ -420,103 +411,55 @@ def _step6_cleanup_insignificant_data(db_path, min_regional_count_by_n=None, min
         """, regional_params + global_params)
         logger.info(f"  Deleted {cursor.rowcount:,} low-support significance rows")
 
-    # Delete from ngram_tendency — per-level to handle NULLs
+    # Delete from ngram_tendency — iterate over ALL region levels in the data
     tendency_deleted = 0
-
-    cursor.execute(f"""
-        DELETE FROM ngram_tendency
-        WHERE region_level = {REGION_LEVELS[0]}
-        AND NOT EXISTS (
-            SELECT 1 FROM ngram_significance
-            WHERE ngram_significance.ngram = ngram_tendency.ngram
-            AND ngram_significance.region_level = ngram_tendency.region_level
-            AND ngram_significance.city = ngram_tendency.city
-            AND ngram_significance.n = ngram_tendency.n
-            AND ngram_significance.position = ngram_tendency.position
+    cursor.execute("SELECT DISTINCT region_level FROM ngram_tendency")
+    levels_in_data = [row[0] for row in cursor.fetchall()]
+    for level in levels_in_data:
+        idx = REGION_LEVELS.index(level)
+        match_cols = [_L0, _L1, _L2][:min(idx, 2) + 1]
+        conditions = " AND ".join(
+            f"ngram_significance.{c} = ngram_tendency.{c}" for c in match_cols
         )
-    """)
-    tendency_deleted += cursor.rowcount
-
-    cursor.execute(f"""
-        DELETE FROM ngram_tendency
-        WHERE region_level = {REGION_LEVELS[1]}
-        AND NOT EXISTS (
-            SELECT 1 FROM ngram_significance
-            WHERE ngram_significance.ngram = ngram_tendency.ngram
-            AND ngram_significance.region_level = ngram_tendency.region_level
-            AND ngram_significance.city = ngram_tendency.city
-            AND ngram_significance.county = ngram_tendency.county
-            AND ngram_significance.n = ngram_tendency.n
-            AND ngram_significance.position = ngram_tendency.position
-        )
-    """)
-    tendency_deleted += cursor.rowcount
-
-    cursor.execute(f"""
-        DELETE FROM ngram_tendency
-        WHERE region_level = {REGION_LEVELS[2]}
-        AND NOT EXISTS (
-            SELECT 1 FROM ngram_significance
-            WHERE ngram_significance.ngram = ngram_tendency.ngram
-            AND ngram_significance.region_level = ngram_tendency.region_level
-            AND ngram_significance.city = ngram_tendency.city
-            AND ngram_significance.county = ngram_tendency.county
-            AND ngram_significance.township = ngram_tendency.township
-            AND ngram_significance.n = ngram_tendency.n
-            AND ngram_significance.position = ngram_tendency.position
-        )
-    """)
-    tendency_deleted += cursor.rowcount
+        cursor.execute(f"""
+            DELETE FROM ngram_tendency
+            WHERE region_level = ?
+            AND NOT EXISTS (
+                SELECT 1 FROM ngram_significance
+                WHERE ngram_significance.ngram = ngram_tendency.ngram
+                AND ngram_significance.region_level = ngram_tendency.region_level
+                AND {conditions}
+                AND ngram_significance.n = ngram_tendency.n
+                AND ngram_significance.position = ngram_tendency.position
+            )
+        """, (level,))
+        tendency_deleted += cursor.rowcount
 
     logger.info(f"  Deleted {tendency_deleted:,} tendency rows")
 
-    # Delete from regional_ngram_frequency — per-level to handle NULLs
+    # Delete from regional_ngram_frequency — same pattern
     frequency_deleted = 0
-
-    cursor.execute(f"""
-        DELETE FROM regional_ngram_frequency
-        WHERE region_level = {REGION_LEVELS[0]}
-        AND NOT EXISTS (
-            SELECT 1 FROM ngram_significance
-            WHERE ngram_significance.ngram = regional_ngram_frequency.ngram
-            AND ngram_significance.region_level = regional_ngram_frequency.region_level
-            AND ngram_significance.city = regional_ngram_frequency.city
-            AND ngram_significance.n = regional_ngram_frequency.n
-            AND ngram_significance.position = regional_ngram_frequency.position
+    cursor.execute("SELECT DISTINCT region_level FROM regional_ngram_frequency")
+    levels_in_freq = [row[0] for row in cursor.fetchall()]
+    for level in levels_in_freq:
+        idx = REGION_LEVELS.index(level)
+        match_cols = [_L0, _L1, _L2][:min(idx, 2) + 1]
+        conditions = " AND ".join(
+            f"ngram_significance.{c} = regional_ngram_frequency.{c}" for c in match_cols
         )
-    """)
-    frequency_deleted += cursor.rowcount
-
-    cursor.execute(f"""
-        DELETE FROM regional_ngram_frequency
-        WHERE region_level = {REGION_LEVELS[1]}
-        AND NOT EXISTS (
-            SELECT 1 FROM ngram_significance
-            WHERE ngram_significance.ngram = regional_ngram_frequency.ngram
-            AND ngram_significance.region_level = regional_ngram_frequency.region_level
-            AND ngram_significance.city = regional_ngram_frequency.city
-            AND ngram_significance.county = regional_ngram_frequency.county
-            AND ngram_significance.n = regional_ngram_frequency.n
-            AND ngram_significance.position = regional_ngram_frequency.position
-        )
-    """)
-    frequency_deleted += cursor.rowcount
-
-    cursor.execute(f"""
-        DELETE FROM regional_ngram_frequency
-        WHERE region_level = {REGION_LEVELS[2]}
-        AND NOT EXISTS (
-            SELECT 1 FROM ngram_significance
-            WHERE ngram_significance.ngram = regional_ngram_frequency.ngram
-            AND ngram_significance.region_level = regional_ngram_frequency.region_level
-            AND ngram_significance.city = regional_ngram_frequency.city
-            AND ngram_significance.county = regional_ngram_frequency.county
-            AND ngram_significance.township = regional_ngram_frequency.township
-            AND ngram_significance.n = regional_ngram_frequency.n
-            AND ngram_significance.position = regional_ngram_frequency.position
-        )
-    """)
-    frequency_deleted += cursor.rowcount
+        cursor.execute(f"""
+            DELETE FROM regional_ngram_frequency
+            WHERE region_level = ?
+            AND NOT EXISTS (
+                SELECT 1 FROM ngram_significance
+                WHERE ngram_significance.ngram = regional_ngram_frequency.ngram
+                AND ngram_significance.region_level = regional_ngram_frequency.region_level
+                AND {conditions}
+                AND ngram_significance.n = regional_ngram_frequency.n
+                AND ngram_significance.position = regional_ngram_frequency.position
+            )
+        """, (level,))
+        frequency_deleted += cursor.rowcount
 
     logger.info(f"  Deleted {frequency_deleted:,} regional frequency rows")
 
@@ -572,10 +515,9 @@ def _step8_create_optimization_indexes(db_path, schema):
     cursor = conn.cursor()
     S = schema
 
-    # Indexes on preprocessed table
-    for idx_name, col in [('idx_village_township', S.township_col),
-                           ('idx_village_county', S.county_col),
-                           ('idx_village_city', S.city_col)]:
+    for idx_name, col in [(f'idx_village_{REGION_LEVELS[2]}', S.township_col),
+                           (f'idx_village_{REGION_LEVELS[1]}', S.county_col),
+                           (f'idx_village_{REGION_LEVELS[0]}', S.city_col)]:
         try:
             cursor.execute(f'CREATE INDEX IF NOT EXISTS {idx_name} ON {S.preprocessed_table} ({col})')
         except Exception:
@@ -584,17 +526,17 @@ def _step8_create_optimization_indexes(db_path, schema):
     # Regional centroids
     cursor.execute('PRAGMA table_info(regional_centroids)')
     existing_cols = {row[1] for row in cursor.fetchall()}
-    required_cols = {'region_level', REGION_LEVELS[0], REGION_LEVELS[1], REGION_LEVELS[2], 'region_name',
+    required_cols = {'region_level', _L0, _L1, _L2, 'region_name',
                      'centroid_lon', 'centroid_lat', 'village_count'}
     if existing_cols and not required_cols.issubset(existing_cols):
         cursor.execute('DROP TABLE regional_centroids')
 
-    cursor.execute('''
+    cursor.execute(f'''
     CREATE TABLE IF NOT EXISTS regional_centroids (
         region_level TEXT NOT NULL,
-        city TEXT,
-        county TEXT,
-        township TEXT,
+        {_L0} TEXT,
+        {_L1} TEXT,
+        {_L2} TEXT,
         region_name TEXT NOT NULL,
         centroid_lon REAL NOT NULL,
         centroid_lat REAL NOT NULL,
@@ -608,12 +550,12 @@ def _step8_create_optimization_indexes(db_path, schema):
 
     cursor.execute('DELETE FROM regional_centroids')
     cursor.execute(f'''
-    INSERT OR REPLACE INTO regional_centroids (region_level, city, county, township, region_name, centroid_lon, centroid_lat, village_count)
+    INSERT OR REPLACE INTO regional_centroids (region_level, {_L0}, {_L1}, {_L2}, region_name, centroid_lon, centroid_lat, village_count)
     SELECT
-        '{REGION_LEVELS[2]}' as region_level,
-        {S.city_col} as city,
-        {S.county_col} as county,
-        {S.township_col} as township,
+        '{_L2}' as region_level,
+        {S.city_col} as {_L0},
+        {S.county_col} as {_L1},
+        {S.township_col} as {_L2},
         {S.township_col} as region_name,
         AVG(CAST({S.longitude_col} AS REAL)) as centroid_lon,
         AVG(CAST({S.latitude_col} AS REAL)) as centroid_lat,
@@ -625,10 +567,10 @@ def _step8_create_optimization_indexes(db_path, schema):
     UNION ALL
 
     SELECT
-        '{REGION_LEVELS[1]}' as region_level,
-        {S.city_col} as city,
-        {S.county_col} as county,
-        NULL as township,
+        '{_L1}' as region_level,
+        {S.city_col} as {_L0},
+        {S.county_col} as {_L1},
+        NULL as {_L2},
         {S.county_col} as region_name,
         AVG(CAST({S.longitude_col} AS REAL)) as centroid_lon,
         AVG(CAST({S.latitude_col} AS REAL)) as centroid_lat,
@@ -640,10 +582,10 @@ def _step8_create_optimization_indexes(db_path, schema):
     UNION ALL
 
     SELECT
-        '{REGION_LEVELS[0]}' as region_level,
-        {S.city_col} as city,
-        NULL as county,
-        NULL as township,
+        '{_L0}' as region_level,
+        {S.city_col} as {_L0},
+        NULL as {_L1},
+        NULL as {_L2},
         {S.city_col} as region_name,
         AVG(CAST({S.longitude_col} AS REAL)) as centroid_lon,
         AVG(CAST({S.latitude_col} AS REAL)) as centroid_lat,
@@ -657,7 +599,6 @@ def _step8_create_optimization_indexes(db_path, schema):
     for level, count in cursor.fetchall():
         logger.info(f"    {level}: {count} regions")
 
-    # N-gram query indexes
     ngram_indexes = [
         ('idx_ngram_freq_n_position_frequency', 'ngram_frequency', 'n, position, frequency DESC'),
         ('idx_regional_ngram_level_n_region_freq', 'regional_ngram_frequency', 'region_level, n, region_name, frequency DESC'),
